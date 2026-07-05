@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>day colours · v0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#12141c">
+</head>
+<body>
+
+<header>
+  <h1>day colours<span class="dot">.</span></h1>
+  <div class="status" id="status">loading…</div>
+</header>
+
+<div class="card">
+  <div class="windows">
+    <div>
+      <div class="card-title"><h2>last 30 days</h2>
+        <span class="logged" id="log30"></span></div>
+      <div class="dist" id="dist30"></div>
+      <div class="legend" id="leg30"></div>
+    </div>
+    <div>
+      <div class="card-title"><h2>last 360 days</h2>
+        <span class="logged" id="log360"></span></div>
+      <div class="dist" id="dist360"></div>
+      <div class="legend" id="leg360"></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title"><h2>last 30 days</h2>
+    <span class="logged">tap a day to set or change it</span></div>
+  <div class="wk-head">
+    <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div>
+    <div>Thu</div><div>Fri</div><div>Sat</div></div>
+  <div id="cal"></div>
+</div>
+
+<div class="card">
+  <div class="card-title"><h2>last 360 days</h2></div>
+  <div id="ribbon"></div>
+  <div class="ribbon-scale"><span>today</span><span id="ribStart"></span></div>
+</div>
+
+<div class="card">
+  <div class="card-title"><h2>your data</h2></div>
+  <div class="data-row">
+    <button class="btn" id="exportBtn">Export JSON</button>
+    <button class="btn" id="importBtn">Import JSON</button>
+    <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+  </div>
+  <div class="hint" id="dataHint"></div>
+</div>
+
+<div class="card">
+  <button class="legend-toggle" id="legendToggle" aria-expanded="false">
+    <h2>legend</h2>
+    <span class="chev">▾</span>
+  </button>
+  <div class="legend-full" id="legendFull" hidden></div>
+</div>
+
+<div class="yesterday-bar">
+  <div class="lbl"><h3>how was yesterday?</h3>
+    <span class="dat" id="yesterdayDate"></span>
+  </div>
+  <div class="rate-opts" id="yesterdayOpts"></div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <div class="sh-head">
+      <h3 id="sheetDate">day</h3>
+      <button class="opt away-btn" data-r="purple" id="awayBtn"><span class="ol">away</span></button>
+      <button class="x" id="sheetClose" aria-label="close">✕</button>
+    </div>
+    <div class="rate-opts" id="sheetOpts"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
