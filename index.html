@@ -4,8 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>AutoReList</title>
-<link rel="stylesheet" href="styles.css">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="stylesheet" href="style-minim.css">
+<link rel="stylesheet" href="swipe-nav.css">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#4a6f8a">
 <script>
@@ -59,7 +60,8 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="script.js"></script>
+<script src="autorelists.js"></script>
+<script src="swipe-nav.js" data-direction="up" data-neighbor="colourcaln.html" data-label="swipe up again for Colourcaln"></script>
 <script>
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js");
