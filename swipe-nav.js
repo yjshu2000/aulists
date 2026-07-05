@@ -15,6 +15,7 @@
 
   var state = 'rest';
   var startY = null;
+  var revealedAtTouchStart = false;
 
   function scrollTop() {
     return document.scrollingElement.scrollTop;
@@ -44,6 +45,7 @@
   document.addEventListener('touchstart', function (e) {
     if (e.touches.length !== 1) return;
     startY = e.touches[0].clientY;
+    revealedAtTouchStart = state === 'revealed';
     if (state === 'rest' && !atBoundary()) startY = null;
   }, { passive: true });
 
@@ -60,13 +62,15 @@
 
     e.preventDefault();
 
-    if (state === 'rest') {
-      setOffset(Math.min(dist, REVEAL_PX));
-      if (dist >= REVEAL_PX) state = 'revealed';
-    } else if (state === 'revealed') {
+    if (revealedAtTouchStart) {
+      // this drag started already-revealed, so it's the second, separate swipe that commits
       if (dist >= COMMIT_PX) {
         location.href = neighbor;
       }
+    } else {
+      // this drag is the first swipe: it can only reveal, never commit, no matter how far or how long it holds
+      setOffset(Math.min(dist, REVEAL_PX));
+      if (dist >= REVEAL_PX) state = 'revealed';
     }
   }, { passive: false });
 
