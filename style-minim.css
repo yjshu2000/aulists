@@ -308,6 +308,14 @@ button.primary { background: var(--accent); color: var(--accent-ink); border-col
   border-color: var(--accent); font-weight: 600;
 }
 
+.app-links {
+  display: flex; justify-content: center;
+  padding: 24px 0 16px;
+}
+.app-links a {
+  font-size: 0.82rem; color: var(--ink-soft); text-decoration: underline;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, .chev { transition: none !important; }
   button:active { transform: none; }

@@ -1,0 +1,35 @@
+.back-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: "Inter", sans-serif; font-size: 13px; font-weight: 600;
+  color: var(--text); text-decoration: none;
+  background: var(--panel-2); border: 1px solid var(--line);
+  padding: 10px 16px; border-radius: 10px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.about-card h2 {
+  font-size: 20px; font-weight: 800; margin-bottom: 10px;
+}
+
+.about-card p {
+  color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0;
+}
+
+.changelog-entry {
+  margin-top: 16px;
+}
+.changelog-entry:first-of-type {
+  margin-top: 0;
+}
+.changelog-entry h3 {
+  font-size: 15px; font-weight: 700; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+}
+.changelog-date {
+  font-family: "Inter", sans-serif; font-weight: 500; font-size: 12px; color: var(--faint);
+}
+.changelog-entry ul {
+  margin: 8px 0 0; padding-left: 18px; color: var(--muted); font-size: 13.5px; line-height: 1.6;
+}
+.changelog-entry li + li {
+  margin-top: 4px;
+}
