@@ -13,6 +13,10 @@
   var editingNote = null;
   var randomizer = { active: false, target: null, winnerId: null, highlightId: null, done: false };
   var randomizerGen = 0;
+  var todayCardOffset = 0; // 0 = today; negative = carousel test steps into the past
+  var carouselAnimating = false;
+  var CAROUSEL_PEEK = 20; // must match .today-nav width / left/right in style-minim.css
+  var CAROUSEL_GAP = 8;   // must match .today-carousel-track gap in style-minim.css
 
   function freshState() {
     return {
@@ -263,30 +267,72 @@
   var appEl = document.getElementById("app");
 
   function render() {
+    closeAllMenus();
     appEl.innerHTML = "";
 
-    // Today card: ONE visible list ("List 1"), one header, two zones split by a
-    // thin divider. Above the divider = backend "0", below = backend "1".
-    var today = document.createElement("section");
-    today.className = "card today-card list fixed";
-    today.appendChild(buildHead("today", "List 1", { fixed: true, countKeys: ["0", "1"], selectToKeep: true, randomizerTarget: "today" }));
+    // Today carousel: a 3-slide track (prev/current/next) always centered on
+    // the current slide, so neighbour cards peek in at the edges.
+    var todayWrap = document.createElement("div");
+    todayWrap.className = "today-carousel";
 
-    var zoneTop = document.createElement("ul");
-    zoneTop.className = "items";
-    fillZone(zoneTop, "0", true);
-    today.appendChild(zoneTop);
+    var prevBtn = document.createElement("button");
+    prevBtn.className = "today-nav today-nav-prev";
+    prevBtn.textContent = "<";
+    prevBtn.setAttribute("aria-label", "Previous day");
+    prevBtn.addEventListener("click", function () {
+      if (carouselAnimating) return;
+      animateCarousel(-1);
+    });
+    todayWrap.appendChild(prevBtn);
 
-    var div = document.createElement("div");
-    div.className = "divider";
-    today.appendChild(div);
+    var viewport = document.createElement("div");
+    viewport.className = "today-carousel-viewport";
 
-    var zoneBot = document.createElement("ul");
-    zoneBot.className = "items";
-    fillZone(zoneBot, "1", true);
-    today.appendChild(zoneBot);
+    var track = document.createElement("div");
+    track.className = "today-carousel-track";
 
-    if (!selectToKeep.active && !(randomizer.active && randomizer.target === "today")) today.appendChild(buildAdder("1"));
-    appEl.appendChild(today);
+    var prevSlide = buildCardForOffset(todayCardOffset - 1);
+    prevSlide.classList.add("carousel-slide");
+    track.appendChild(prevSlide);
+
+    var currentSlide = buildCardForOffset(todayCardOffset);
+    currentSlide.classList.add("carousel-slide");
+    track.appendChild(currentSlide);
+
+    var nextSlide;
+    if (todayCardOffset < 0) {
+      nextSlide = buildCardForOffset(todayCardOffset + 1);
+      nextSlide.classList.add("carousel-slide");
+    } else {
+      nextSlide = document.createElement("div");
+      nextSlide.className = "carousel-slide spacer";
+    }
+    track.appendChild(nextSlide);
+
+    viewport.appendChild(track);
+    todayWrap.appendChild(viewport);
+
+    var nextBtn = document.createElement("button");
+    nextBtn.className = "today-nav today-nav-next";
+    nextBtn.textContent = ">";
+    nextBtn.setAttribute("aria-label", "Next day");
+    nextBtn.disabled = todayCardOffset === 0;
+    nextBtn.addEventListener("click", function () {
+      if (carouselAnimating || todayCardOffset === 0) return;
+      animateCarousel(1);
+    });
+    todayWrap.appendChild(nextBtn);
+
+    appEl.appendChild(todayWrap);
+    track.style.transform = "translateX(" + (CAROUSEL_PEEK - carouselStepPx(viewport)) + "px)";
+
+    var currentHeight = currentSlide.getBoundingClientRect().height;
+    prevSlide.style.maxHeight = currentHeight + "px";
+    prevSlide.style.overflow = "hidden";
+    if (todayCardOffset < 0) {
+      nextSlide.style.maxHeight = currentHeight + "px";
+      nextSlide.style.overflow = "hidden";
+    }
 
     // List 2 (own card, fixed)
     appEl.appendChild(renderCard("2", "List 2", { fixed: true, randomizerTarget: "2" }));
@@ -327,6 +373,71 @@
     updateNextNote();
   }
 
+  // translate() percentages resolve against the track's own width, not the
+  // viewport, so the per-slide step has to be computed from a real measurement.
+  function carouselStepPx(viewportEl) {
+    var cw = viewportEl.getBoundingClientRect().width;
+    return (cw - 2 * CAROUSEL_PEEK) + CAROUSEL_GAP;
+  }
+
+  var CARD_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var CARD_DOWS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  function formatCardDate(offset) {
+    var d = new Date();
+    d.setDate(d.getDate() + offset);
+    var day = String(d.getDate());
+    if (day.length < 2) day = "0" + day;
+    return CARD_MONTHS[d.getMonth()] + " " + day + " " + CARD_DOWS[d.getDay()];
+  }
+
+  function buildCardForOffset(offset) {
+    if (offset === 0) return buildTodayRealCard();
+    return buildPlaceholderDayCard(offset);
+  }
+
+  function buildTodayRealCard() {
+    var today = document.createElement("section");
+    today.className = "card today-card list fixed";
+    today.appendChild(buildHead("today", "Today | " + formatCardDate(0), { fixed: true, countKeys: ["0", "1"], selectToKeep: true, randomizerTarget: "today" }));
+
+    var zoneTop = document.createElement("ul");
+    zoneTop.className = "items";
+    fillZone(zoneTop, "0", true);
+    today.appendChild(zoneTop);
+
+    var div = document.createElement("div");
+    div.className = "divider";
+    today.appendChild(div);
+
+    var zoneBot = document.createElement("ul");
+    zoneBot.className = "items";
+    fillZone(zoneBot, "1", true);
+    today.appendChild(zoneBot);
+
+    if (!selectToKeep.active && !(randomizer.active && randomizer.target === "today")) today.appendChild(buildAdder("1"));
+
+    return today;
+  }
+
+  // slides one step in the given direction, then swaps the underlying day and
+  // snaps the track back to its resting (centered) transform with no transition.
+  function animateCarousel(step) {
+    var track = appEl.querySelector(".today-carousel-track");
+    if (!track) return;
+    var stepPx = carouselStepPx(track.parentElement);
+    carouselAnimating = true;
+    track.classList.add("anim");
+    void track.offsetWidth;
+    var targetPx = step < 0 ? CAROUSEL_PEEK : (CAROUSEL_PEEK - 2 * stepPx);
+    track.style.transform = "translateX(" + targetPx + "px)";
+    setTimeout(function () {
+      todayCardOffset += step;
+      carouselAnimating = false;
+      render();
+    }, 280);
+  }
+
   // fill a zone (one of the two halves of a split card) with rows for a key.
   // scoped = true only for the Today card's zones, which support select-to-keep / randomizer.
   function fillZone(ul, key, scoped) {
@@ -342,6 +453,30 @@
       if (scoped && randomizer.active && randomizer.target === "today") ul.appendChild(buildRandomizerRow(item));
       else ul.appendChild(scoped && selectToKeep.active ? buildSelectRow(item) : buildMainRow(key, item));
     });
+  }
+
+  // placeholder for carousel testing only: a bare, always-empty day card, no data behind it yet.
+  function buildPlaceholderDayCard(offset) {
+    var card = document.createElement("section");
+    card.className = "card today-card list fixed";
+    card.appendChild(buildHead("todayPlaceholder", formatCardDate(offset), { fixed: true, noCount: true }));
+
+    for (var i = 0; i < 3; i++) {
+      if (i > 0) {
+        var div = document.createElement("div");
+        div.className = "divider";
+        card.appendChild(div);
+      }
+      var ul = document.createElement("ul");
+      ul.className = "items";
+      var empty = document.createElement("li");
+      empty.className = "empty";
+      empty.textContent = "(empty)";
+      ul.appendChild(empty);
+      card.appendChild(ul);
+    }
+
+    return card;
   }
 
   function buildSelectRow(item) {
@@ -497,6 +632,7 @@
           var enterBtn = document.createElement("button");
           enterBtn.className = "head-btn";
           enterBtn.textContent = "Select to keep";
+          enterBtn.style.display = "none";
           enterBtn.addEventListener("click", function () {
             selectToKeep.active = true;
             selectToKeep.selected = {};
@@ -716,9 +852,11 @@
     return btn;
   }
 
+  var menuOpenBtn = null;
   function closeAllMenus() {
     var open = document.querySelectorAll(".item-menu");
     open.forEach(function (m) { m.remove(); });
+    menuOpenBtn = null;
   }
   document.addEventListener("click", function (e) {
     if (!e.target.closest(".menu-anchor")) closeAllMenus();
@@ -734,26 +872,28 @@
     var btn = mkMini("☰", "More options");
     btn.addEventListener("click", function (e) {
       e.stopPropagation();
-      var existing = wrap.querySelector(".item-menu");
-      if (existing) { existing.remove(); return; }
+      if (menuOpenBtn === btn) { closeAllMenus(); return; }
       closeAllMenus();
+      menuOpenBtn = btn;
       var menu = document.createElement("div");
-      menu.className = "item-menu";
+      menu.className = "item-menu" + ((key === "0" || key === "1") ? " item-menu-today" : "");
 
       var isChain = CHAIN.indexOf(key) !== -1;
 
       if (isChain) {
-        var up = document.createElement("button");
-        up.textContent = "Move up";
-        if (key === "0") up.style.display = "none";
-        up.addEventListener("click", function () { moveChain(key, item.id, -1); });
-        menu.appendChild(up);
+        if (key !== "0") {
+          var up = document.createElement("button");
+          up.textContent = "Move up";
+          up.addEventListener("click", function () { moveChain(key, item.id, -1); });
+          menu.appendChild(up);
+        }
 
-        var down = document.createElement("button");
-        down.textContent = "Move down";
-        if (key === "4") down.style.display = "none";
-        down.addEventListener("click", function () { moveChain(key, item.id, 1); });
-        menu.appendChild(down);
+        if (key !== "4") {
+          var down = document.createElement("button");
+          down.textContent = "Move down";
+          down.addEventListener("click", function () { moveChain(key, item.id, 1); });
+          menu.appendChild(down);
+        }
       }
 
       var note = document.createElement("button");
@@ -764,13 +904,20 @@
       });
       menu.appendChild(note);
 
+      var recurrence = document.createElement("button");
+      recurrence.textContent = "Edit recurrence";
+      menu.appendChild(recurrence);
+
       var del = document.createElement("button");
       del.className = "danger";
       del.textContent = "Delete";
       del.addEventListener("click", function () { trashItem(key, item.id); });
       menu.appendChild(del);
 
-      wrap.appendChild(menu);
+      var rect = btn.getBoundingClientRect();
+      menu.style.top = (rect.bottom + 4) + "px";
+      menu.style.right = (window.innerWidth - rect.right) + "px";
+      document.body.appendChild(menu);
     });
     wrap.appendChild(btn);
     return wrap;
