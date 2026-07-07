@@ -18,6 +18,41 @@
   var CAROUSEL_PEEK = 20; // must match .today-nav width / left/right in style-minim.css
   var CAROUSEL_GAP = 8;   // must match .today-carousel-track gap in style-minim.css
 
+  // TEMP debug override for "now", for testing date-dependent behaviour without waiting real days.
+  // getNow() stays permanently. Comment out this block, #debugDatePanel in index.html, and its
+  // wiring near the bottom of this file when not actively testing.
+  var DEBUG_NOW_KEY = "aulists.debugNow";
+  var debugNowOverride = null;
+  (function loadDebugNow() {
+    try {
+      var raw = localStorage.getItem(DEBUG_NOW_KEY);
+      if (!raw) {
+        return;
+      }
+      var d = new Date(raw);
+      if (isNaN(d.getTime())) {
+        return;
+      }
+      debugNowOverride = d;
+    } catch (e) {}
+  })();
+  function getNow() {
+    if (debugNowOverride) {
+      return new Date(debugNowOverride.getTime());
+    }
+    return new Date();
+  }
+  function setDebugNow(dateOrNull) {
+    debugNowOverride = dateOrNull;
+    try {
+      if (dateOrNull) {
+        localStorage.setItem(DEBUG_NOW_KEY, dateOrNull.toISOString());
+      } else {
+        localStorage.removeItem(DEBUG_NOW_KEY);
+      }
+    } catch (e) {}
+  }
+
   function freshState() {
     return {
       version: 1,
@@ -64,11 +99,19 @@
           s.items.trash = obj.items.trash
             .filter(function (it) { return it && typeof it.text === "string"; })
             .map(function (it) {
+              var origin = "3";
+              if (CHAIN.indexOf(it.origin) !== -1 || it.origin === "completed") {
+                origin = it.origin;
+              }
+              var deletedAt = getNow().toISOString();
+              if (typeof it.deletedAt === "string") {
+                deletedAt = it.deletedAt;
+              }
               var o = {
                 id: it.id || uid(),
                 text: it.text,
-                origin: CHAIN.indexOf(it.origin) !== -1 || it.origin === "completed" ? it.origin : "3",
-                deletedAt: typeof it.deletedAt === "string" ? it.deletedAt : new Date().toISOString()
+                origin: origin,
+                deletedAt: deletedAt
               };
               if (it.note) o.note = it.note;
               return o;
@@ -77,9 +120,21 @@
       }
       if (obj.collapsed) {
         s.collapsed["3"] = !!obj.collapsed["3"];
-        s.collapsed["4"] = obj.collapsed["4"] === undefined ? true : !!obj.collapsed["4"];
-        s.collapsed.completed = obj.collapsed.completed === undefined ? true : !!obj.collapsed.completed;
-        s.collapsed.trash = obj.collapsed.trash === undefined ? true : !!obj.collapsed.trash;
+        if (obj.collapsed["4"] === undefined) {
+          s.collapsed["4"] = true;
+        } else {
+          s.collapsed["4"] = !!obj.collapsed["4"];
+        }
+        if (obj.collapsed.completed === undefined) {
+          s.collapsed.completed = true;
+        } else {
+          s.collapsed.completed = !!obj.collapsed.completed;
+        }
+        if (obj.collapsed.trash === undefined) {
+          s.collapsed.trash = true;
+        } else {
+          s.collapsed.trash = !!obj.collapsed.trash;
+        }
       }
       if (obj.schedule) {
         var ed = parseInt(obj.schedule.everyDays, 10);
@@ -142,12 +197,15 @@
   }
 
   function applyAutoReturn() {
-    var now = new Date();
+    var now = getNow();
     var boundary = lastBoundaryBefore(now);
     if (!boundary) return false;
-    var crossed = state.lastReturn
-      ? boundary.getTime() > new Date(state.lastReturn).getTime()
-      : boundary.getTime() <= now.getTime();
+    var crossed;
+    if (state.lastReturn) {
+      crossed = boundary.getTime() > new Date(state.lastReturn).getTime();
+    } else {
+      crossed = boundary.getTime() <= now.getTime();
+    }
 
     if (crossed && state.items["2"].length > 0) {
       state.items["1"] = state.items["1"].concat(state.items["2"]);
@@ -162,7 +220,7 @@
 
   // ---------- trash purge (compute on open) ----------
   function purgeTrash() {
-    var now = Date.now();
+    var now = getNow().getTime();
     var before = state.items.trash.length;
     state.items.trash = state.items.trash.filter(function (t) {
       return (now - new Date(t.deletedAt).getTime()) < WEEK_MS;
@@ -209,7 +267,7 @@
     var moved = state.items[fromKey].splice(i, 1)[0];
     var trashed = {
       id: moved.id, text: moved.text,
-      origin: fromKey, deletedAt: new Date().toISOString()
+      origin: fromKey, deletedAt: getNow().toISOString()
     };
     if (moved.note) trashed.note = moved.note;
     state.items.trash.push(trashed);
@@ -220,7 +278,10 @@
     var i = findIn("trash", id);
     if (i === -1) return;
     var t = state.items.trash.splice(i, 1)[0];
-    var dest = (state.items[t.origin]) ? t.origin : "3";
+    var dest = "3";
+    if (state.items[t.origin]) {
+      dest = t.origin;
+    }
     var recovered = { id: t.id, text: t.text };
     if (t.note) recovered.note = t.note;
     state.items[dest].push(recovered);
@@ -344,7 +405,11 @@
     // Above the divider = backend "3" (closer to list 2), below = backend "3.5" (further, but not list 4 far).
     var collapsed3 = state.collapsed["3"];
     var list3 = document.createElement("section");
-    list3.className = "card list" + (collapsed3 ? " collapsed" : "");
+    var list3CollapsedClass = "";
+    if (collapsed3) {
+      list3CollapsedClass = " collapsed";
+    }
+    list3.className = "card list" + list3CollapsedClass;
     list3.appendChild(buildHead("3", "List 3", { collapsible: true, countKeys: ["3", "3.5"] }));
 
     var zone3Top = document.createElement("ul");
@@ -384,7 +449,7 @@
   var CARD_DOWS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   function formatCardDate(offset) {
-    var d = new Date();
+    var d = getNow();
     d.setDate(d.getDate() + offset);
     var day = String(d.getDate());
     if (day.length < 2) day = "0" + day;
@@ -429,7 +494,12 @@
     carouselAnimating = true;
     track.classList.add("anim");
     void track.offsetWidth;
-    var targetPx = step < 0 ? CAROUSEL_PEEK : (CAROUSEL_PEEK - 2 * stepPx);
+    var targetPx;
+    if (step < 0) {
+      targetPx = CAROUSEL_PEEK;
+    } else {
+      targetPx = CAROUSEL_PEEK - 2 * stepPx;
+    }
     track.style.transform = "translateX(" + targetPx + "px)";
     setTimeout(function () {
       todayCardOffset += step;
@@ -450,8 +520,15 @@
       return;
     }
     arr.forEach(function (item) {
-      if (scoped && randomizer.active && randomizer.target === "today") ul.appendChild(buildRandomizerRow(item));
-      else ul.appendChild(scoped && selectToKeep.active ? buildSelectRow(item) : buildMainRow(key, item));
+      if (scoped && randomizer.active && randomizer.target === "today") {
+        ul.appendChild(buildRandomizerRow(item));
+        return;
+      }
+      if (scoped && selectToKeep.active) {
+        ul.appendChild(buildSelectRow(item));
+      } else {
+        ul.appendChild(buildMainRow(key, item));
+      }
     });
   }
 
@@ -481,7 +558,11 @@
 
   function buildSelectRow(item) {
     var li = document.createElement("li");
-    li.className = "item stk-mode" + (selectToKeep.selected[item.id] ? " stk-on" : "");
+    var stkOnClass = "";
+    if (selectToKeep.selected[item.id]) {
+      stkOnClass = " stk-on";
+    }
+    li.className = "item stk-mode" + stkOnClass;
     li.dataset.id = item.id;
 
     var wrap = document.createElement("div");
@@ -524,7 +605,15 @@
     opts = opts || {};
     var collapsed = opts.collapsible && state.collapsed[key];
     var card = document.createElement("section");
-    card.className = "card list" + (opts.fixed ? " fixed" : "") + (collapsed ? " collapsed" : "");
+    var fixedClass = "";
+    if (opts.fixed) {
+      fixedClass = " fixed";
+    }
+    var collapsedClass = "";
+    if (collapsed) {
+      collapsedClass = " collapsed";
+    }
+    card.className = "card list" + fixedClass + collapsedClass;
     card.appendChild(buildHead(key, titleText, opts));
     card.appendChild(buildItems(key, opts));
     if (opts.kind !== "trash" && !(randomizer.active && randomizer.target === opts.randomizerTarget)) card.appendChild(buildAdder(key));
@@ -540,7 +629,11 @@
     chev.className = "chev";
     chev.textContent = "▾";
     if (opts.collapsible) {
-      chev.setAttribute("aria-label", (state.collapsed[key] ? "Expand " : "Collapse ") + titleText);
+      var chevVerb = "Collapse ";
+      if (state.collapsed[key]) {
+        chevVerb = "Expand ";
+      }
+      chev.setAttribute("aria-label", chevVerb + titleText);
       chev.addEventListener("click", function () {
         state.collapsed[key] = !state.collapsed[key]; save(); render();
       });
@@ -616,7 +709,12 @@
           randBtn.className = "head-btn";
           randBtn.textContent = "Randomizer!";
           randBtn.addEventListener("click", function () {
-            var keys = opts.randomizerTarget === "today" ? ["0", "1"] : [opts.randomizerTarget];
+            var keys;
+            if (opts.randomizerTarget === "today") {
+              keys = ["0", "1"];
+            } else {
+              keys = [opts.randomizerTarget];
+            }
             var allItems = [];
             keys.forEach(function (k) {
               state.items[k].forEach(function (item) { allItems.push(item); });
@@ -647,9 +745,12 @@
     if (!opts.noCount) {
       var count = document.createElement("span");
       count.className = "count";
-      var n = opts.countKeys
-        ? opts.countKeys.reduce(function (sum, k) { return sum + state.items[k].length; }, 0)
-        : state.items[key].length;
+      var n;
+      if (opts.countKeys) {
+        n = opts.countKeys.reduce(function (sum, k) { return sum + state.items[k].length; }, 0);
+      } else {
+        n = state.items[key].length;
+      }
       count.textContent = n;
       head.appendChild(count);
     }
@@ -744,10 +845,14 @@
     label.textContent = item.text;
     wrap.appendChild(label);
 
-    var days = Math.max(0, Math.ceil((WEEK_MS - (Date.now() - new Date(item.deletedAt).getTime())) / (24*60*60*1000)));
+    var days = Math.max(0, Math.ceil((WEEK_MS - (getNow().getTime() - new Date(item.deletedAt).getTime())) / (24*60*60*1000)));
     var ttl = document.createElement("div");
     ttl.className = "ttl";
-    ttl.textContent = "deletes in " + days + (days === 1 ? " day" : " days");
+    var dayWord = " days";
+    if (days === 1) {
+      dayWord = " day";
+    }
+    ttl.textContent = "deletes in " + days + dayWord;
     wrap.appendChild(ttl);
     li.appendChild(wrap);
 
@@ -772,7 +877,11 @@
   function buildCheck(ticked, onToggle) {
     var btn = document.createElement("button");
     btn.className = "check";
-    btn.setAttribute("aria-label", ticked ? "Mark as not done" : "Mark as done");
+    var checkLabel = "Mark as done";
+    if (ticked) {
+      checkLabel = "Mark as not done";
+    }
+    btn.setAttribute("aria-label", checkLabel);
     var box = document.createElement("span");
     box.className = "box";
     btn.appendChild(box);
@@ -832,7 +941,11 @@
     wrap.addEventListener("click", function (e) {
       if (e.target.closest("button") || e.target.closest(".label-edit") || e.target.closest(".item-note-edit")) return;
       if (!item.note) return;
-      expandedNote = expandedNote === item.id ? null : item.id;
+      if (expandedNote === item.id) {
+        expandedNote = null;
+      } else {
+        expandedNote = item.id;
+      }
       render();
     });
 
@@ -876,7 +989,11 @@
       closeAllMenus();
       menuOpenBtn = btn;
       var menu = document.createElement("div");
-      menu.className = "item-menu" + ((key === "0" || key === "1") ? " item-menu-today" : "");
+      var menuTodayClass = "";
+      if (key === "0" || key === "1") {
+        menuTodayClass = " item-menu-today";
+      }
+      menu.className = "item-menu" + menuTodayClass;
 
       var isChain = CHAIN.indexOf(key) !== -1;
 
@@ -983,7 +1100,12 @@
   // ---------- randomizer animation ----------
   function runRandomizerAnimation() {
     var gen = ++randomizerGen;
-    var keys = randomizer.target === "today" ? ["0", "1"] : [randomizer.target];
+    var keys;
+    if (randomizer.target === "today") {
+      keys = ["0", "1"];
+    } else {
+      keys = [randomizer.target];
+    }
     var allItems = [];
     keys.forEach(function (k) {
       state.items[k].forEach(function (item) { allItems.push(item); });
@@ -1100,7 +1222,11 @@
           btn.addEventListener("click", swallow, true);
           setTimeout(function () { btn.removeEventListener("click", swallow, true); }, 350);
         }
-        onCommit(dx < 0 ? "left" : "right");
+        var swipeDir = "right";
+        if (dx < 0) {
+          swipeDir = "left";
+        }
+        onCommit(swipeDir);
       }
     });
   }
@@ -1111,7 +1237,13 @@
   var atMinEl = document.getElementById("atMin");
   var nextNote = document.getElementById("nextNote");
 
-  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function pad(n) {
+    var prefix = "";
+    if (n < 10) {
+      prefix = "0";
+    }
+    return prefix + n;
+  }
   function syncScheduleInputs() {
     everyEl.value = state.schedule.everyDays;
     atHourEl.value = Math.floor(state.schedule.atMinutes / 60);
@@ -1132,7 +1264,7 @@
   atMinEl.addEventListener("change", onScheduleChange);
 
   function updateNextNote() {
-    var next = nextBoundaryAfter(new Date());
+    var next = nextBoundaryAfter(getNow());
     nextNote.textContent = "Next return: " + next.toLocaleString("en-CA",
       { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
   }
@@ -1140,7 +1272,7 @@
   // ---------- export / import ----------
   function exportJSON() { return JSON.stringify(state, null, 2); }
   function markExported() {
-    state.lastExported = new Date().toISOString();
+    state.lastExported = getNow().toISOString();
     save(); updateLastExported();
   }
   function importFromText(text) {
@@ -1191,7 +1323,8 @@
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    var d = new Date(); a.download = "lists-" + d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") + ".json";
+    var d = getNow();
+    a.download = "lists-" + d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") + ".json";
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     markExported();
@@ -1305,9 +1438,15 @@
     if (pref === "dark") dark = true;
     else if (pref === "light") dark = false;
     else dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    var themeAttr = "light";
+    var themeColor = "#4a6f8a";
+    if (dark) {
+      themeAttr = "dark";
+      themeColor = "#2c2c2c";
+    }
+    document.documentElement.setAttribute("data-theme", themeAttr);
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", dark ? "#2c2c2c" : "#4a6f8a");
+    if (meta) meta.setAttribute("content", themeColor);
   }
   function initTheme() {
     var pref = localStorage.getItem(THEME_KEY) || "system";
@@ -1329,8 +1468,60 @@
     });
   }
 
+  // TEMP debug panel wiring — comment out along with the override block near the top of this
+  // file and #debugDatePanel in index.html when not actively testing.
+  function populateDebugNowInputs(dateEl, hourEl, d) {
+    dateEl.value = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+    hourEl.value = d.getHours();
+  }
+  function updateDebugNowStatus() {
+    var statusEl = document.getElementById("debugNowStatus");
+    if (debugNowOverride) {
+      statusEl.textContent = "Overridden to: " + getNow().toLocaleString("en-CA",
+        { weekday: "short", year: "numeric", month: "short", day: "numeric", hour: "2-digit", hour12: false });
+    } else {
+      statusEl.textContent = "Using real time.";
+    }
+  }
+  function applyDebugNowChange() {
+    updateDebugNowStatus();
+    purgeTrash();
+    applyAutoReturn();
+    render();
+  }
+  function initDebugNowPanel() {
+    var dateEl = document.getElementById("debugNowDate");
+    var hourEl = document.getElementById("debugNowHour");
+    var setBtn = document.getElementById("debugNowSetBtn");
+    var clearBtn = document.getElementById("debugNowClearBtn");
+    populateDebugNowInputs(dateEl, hourEl, getNow());
+    setBtn.addEventListener("click", function () {
+      if (!dateEl.value) {
+        toast("Pick a date first.");
+        return;
+      }
+      var parts = dateEl.value.split("-");
+      var h = clamp(hourEl.value, 0, 23);
+      hourEl.value = h;
+      var picked = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), h, 0);
+      if (isNaN(picked.getTime())) {
+        toast("Invalid date.");
+        return;
+      }
+      setDebugNow(picked);
+      applyDebugNowChange();
+    });
+    clearBtn.addEventListener("click", function () {
+      setDebugNow(null);
+      populateDebugNowInputs(dateEl, hourEl, getNow());
+      applyDebugNowChange();
+    });
+    updateDebugNowStatus();
+  }
+
   // ---------- boot ----------
   initTheme();
+  initDebugNowPanel();
   purgeTrash();
   applyAutoReturn();
   syncScheduleInputs();

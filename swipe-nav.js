@@ -34,7 +34,11 @@
 
   function setOffset(dist) {
     var hidden = REVEAL_PX - dist;
-    margin.style.transform = 'translateY(' + (direction === 'up' ? hidden : -hidden) + 'px)';
+    var offset = -hidden;
+    if (direction === 'up') {
+      offset = hidden;
+    }
+    margin.style.transform = 'translateY(' + offset + 'px)';
   }
 
   function retract() {
@@ -52,7 +56,10 @@
   document.addEventListener('touchmove', function (e) {
     if (startY === null) return;
     var dy = e.touches[0].clientY - startY;
-    var forward = direction === 'up' ? dy < 0 : dy > 0;
+    var forward = dy > 0;
+    if (direction === 'up') {
+      forward = dy < 0;
+    }
     var dist = Math.abs(dy);
 
     if (!forward) {

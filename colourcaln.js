@@ -39,8 +39,11 @@ async function persist(){
 }
 function setStatus(){
   const s=document.getElementById('status');
-  s.textContent = storageOK ? 'saved on this device · export to transfer data'
-                            : 'not saved — this browser is blocking local storage, use export to keep it';
+  if (storageOK) {
+    s.textContent = 'saved on this device · export to transfer data';
+  } else {
+    s.textContent = 'not saved — this browser is blocking local storage, use export to keep it';
+  }
 }
 
 function setRating(key, id){
@@ -54,10 +57,20 @@ function optButtons(currentId, onPick){
   wrap.style.display='contents';
   RATINGS.forEach(r=>{
     const b=document.createElement('button');
-    b.className='opt'+(currentId===r.id?' sel':'');
+    let selClass = '';
+    if (currentId === r.id) {
+      selClass = ' sel';
+    }
+    b.className='opt'+selClass;
     b.dataset.r=r.id;
     b.innerHTML='<span class="oe">'+r.emoji+'</span><span class="ol">'+r.label+'</span>';
-    b.addEventListener('click',()=>onPick(currentId===r.id ? null : r.id));
+    b.addEventListener('click',()=>{
+      let picked = r.id;
+      if (currentId === r.id) {
+        picked = null;
+      }
+      onPick(picked);
+    });
     wrap.appendChild(b);
   });
   return wrap;
@@ -77,7 +90,11 @@ function renderWindow(days, distId, legId, logId){
   const {counts,total}=windowStats(days);
   const dist=document.getElementById(distId);
   dist.innerHTML='';
-  dist.className='dist'+(total===0?' empty':'');
+  let emptyClass = '';
+  if (total === 0) {
+    emptyClass = ' empty';
+  }
+  dist.className='dist'+emptyClass;
   if(total>0){
     RATINGS.forEach(r=>{
       const c=counts[r.id]; if(c<=0) return;
@@ -116,7 +133,13 @@ function renderRibbon(){
         if(id===AWAY.id){ cell.className='rc'; cell.style.background=AWAY.colour; cell.style.boxShadow='0 0 7px -3px '+AWAY.colour; }
         else if(id){ cell.className='rc'; cell.style.background=RMAP[id].colour; cell.style.boxShadow='0 0 7px -3px '+RMAP[id].colour; }
         else{ cell.className='rc'; }
-        cell.title=fmtShort(d)+(id===AWAY.id?' · '+AWAY.label:id?' · '+RMAP[id].label:'');
+        let titleSuffix = '';
+        if (id === AWAY.id) {
+          titleSuffix = ' · ' + AWAY.label;
+        } else if (id) {
+          titleSuffix = ' · ' + RMAP[id].label;
+        }
+        cell.title=fmtShort(d)+titleSuffix;
       }
       rib.appendChild(cell);
     }
@@ -143,11 +166,23 @@ function renderCal(){
     if(isFuture) cls+=' future';
     if(key===toKey(T)) cls+=' today';
     cell.className=cls;
-    cell.innerHTML='<span class="d">'+d.getDate()+'</span>'+(id===AWAY.id?'<span class="e">'+AWAY.emoji+'</span>':id?'<span class="e">'+RMAP[id].emoji+'</span>':'');
+    let emojiSpan = '';
+    if (id === AWAY.id) {
+      emojiSpan = '<span class="e">'+AWAY.emoji+'</span>';
+    } else if (id) {
+      emojiSpan = '<span class="e">'+RMAP[id].emoji+'</span>';
+    }
+    cell.innerHTML='<span class="d">'+d.getDate()+'</span>'+emojiSpan;
     if(inWin){
       cell.setAttribute('tabindex','0');
       cell.setAttribute('role','button');
-      cell.title=fmtLong(d)+(id===AWAY.id?' · '+AWAY.label:id?' · '+RMAP[id].label:'');
+      let titleSuffix = '';
+      if (id === AWAY.id) {
+        titleSuffix = ' · ' + AWAY.label;
+      } else if (id) {
+        titleSuffix = ' · ' + RMAP[id].label;
+      }
+      cell.title=fmtLong(d)+titleSuffix;
       const open=()=>openEditor(key,d);
       cell.addEventListener('click',open);
       cell.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();open();} });
@@ -180,7 +215,11 @@ function closeEditor(){ document.getElementById('overlay').classList.remove('sho
 document.getElementById('sheetClose').addEventListener('click',closeEditor);
 document.getElementById('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay') closeEditor(); });
 document.getElementById('awayBtn').addEventListener('click',()=>{
-  setRating(editorKey, data[editorKey]===AWAY.id ? null : AWAY.id);
+  let awayValue = AWAY.id;
+  if (data[editorKey] === AWAY.id) {
+    awayValue = null;
+  }
+  setRating(editorKey, awayValue);
   closeEditor();
 });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeEditor(); });

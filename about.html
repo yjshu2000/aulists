@@ -28,6 +28,15 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v0.6 <span class="changelog-date">2026-07-06 21H</span></h3>
+    <ul>
+      <li>Removed every ternary operator from the codebase (autorelists.js, colourcaln.js, swipe-nav.js), expanded to if/else</li>
+      <li>All "current time" reads now go through one internal getNow() function instead of calling new Date() / Date.now() directly, in prep for recurring items and day rollover</li>
+      <li>Added a temporary debug panel (bottom of the lists page) to override "now" for testing date-dependent behaviour without waiting for real days to pass</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v0.5 <span class="changelog-date">2026-07-05 21H</span></h3>
     <ul>
       <li>List 1 is now a "Today" carousel card, styled distinctly (Colourcaln-style dark/vivid theme) from the rest of the lists</li>

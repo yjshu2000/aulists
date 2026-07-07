@@ -62,6 +62,16 @@
     <a href="about.html">About</a>
   </nav>
 
+  <section id="debugDatePanel">
+    <p>DEBUG: override "now"</p>
+    <input type="date" id="debugNowDate">
+    <input type="number" id="debugNowHour" min="0" max="23" step="1" value="0" aria-label="Hour (0-23)">
+    <span>24h</span>
+    <button id="debugNowSetBtn">Set</button>
+    <button id="debugNowClearBtn">Use real time</button>
+    <p id="debugNowStatus"></p>
+  </section>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="autorelists.js"></script>
