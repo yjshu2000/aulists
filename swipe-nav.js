@@ -17,14 +17,29 @@
   var startY = null;
   var revealedAtTouchStart = false;
 
+  /**
+   * Returns the page's current vertical scroll offset.
+   * @returns {number} scroll offset in pixels.
+   */
   function scrollTop() {
     return document.scrollingElement.scrollTop;
   }
 
+  /**
+   * Returns the maximum vertical scroll offset the page can reach.
+   * @returns {number} max scroll offset in pixels.
+   */
   function maxScrollTop() {
-    return document.scrollingElement.scrollHeight - document.scrollingElement.clientHeight;
+    return (document.scrollingElement.scrollHeight 
+      - document.scrollingElement.clientHeight);
   }
 
+  /**
+   * Checks whether the page is scrolled to the edge this nav margin cares
+   * about - the bottom for a "down" swipe target, the top for an "up" one -
+   * since the gesture should only start from that edge.
+   * @returns {boolean} true if at the relevant scroll boundary.
+   */
   function atBoundary() {
     if (direction === 'up') {
       return scrollTop() >= maxScrollTop() - 1;
@@ -32,6 +47,12 @@
     return scrollTop() <= 0;
   }
 
+  /**
+   * Positions the reveal margin at a given drag distance, sliding it in from
+   * the edge that matches `direction`.
+   * @param {number} dist - drag distance in pixels (0 = fully hidden,
+   *   `REVEAL_PX` = fully revealed).
+   */
   function setOffset(dist) {
     var hidden = REVEAL_PX - dist;
     var offset = -hidden;
@@ -41,6 +62,9 @@
     margin.style.transform = 'translateY(' + offset + 'px)';
   }
 
+  /**
+   * Resets the margin back to fully hidden and rest state.
+   */
   function retract() {
     state = 'rest';
     setOffset(0);
@@ -50,7 +74,9 @@
     if (e.touches.length !== 1) return;
     startY = e.touches[0].clientY;
     revealedAtTouchStart = state === 'revealed';
-    if (state === 'rest' && !atBoundary()) startY = null;
+    if (state === 'rest' && !atBoundary()) {
+      startY = null;
+    }
   }, { passive: true });
 
   document.addEventListener('touchmove', function (e) {
@@ -70,12 +96,14 @@
     e.preventDefault();
 
     if (revealedAtTouchStart) {
-      // this drag started already-revealed, so it's the second, separate swipe that commits
+      // this drag started already-revealed, so it's the second, separate
+      //  swipe that commits
       if (dist >= COMMIT_PX) {
         location.href = neighbor;
       }
     } else {
-      // this drag is the first swipe: it can only reveal, never commit, no matter how far or how long it holds
+      // this drag is the first swipe: it can only reveal, never commit, no
+      //  matter how far or how long it holds
       setOffset(Math.min(dist, REVEAL_PX));
       if (dist >= REVEAL_PX) state = 'revealed';
     }

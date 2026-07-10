@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "fourlist.v1";
+  var STORAGE_KEY = "aulists.listdata";
   var WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
   // chain order for movement
@@ -11,18 +11,33 @@
   var selectToKeep = { active: false, selected: {} };
   var expandedNote = null;
   var editingNote = null;
-  var randomizer = { active: false, target: null, winnerId: null, highlightId: null, done: false };
+  var randomizer = {
+    active: false,
+    target: null,
+    winnerId: null,
+    highlightId: null,
+    done: false
+  };
   var randomizerGen = 0;
-  var todayCardOffset = 0; // 0 = today; negative = carousel test steps into the past
+  var todayCardOffset = 0; // 0 = today; negative = carousel test steps into the
+                           // past
   var carouselAnimating = false;
-  var CAROUSEL_PEEK = 20; // must match .today-nav width / left/right in style-minim.css
-  var CAROUSEL_GAP = 8;   // must match .today-carousel-track gap in style-minim.css
+  var CAROUSEL_PEEK = 20; // must match .today-nav width / left/right in
+                          // style-minim.css
+  var CAROUSEL_GAP = 8;   // must match .today-carousel-track gap in
+                          // style-minim.css
 
-  // TEMP debug override for "now", for testing date-dependent behaviour without waiting real days.
-  // getNow() stays permanently. Comment out this block, #debugDatePanel in index.html, and its
-  // wiring near the bottom of this file when not actively testing.
+  // TEMP debug override for "now", for testing date-dependent behaviour
+  // without waiting real days. getNow() stays permanently. Comment out this
+  // block, #debugDatePanel in index.html, and its wiring near the bottom of
+  // this file when not actively testing.
   var DEBUG_NOW_KEY = "aulists.debugNow";
   var debugNowOverride = null;
+
+  /**
+   * Reads a previously-set debug "now" override out of localStorage on boot, so
+   * the override survives a page reload during testing.
+   */
   (function loadDebugNow() {
     try {
       var raw = localStorage.getItem(DEBUG_NOW_KEY);
@@ -36,12 +51,25 @@
       debugNowOverride = d;
     } catch (e) {}
   })();
+
+  /**
+   * Returns the current moment the app should treat as "now" - either the real
+   * clock, or the debug override set via the temp debug panel.
+   * @returns {Date} a fresh Date instance (safe for callers to mutate).
+   */
   function getNow() {
     if (debugNowOverride) {
       return new Date(debugNowOverride.getTime());
     }
     return new Date();
   }
+
+  /**
+   * Sets or clears the debug "now" override and persists the choice to
+   * localStorage.
+   * @param {Date|null} dateOrNull - the fake "now" to use, or null to resume
+   *   using the real clock.
+   */
   function setDebugNow(dateOrNull) {
     debugNowOverride = dateOrNull;
     try {
@@ -53,10 +81,18 @@
     } catch (e) {}
   }
 
+  /**
+   * Builds a brand-new, empty state object - the baseline used on first run,
+   * and the starting point `normalise` fills in from parsed JSON.
+   * @returns {Object} an empty-but-well-formed state object.
+   */
   function freshState() {
     return {
       version: 1,
-      items: { "0": [], "1": [], "2": [], "3": [], "3.5": [], "4": [], completed: [], trash: [] },
+      items: {
+        "0": [], "1": [], "2": [], "3": [], "3.5": [], "4": [],
+        completed: [], trash: []
+      },
       collapsed: { "3": false, "4": true, completed: true, trash: true },
       schedule: { everyDays: 1, atMinutes: 0 },
       lastReturn: null,
@@ -65,10 +101,20 @@
     };
   }
 
+  /**
+   * Generates a short, collision-resistant id for a new item.
+   * @returns {string} an id like "i8k2p3q7x" (timestamp + random, base36).
+   */
   function uid() {
-    return "i" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    return "i" + Date.now().toString(36) +
+      Math.random().toString(36).slice(2, 7);
   }
 
+  /**
+   * Loads and sanitizes state from localStorage, falling back to a fresh state
+   * if nothing is stored or the stored JSON can't be parsed.
+   * @returns {Object} a fully-formed state object.
+   */
   function load() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
@@ -77,6 +123,12 @@
     } catch (e) { return freshState(); }
   }
 
+  /**
+   * Filters and sanitizes a candidate array of item objects.
+   * @param {Array} arr - untrusted candidate array from parsed JSON.
+   * @returns {Array} a clean array of `{id, text, note?}` objects; entries
+   *   missing a string `.text` are dropped, missing ids are re-minted.
+   */
   function cleanItems(arr) {
     if (!Array.isArray(arr)) return [];
     return arr
@@ -88,6 +140,13 @@
       });
   }
 
+  /**
+   * Sanitizes an arbitrary parsed-JSON blob (from localStorage or an import)
+   * into a fully-formed state object. Anything malformed, partial, or garbage
+   * is dropped or defaulted rather than allowed to corrupt `state`.
+   * @param {Object} obj - parsed JSON, untrusted.
+   * @returns {Object} a complete, safe-to-use state object.
+   */
   function normalise(obj) {
     var s = freshState();
     if (obj && typeof obj === "object") {
@@ -100,7 +159,8 @@
             .filter(function (it) { return it && typeof it.text === "string"; })
             .map(function (it) {
               var origin = "3";
-              if (CHAIN.indexOf(it.origin) !== -1 || it.origin === "completed") {
+              if (CHAIN.indexOf(it.origin) !== -1 ||
+                it.origin === "completed") {
                 origin = it.origin;
               }
               var deletedAt = getNow().toISOString();
@@ -143,30 +203,59 @@
         if (am >= 0 && am < 1440) s.schedule.atMinutes = am;
       }
       if (typeof obj.lastReturn === "string") s.lastReturn = obj.lastReturn;
-      if (typeof obj.lastExported === "string") s.lastExported = obj.lastExported;
-      if (typeof obj.lastExportedConfirmed === "string") s.lastExportedConfirmed = obj.lastExportedConfirmed;
+      if (typeof obj.lastExported === "string") {
+        s.lastExported = obj.lastExported;
+      }
+      if (typeof obj.lastExportedConfirmed === "string") {
+        s.lastExportedConfirmed = obj.lastExportedConfirmed;
+      }
     }
     return s;
   }
 
+  /**
+   * Persists the whole in-memory `state` object to localStorage as JSON.
+   */
   function save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
     catch (e) { toast("Could not save to this browser's storage."); }
   }
 
   // ---------- schedule (compute on open) ----------
+  /**
+   * Returns the schedule boundary (midnight + `atMin` minutes) for a given
+   * calendar day, ignoring whatever time-of-day `date` itself carries.
+   * @param {Date} date - any moment on the calendar day to anchor to.
+   * @param {number} atMin - minutes after midnight the boundary sits at.
+   * @returns {Date} the boundary moment on `date`'s calendar day.
+   */
   function boundaryAt(date, atMin) {
-    var b = new Date(date); b.setHours(0,0,0,0);
+    var b = new Date(date);
+    b.setHours(0, 0, 0, 0);
     b.setMinutes(atMin);
     return b;
   }
 
+  /**
+   * Adds (or subtracts) whole days to a date, preserving its time-of-day.
+   * @param {Date} date - starting date.
+   * @param {number} days - number of days to add; negative to subtract.
+   * @returns {Date} a new Date `days` days after `date`.
+   */
   function stepDays(date, days) {
     var d = new Date(date);
     d.setDate(d.getDate() + days);
     return d;
   }
 
+  /**
+   * Finds the most recent scheduled return boundary that has already passed,
+   * relative to `now` - the moment List 2's contents last should have returned
+   * to List 1 (whether or not that return actually ran yet).
+   * @param {Date} now - the moment to search backward from.
+   * @returns {Date|null} the boundary, or null if `state.lastReturn`'s anchor
+   *   is itself still in the future (nothing has passed yet).
+   */
   function lastBoundaryBefore(now) {
     var atMin = state.schedule.atMinutes;
     var days = state.schedule.everyDays;
@@ -186,6 +275,12 @@
     return c;
   }
 
+  /**
+   * Finds the next upcoming scheduled return boundary after `now`, for display
+   * in the "Next return" note.
+   * @param {Date} now - the moment to search forward from.
+   * @returns {Date} the next boundary strictly after `now`.
+   */
   function nextBoundaryAfter(now) {
     var days = state.schedule.everyDays;
     var last = lastBoundaryBefore(now);
@@ -196,6 +291,14 @@
     return next;
   }
 
+  /**
+   * Checks whether a scheduled List 2 -> List 1 return boundary has been
+   * crossed since the last check, and if so, performs it: moves everything in
+   * List 2 back into List 1 and records the new `lastReturn` anchor. Safe to
+   * call repeatedly (e.g. on every app-open/visibility-change) - it's a no-op
+   * if no new boundary has been crossed.
+   * @returns {boolean} true if items were actually moved this call.
+   */
   function applyAutoReturn() {
     var now = getNow();
     var boundary = lastBoundaryBefore(now);
@@ -214,11 +317,18 @@
       save();
       return true;
     }
-    if (crossed) { state.lastReturn = boundary.toISOString(); save(); }
+    if (crossed) {
+      state.lastReturn = boundary.toISOString();
+      save();
+    }
     return false;
   }
 
   // ---------- trash purge (compute on open) ----------
+  /**
+   * Permanently drops any trash entries older than the 7-day TTL (`WEEK_MS`).
+   * Safe to call repeatedly; only saves if something changed.
+   */
   function purgeTrash() {
     var now = getNow().getTime();
     var before = state.items.trash.length;
@@ -229,10 +339,24 @@
   }
 
   // ---------- item operations ----------
+  /**
+   * Finds an item's index within one of the plain item-array list keys.
+   * @param {string} listKey - one of the `state.items` keys (not "trash").
+   * @param {string} id - id of the item to find.
+   * @returns {number} the index, or -1 if not present in that list.
+   */
   function findIn(listKey, id) {
     return state.items[listKey].findIndex(function (i) { return i.id === id; });
   }
 
+  /**
+   * Moves an item one step along the chain (0->1->2->3->3.5->4), in either
+   * direction. No-ops if the item isn't found, or the move would fall off
+   * either end of the chain.
+   * @param {string} fromKey - chain key the item currently lives in.
+   * @param {string} id - id of the item to move.
+   * @param {number} dir - +1 to move down the chain, -1 to move up.
+   */
   function moveChain(fromKey, id, dir) {
     var idx = CHAIN.indexOf(fromKey);
     if (idx === -1) return;
@@ -242,25 +366,46 @@
     if (i === -1) return;
     var moved = state.items[fromKey].splice(i, 1)[0];
     state.items[toKey].push(moved);
-    save(); render();
+    save();
+    render();
   }
 
+  /**
+   * Moves an item out of its current list and into Completed.
+   * @param {string} fromKey - list key the item currently lives in.
+   * @param {string} id - id of the item to complete.
+   */
   function completeItem(fromKey, id) {
     var i = findIn(fromKey, id);
     if (i === -1) return;
     var moved = state.items[fromKey].splice(i, 1)[0];
     state.items.completed.push(moved);
-    save(); render();
+    save();
+    render();
   }
 
+  /**
+   * Moves an item out of Completed and back into List 2. Always List 2,
+   * regardless of which list the item was completed from - this hardcoded
+   * one-way return is the thing Checkpoint B replaces with `origin`-based
+   * routing.
+   * @param {string} id - id of the item to uncomplete.
+   */
   function uncompleteItem(id) {
     var i = findIn("completed", id);
     if (i === -1) return;
     var moved = state.items.completed.splice(i, 1)[0];
     state.items["2"].push(moved);   // one-way back to list 2
-    save(); render();
+    save();
+    render();
   }
 
+  /**
+   * Moves an item out of its current list and into Trash, recording where it
+   * came from (so Recover knows where to put it back).
+   * @param {string} fromKey - list key the item currently lives in.
+   * @param {string} id - id of the item to trash.
+   */
   function trashItem(fromKey, id) {
     var i = findIn(fromKey, id);
     if (i === -1) return;
@@ -271,9 +416,15 @@
     };
     if (moved.note) trashed.note = moved.note;
     state.items.trash.push(trashed);
-    save(); render();
+    save();
+    render();
   }
 
+  /**
+   * Moves an item out of Trash and back into its recorded origin list, falling
+   * back to List 3 if that list no longer exists.
+   * @param {string} id - id of the item to recover.
+   */
   function recoverItem(id) {
     var i = findIn("trash", id);
     if (i === -1) return;
@@ -285,25 +436,46 @@
     var recovered = { id: t.id, text: t.text };
     if (t.note) recovered.note = t.note;
     state.items[dest].push(recovered);
-    save(); render();
+    save();
+    render();
   }
 
+  /**
+   * Removes an item from Trash for good, ahead of its 7-day TTL.
+   * @param {string} id - id of the item to permanently delete.
+   */
   function permaDelete(id) {
     var i = findIn("trash", id);
     if (i === -1) return;
     state.items.trash.splice(i, 1);
-    save(); render();
+    save();
+    render();
   }
 
+  /**
+   * Overwrites an item's text in place, unless the trimmed replacement is empty
+   * (treated as a cancel, leaving the original text untouched).
+   * @param {string} listKey - list key the item currently lives in.
+   * @param {string} id - id of the item to edit.
+   * @param {string} newText - proposed replacement text, untrimmed.
+   */
   function editItem(listKey, id, newText) {
     var i = findIn(listKey, id);
     if (i === -1) return;
     var v = newText.trim();
     if (v === "") return;            // empty = cancel, keep original
     state.items[listKey][i].text = v;
-    save(); render();
+    save();
+    render();
   }
 
+  /**
+   * Overwrites (or clears) an item's note. A blank trimmed value deletes the
+   * `.note` field entirely rather than storing an empty string.
+   * @param {string} listKey - list key the item currently lives in.
+   * @param {string} id - id of the item to edit.
+   * @param {string} newNote - proposed replacement note, untrimmed.
+   */
   function editNote(listKey, id, newNote) {
     var i = findIn(listKey, id);
     if (i === -1) return;
@@ -315,9 +487,15 @@
       delete state.items[listKey][i].note;
       expandedNote = null;
     }
-    save(); render();
+    save();
+    render();
   }
 
+  /**
+   * Opens the note editor for a single item, expanding its note area.
+   * @param {string} key - list key the item currently lives in.
+   * @param {Object} item - the item object being edited.
+   */
   function startNoteEdit(key, item) {
     editingNote = { key: key, id: item.id };
     expandedNote = item.id;
@@ -327,6 +505,11 @@
   // ---------- rendering ----------
   var appEl = document.getElementById("app");
 
+  /**
+   * Rebuilds the entire `#app` DOM tree from the current in-memory `state` -
+   * the Today carousel, List 2, Completed, List 3 (with its two zones), List 4,
+   * and Trash. Called after any state mutation.
+   */
   function render() {
     closeAllMenus();
     appEl.innerHTML = "";
@@ -385,7 +568,8 @@
     todayWrap.appendChild(nextBtn);
 
     appEl.appendChild(todayWrap);
-    track.style.transform = "translateX(" + (CAROUSEL_PEEK - carouselStepPx(viewport)) + "px)";
+    track.style.transform =
+      "translateX(" + (CAROUSEL_PEEK - carouselStepPx(viewport)) + "px)";
 
     var currentHeight = currentSlide.getBoundingClientRect().height;
     prevSlide.style.maxHeight = currentHeight + "px";
@@ -396,13 +580,16 @@
     }
 
     // List 2 (own card, fixed)
-    appEl.appendChild(renderCard("2", "List 2", { fixed: true, randomizerTarget: "2" }));
+    appEl.appendChild(renderCard("2", "List 2", 
+      {fixed: true, randomizerTarget: "2"}));
 
     // Completed purgatory (collapsible)
-    appEl.appendChild(renderCard("completed", "Completed", { collapsible: true, kind: "completed" }));
+    appEl.appendChild(renderCard("completed", "Completed", 
+      {collapsible: true, kind: "completed"}));
 
     // List 3: collapsible card, two zones split by a divider.
-    // Above the divider = backend "3" (closer to list 2), below = backend "3.5" (further, but not list 4 far).
+    // Above the divider = backend "3" (closer to list 2), below = backend
+    // "3.5" (further, but not list 4 far).
     var collapsed3 = state.collapsed["3"];
     var list3 = document.createElement("section");
     var list3CollapsedClass = "";
@@ -410,7 +597,8 @@
       list3CollapsedClass = " collapsed";
     }
     list3.className = "card list" + list3CollapsedClass;
-    list3.appendChild(buildHead("3", "List 3", { collapsible: true, countKeys: ["3", "3.5"] }));
+    list3.appendChild(buildHead("3", "List 3", 
+      { collapsible: true, countKeys: ["3", "3.5"] }));
 
     var zone3Top = document.createElement("ul");
     zone3Top.className = "items";
@@ -433,21 +621,34 @@
     appEl.appendChild(renderCard("4", "List 4", { collapsible: true }));
 
     // Trash (collapsible, no count)
-    appEl.appendChild(renderCard("trash", "Trash", { collapsible: true, kind: "trash" }));
+    appEl.appendChild(renderCard("trash", "Trash", 
+      { collapsible: true, kind: "trash" }));
 
     updateNextNote();
   }
 
-  // translate() percentages resolve against the track's own width, not the
-  // viewport, so the per-slide step has to be computed from a real measurement.
+  /**
+   * Computes the pixel distance the carousel track must translate to move one
+   * slide over. `translate()` percentages resolve against the track's own
+   * width, not the viewport, so this has to come from a real DOM measurement
+   * rather than a fixed percentage.
+   * @param {Element} viewportEl - the `.today-carousel-viewport` element.
+   * @returns {number} pixel step for one slide.
+   */
   function carouselStepPx(viewportEl) {
     var cw = viewportEl.getBoundingClientRect().width;
     return (cw - 2 * CAROUSEL_PEEK) + CAROUSEL_GAP;
   }
 
-  var CARD_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var CARD_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   var CARD_DOWS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+  /**
+   * Formats a carousel card's date label, e.g. "Jul 08 Wed".
+   * @param {number} offset - days from today (0 = today, -1 = yesterday).
+   * @returns {string} the formatted label.
+   */
   function formatCardDate(offset) {
     var d = getNow();
     d.setDate(d.getDate() + offset);
@@ -456,15 +657,29 @@
     return CARD_MONTHS[d.getMonth()] + " " + day + " " + CARD_DOWS[d.getDay()];
   }
 
+  /**
+   * Builds the DOM for one carousel slide.
+   * @param {number} offset - days from today for this slide.
+   * @returns {Element} the real Today card (offset 0) or an empty placeholder
+   *   card (any other offset).
+   */
   function buildCardForOffset(offset) {
     if (offset === 0) return buildTodayRealCard();
     return buildPlaceholderDayCard(offset);
   }
 
+  /**
+   * Builds the live Today card: its head, the two zones (lists "0" and "1")
+   * split by a divider, and the adder row (hidden while select-to-keep or the
+   * today-targeted randomizer is active).
+   * @returns {Element} the assembled Today card section.
+   */
   function buildTodayRealCard() {
     var today = document.createElement("section");
     today.className = "card today-card list fixed";
-    today.appendChild(buildHead("today", "Today | " + formatCardDate(0), { fixed: true, countKeys: ["0", "1"], selectToKeep: true, randomizerTarget: "today" }));
+    today.appendChild(buildHead("today", "Today | " + formatCardDate(0), 
+    { fixed: true, countKeys: ["0", "1"], selectToKeep: true, 
+      randomizerTarget: "today" }));
 
     var zoneTop = document.createElement("ul");
     zoneTop.className = "items";
@@ -480,13 +695,20 @@
     fillZone(zoneBot, "1", true);
     today.appendChild(zoneBot);
 
-    if (!selectToKeep.active && !(randomizer.active && randomizer.target === "today")) today.appendChild(buildAdder("1"));
+    if (!selectToKeep.active 
+      && !(randomizer.active && randomizer.target === "today")) {
+      today.appendChild(buildAdder("1"));
+    } 
 
     return today;
   }
 
-  // slides one step in the given direction, then swaps the underlying day and
-  // snaps the track back to its resting (centered) transform with no transition.
+  /**
+   * Animates the carousel one slide over, then swaps the underlying day and
+   * snaps the track back to its resting (centered) transform with no
+   * transition, ready for the next step.
+   * @param {number} step - +1 to advance a day, -1 to go back a day.
+   */
   function animateCarousel(step) {
     var track = appEl.querySelector(".today-carousel-track");
     if (!track) return;
@@ -508,8 +730,14 @@
     }, 280);
   }
 
-  // fill a zone (one of the two halves of a split card) with rows for a key.
-  // scoped = true only for the Today card's zones, which support select-to-keep / randomizer.
+  /**
+   * Fills a zone (one of the two halves of a split card) with rows for a list
+   * key, or an "(empty)" placeholder if the list is empty.
+   * @param {Element} ul - the `<ul class="items">` to fill.
+   * @param {string} key - the `state.items` key to render rows for.
+   * @param {boolean} [scoped] - true only for the Today card's zones, which
+   *   support select-to-keep and the randomizer.
+   */
   function fillZone(ul, key, scoped) {
     var arr = state.items[key];
     if (arr.length === 0) {
@@ -532,11 +760,18 @@
     });
   }
 
-  // placeholder for carousel testing only: a bare, always-empty day card, no data behind it yet.
+  /**
+   * Builds a placeholder carousel day card for testing only: a bare,
+   * always-empty card with no real data behind it yet.
+   * @param {number} offset - days from today this placeholder stands in for;
+   *   used only to label the card.
+   * @returns {Element} the placeholder card section.
+   */
   function buildPlaceholderDayCard(offset) {
     var card = document.createElement("section");
     card.className = "card today-card list fixed";
-    card.appendChild(buildHead("todayPlaceholder", formatCardDate(offset), { fixed: true, noCount: true }));
+    card.appendChild(buildHead("todayPlaceholder", formatCardDate(offset), { 
+      fixed: true, noCount: true }));
 
     for (var i = 0; i < 3; i++) {
       if (i > 0) {
@@ -556,6 +791,12 @@
     return card;
   }
 
+  /**
+   * Builds a single item row for select-to-keep mode: a plain label with a
+   * highlighted "stk-on" state when the item is currently selected.
+   * @param {Object} item - the item to render.
+   * @returns {Element} the `<li>` row.
+   */
   function buildSelectRow(item) {
     var li = document.createElement("li");
     var stkOnClass = "";
@@ -589,6 +830,13 @@
     return li;
   }
 
+  /**
+   * Builds a single item row for randomizer mode: a plain label (plus a buy tag
+   * when applicable), with no click handling of its own - the randomizer
+   * animation drives highlighting externally.
+   * @param {Object} item - the item to render.
+   * @returns {Element} the `<li>` row.
+   */
   function buildRandomizerRow(item) {
     var li = document.createElement("li");
     li.className = "item rnd-item";
@@ -601,6 +849,15 @@
     return li;
   }
 
+  /**
+   * Builds a full list card: head, item rows, and (unless suppressed) an adder
+   * row.
+   * @param {string} key - the `state.items` key this card renders.
+   * @param {string} titleText - the card's displayed title.
+   * @param {Object} [opts] - see `buildHead` and `buildItems` for the full set
+   *   of recognized flags (fixed, collapsible, kind, etc.).
+   * @returns {Element} the assembled card section.
+   */
   function renderCard(key, titleText, opts) {
     opts = opts || {};
     var collapsed = opts.collapsible && state.collapsed[key];
@@ -616,10 +873,23 @@
     card.className = "card list" + fixedClass + collapsedClass;
     card.appendChild(buildHead(key, titleText, opts));
     card.appendChild(buildItems(key, opts));
-    if (opts.kind !== "trash" && !(randomizer.active && randomizer.target === opts.randomizerTarget)) card.appendChild(buildAdder(key));
+    if (opts.kind !== "trash" && !(randomizer.active 
+      && randomizer.target === opts.randomizerTarget)) {
+        card.appendChild(buildAdder(key));
+      }
     return card;
   }
 
+  /**
+   * Builds a card's header row: the collapse chevron, title, and whatever
+   * header actions (Randomizer!/Done, Move unselected/Cancel) apply given the
+   * card's mode and current select-to-keep/randomizer state.
+   * @param {string} key - the `state.items` key this header belongs to.
+   * @param {string} titleText - the card's displayed title.
+   * @param {Object} [opts] - flags: `collapsible`, `selectToKeep`,
+   *   `randomizerTarget`.
+   * @returns {Element} the assembled `.list-head` element.
+   */
   function buildHead(key, titleText, opts) {
     opts = opts || {};
     var head = document.createElement("div");
@@ -635,7 +905,9 @@
       }
       chev.setAttribute("aria-label", chevVerb + titleText);
       chev.addEventListener("click", function () {
-        state.collapsed[key] = !state.collapsed[key]; save(); render();
+        state.collapsed[key] = !state.collapsed[key];
+        save();
+        render();
       });
     }
     head.appendChild(chev);
@@ -648,7 +920,9 @@
     if (opts.collapsible) {
       title.style.cursor = "pointer";
       title.addEventListener("click", function () {
-        state.collapsed[key] = !state.collapsed[key]; save(); render();
+        state.collapsed[key] = !state.collapsed[key];
+        save();
+        render();
       });
     }
     head.appendChild(title);
@@ -657,7 +931,8 @@
       var headerActions = document.createElement("div");
       headerActions.className = "head-actions";
 
-      var isThisRandomizer = randomizer.active && randomizer.target === opts.randomizerTarget;
+      var isThisRandomizer = (randomizer.active 
+        && randomizer.target === opts.randomizerTarget);
 
       if (isThisRandomizer) {
         var doneBtn = document.createElement("button");
@@ -665,7 +940,8 @@
         doneBtn.textContent = "Done";
         doneBtn.addEventListener("click", function () {
           randomizerGen++;
-          randomizer = { active: false, target: null, winnerId: null, highlightId: null, done: false };
+          randomizer = { active: false, target: null, winnerId: null, 
+            highlightId: null, done: false };
           render();
         });
         headerActions.appendChild(doneBtn);
@@ -690,7 +966,8 @@
           });
           selectToKeep.active = false;
           selectToKeep.selected = {};
-          save(); render();
+          save();
+          render();
         });
         headerActions.appendChild(moveBtn);
 
@@ -719,8 +996,12 @@
             keys.forEach(function (k) {
               state.items[k].forEach(function (item) { allItems.push(item); });
             });
-            if (allItems.length === 0) { toast("No items to randomize!"); return; }
-            randomizer = { active: true, target: opts.randomizerTarget, winnerId: null, highlightId: null, done: false };
+            if (allItems.length === 0) {
+              toast("No items to randomize!");
+              return;
+            }
+            randomizer = { active: true, target: opts.randomizerTarget, 
+              winnerId: null, highlightId: null, done: false };
             render();
             setTimeout(function () { runRandomizerAnimation(); }, 100);
           });
@@ -747,7 +1028,8 @@
       count.className = "count";
       var n;
       if (opts.countKeys) {
-        n = opts.countKeys.reduce(function (sum, k) { return sum + state.items[k].length; }, 0);
+        n = opts.countKeys.reduce(function (sum, k) { 
+          return sum + state.items[k].length; }, 0);
       } else {
         n = state.items[key].length;
       }
@@ -758,6 +1040,14 @@
     return head;
   }
 
+  /**
+   * Builds a card's item list: an "(empty)" placeholder, or one row per item
+   * using whichever row builder matches the card's current mode (randomizer,
+   * trash, completed, or the default main row).
+   * @param {string} key - the `state.items` key to render rows for.
+   * @param {Object} [opts] - flags: `randomizerTarget`, `kind`.
+   * @returns {Element} the assembled `<ul class="items">` element.
+   */
   function buildItems(key, opts) {
     opts = opts || {};
     var ul = document.createElement("ul");
@@ -773,18 +1063,34 @@
     }
 
     arr.forEach(function (item) {
-      if (randomizer.active && randomizer.target === opts.randomizerTarget) ul.appendChild(buildRandomizerRow(item));
-      else if (opts.kind === "trash") ul.appendChild(buildTrashRow(item));
-      else if (opts.kind === "completed") ul.appendChild(buildCompletedRow(item));
+      if (randomizer.active && randomizer.target === opts.randomizerTarget) {
+        ul.appendChild(buildRandomizerRow(item));
+      }
+      else if (opts.kind === "trash") {
+        ul.appendChild(buildTrashRow(item));
+      }
+      else if (opts.kind === "completed") {
+        ul.appendChild(buildCompletedRow(item));
+      }
       else ul.appendChild(buildMainRow(key, item));
     });
     return ul;
   }
 
+  /**
+   * Checks whether an item's text starts with the word "buy" - used to decide
+   * whether to show the shopping-cart tag next to it.
+   * @param {Object} item - the item to test.
+   * @returns {boolean} true if the item's text starts with "buy".
+   */
   function isBuyItem(item) {
     return /^buy\b/i.test(item.text);
   }
 
+  /**
+   * Builds the shopping-cart emoji tag shown next to "buy"-prefixed items.
+   * @returns {Element} the tag `<span>`.
+   */
   function buildBuyTag() {
     var tag = document.createElement("span");
     tag.className = "buy-tag";
@@ -792,7 +1098,13 @@
     return tag;
   }
 
-  // main-chain row: [check] [cart?] [label] [pencil] [hamburger]
+  /**
+   * Builds a standard chain-list row: [check] [cart?] [label] [pencil]
+   * [hamburger], with swipe gestures attached.
+   * @param {string} key - list key the item currently lives in.
+   * @param {Object} item - the item to render.
+   * @returns {Element} the `<li>` row.
+   */
   function buildMainRow(key, item) {
     var li = document.createElement("li");
     li.className = "item";
@@ -812,7 +1124,12 @@
     return li;
   }
 
-  // completed row: [ticked check] [grey label] [pencil] [hamburger]
+  /**
+   * Builds a Completed-list row: [ticked check] [grey label] [pencil]
+   * [hamburger], with an up-only swipe gesture attached.
+   * @param {Object} item - the item to render.
+   * @returns {Element} the `<li>` row.
+   */
   function buildCompletedRow(item) {
     var li = document.createElement("li");
     li.className = "item done";
@@ -832,7 +1149,12 @@
     return li;
   }
 
-  // trash row: [grey label + ttl] [Recover] [permanent x]
+  /**
+   * Builds a Trash-list row: [grey label + time-to-live] [Recover] [permanent
+   * delete].
+   * @param {Object} item - the item to render.
+   * @returns {Element} the `<li>` row.
+   */
   function buildTrashRow(item) {
     var li = document.createElement("li");
     li.className = "item trash-item";
@@ -845,7 +1167,9 @@
     label.textContent = item.text;
     wrap.appendChild(label);
 
-    var days = Math.max(0, Math.ceil((WEEK_MS - (getNow().getTime() - new Date(item.deletedAt).getTime())) / (24*60*60*1000)));
+    var days = Math.max(0, 
+      Math.ceil((WEEK_MS - (getNow().getTime() - 
+      new Date(item.deletedAt).getTime())) / (24*60*60*1000)));
     var ttl = document.createElement("div");
     ttl.className = "ttl";
     var dayWord = " days";
@@ -874,6 +1198,12 @@
   }
 
   // ---- shared row pieces ----
+  /**
+   * Builds the checkbox button shared by main and completed rows.
+   * @param {boolean} ticked - whether to render it already checked.
+   * @param {Function} onToggle - click handler.
+   * @returns {Element} the check `<button>`.
+   */
   function buildCheck(ticked, onToggle) {
     var btn = document.createElement("button");
     btn.className = "check";
@@ -889,6 +1219,13 @@
     return btn;
   }
 
+  /**
+   * Builds an item's label area: the text (with a note marker if it has one),
+   * an inline note editor when this item's note is being edited, or the
+   * expanded note text when tapped open.
+   * @param {Object} item - the item to render.
+   * @returns {Element} the `.label-wrap` element.
+   */
   function buildLabel(item) {
     var wrap = document.createElement("div");
     wrap.className = "label-wrap";
@@ -908,10 +1245,17 @@
       var ta = document.createElement("textarea");
       ta.className = "item-note-edit";
       ta.value = item.note || "";
-      ta.placeholder = "Add a note…";
+      ta.placeholder = "Add a note...";
       ta.rows = 1;
       wrap.appendChild(ta);
-      function autoSize() { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; }
+      /**
+       * Grows the note textarea to fit its content, since notes have no fixed
+       * height.
+       */
+      function autoSize() {
+        ta.style.height = "auto";
+        ta.style.height = ta.scrollHeight + "px";
+      }
       ta.addEventListener("input", autoSize);
       setTimeout(function () {
         autoSize();
@@ -919,6 +1263,10 @@
         ta.setSelectionRange(ta.value.length, ta.value.length);
       }, 0);
       var committed = false;
+      /**
+       * Saves the note edit exactly once (guarded against firing twice from
+       * both the Enter keydown and the subsequent blur).
+       */
       function commit() {
         if (committed) return;
         committed = true;
@@ -927,8 +1275,14 @@
         editNote(eKey, item.id, ta.value);
       }
       ta.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commit(); }
-        else if (e.key === "Escape") { committed = true; editingNote = null; render(); }
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          commit();
+        } else if (e.key === "Escape") {
+          committed = true;
+          editingNote = null;
+          render();
+        }
       });
       ta.addEventListener("blur", commit);
     } else if (item.note && expandedNote === item.id) {
@@ -952,12 +1306,27 @@
     return wrap;
   }
 
+  /**
+   * Builds the pencil (edit) button for a row.
+   * @param {string} key - list key the item currently lives in.
+   * @param {Object} item - the item this button edits.
+   * @param {Element} li - the row's `<li>`, passed through to `startEdit` so it
+   *   can be swapped for an inline editor.
+   * @returns {Element} the pencil button.
+   */
   function buildPencil(key, item, li) {
     var btn = mkMini("✎", "Edit");
     btn.addEventListener("click", function () { startEdit(li, key, item); });
     return btn;
   }
 
+  /**
+   * Builds a standalone trash (delete) button, used outside the hamburger menu.
+   * @param {Function} onClick - click handler.
+   * @param {Object} item - the item this button acts on (unused directly here,
+   *   kept for signature symmetry with other builders).
+   * @returns {Element} the trash button.
+   */
   function buildTrashBtn(onClick, item) {
     var btn = mkMini("🗑", "Delete");
     btn.classList.add("trash");
@@ -965,6 +1334,10 @@
     return btn;
   }
 
+  /**
+   * Closes any open item hamburger menu and clears the tracked open button.
+   * Safe to call when no menu is open.
+   */
   var menuOpenBtn = null;
   function closeAllMenus() {
     var open = document.querySelectorAll(".item-menu");
@@ -973,19 +1346,31 @@
   }
   document.addEventListener("click", function (e) {
     if (!e.target.closest(".menu-anchor")) closeAllMenus();
-    if (expandedNote && !editingNote && !e.target.closest(".item[data-id=\"" + expandedNote + "\"]")) {
+    if (expandedNote && !editingNote 
+      && !e.target.closest(".item[data-id=\"" + expandedNote + "\"]")) {
       expandedNote = null;
       render();
     }
   });
 
+  /**
+   * Builds a row's hamburger button and its dropdown menu (move up/down, edit
+   * note, edit recurrence, delete). The menu itself is built lazily on click
+   * and torn down by `closeAllMenus`.
+   * @param {string} key - list key the item currently lives in.
+   * @param {Object} item - the item this menu acts on.
+   * @returns {Element} the `.menu-anchor` wrapper containing the button.
+   */
   function buildHamburger(key, item) {
     var wrap = document.createElement("div");
     wrap.className = "menu-anchor";
     var btn = mkMini("☰", "More options");
     btn.addEventListener("click", function (e) {
       e.stopPropagation();
-      if (menuOpenBtn === btn) { closeAllMenus(); return; }
+      if (menuOpenBtn === btn) {
+        closeAllMenus();
+        return;
+      }
       closeAllMenus();
       menuOpenBtn = btn;
       var menu = document.createElement("div");
@@ -1001,14 +1386,16 @@
         if (key !== "0") {
           var up = document.createElement("button");
           up.textContent = "Move up";
-          up.addEventListener("click", function () { moveChain(key, item.id, -1); });
+          up.addEventListener("click", function () { 
+            moveChain(key, item.id, -1); });
           menu.appendChild(up);
         }
 
         if (key !== "4") {
           var down = document.createElement("button");
           down.textContent = "Move down";
-          down.addEventListener("click", function () { moveChain(key, item.id, 1); });
+          down.addEventListener("click", function () { 
+            moveChain(key, item.id, 1); });
           menu.appendChild(down);
         }
       }
@@ -1040,6 +1427,13 @@
     return wrap;
   }
 
+  /**
+   * Builds a small icon-only button (used for pencil, trash, hamburger, and the
+   * trash-list permanent-delete button).
+   * @param {string} glyph - the button's text content (an icon glyph).
+   * @param {string} label - accessible label, also used as the tooltip.
+   * @returns {Element} the button.
+   */
   function mkMini(glyph, label) {
     var b = document.createElement("button");
     b.className = "mini";
@@ -1049,6 +1443,13 @@
     return b;
   }
 
+  /**
+   * Swaps an item row's label for an inline text input, wired to commit the
+   * edit on Enter/blur or cancel on Escape.
+   * @param {Element} li - the row's `<li>`.
+   * @param {string} key - list key the item currently lives in.
+   * @param {Object} item - the item being edited.
+   */
   function startEdit(li, key, item) {
     var label = li.querySelector(".label");
     if (!label || li.querySelector(".label-edit")) return;
@@ -1060,6 +1461,10 @@
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
     var committed = false;
+    /**
+     * Saves the edit exactly once (guarded against firing twice from both the
+     * Enter keydown and the subsequent blur).
+     */
     function commit() {
       if (committed) return;
       committed = true;
@@ -1067,37 +1472,57 @@
       if (!input.value.trim()) render();     // restore label on cancel
     }
     input.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") commit();
-      else if (e.key === "Escape") { committed = true; render(); }
+      if (e.key === "Enter") {
+        commit();
+      } else if (e.key === "Escape") {
+        committed = true;
+        render();
+      }
     });
     input.addEventListener("blur", commit);
   }
 
+  /**
+   * Builds the "Add..." input + button row shown at the bottom of a list.
+   * @param {string} key - the `state.items` key new items are added to.
+   * @returns {Element} the assembled `.adder` row.
+   */
   function buildAdder(key) {
     var adder = document.createElement("div");
     adder.className = "adder";
     var input = document.createElement("input");
     input.type = "text";
-    input.placeholder = "Add…";
+    input.placeholder = "Add...";
     input.setAttribute("aria-label", "Add an item");
     var addBtn = document.createElement("button");
     addBtn.className = "primary";
     addBtn.textContent = "Add";
+    /**
+     * Reads the input, pushes a new item if non-blank, and resets the input.
+     */
     function commit() {
       var v = input.value.trim();
       if (!v) return;
       state.items[key].push({ id: uid(), text: v });
       input.value = "";
-      save(); render();
+      save();
+      render();
     }
     addBtn.addEventListener("click", commit);
-    input.addEventListener("keydown", function (e) { if (e.key === "Enter") commit(); });
+    input.addEventListener("keydown", function (e) { 
+      if (e.key === "Enter") commit(); });
     adder.appendChild(input);
     adder.appendChild(addBtn);
     return adder;
   }
 
   // ---------- randomizer animation ----------
+  /**
+   * Runs the randomizer's slot-machine-style highlight animation: picks a
+   * winner up front, then ticks through items with slowing timing until it
+   * lands on the winner. A no-op if the target list is empty; skips straight to
+   * the winner if it has exactly one item.
+   */
   function runRandomizerAnimation() {
     var gen = ++randomizerGen;
     var keys;
@@ -1126,6 +1551,12 @@
     var totalTicks = allItems.length * cycles + winnerIdx;
     var currentTick = 0;
 
+    /**
+     * Advances the randomizer highlight by one item and schedules the next tick
+     * with slowing delay, until `totalTicks` is reached and the animation lands
+     * on the pre-chosen winner. Bails out early if `randomizerGen` has moved on
+     * (a newer randomizer run started).
+     */
     function tick() {
       if (gen !== randomizerGen) return;
       var itemIdx = currentTick % allItems.length;
@@ -1153,13 +1584,26 @@
     tick();
   }
 
+  /**
+   * Blinks the randomizer's winning item 4 times, then leaves it highlighted.
+   * Bails out early if `randomizerGen` has moved on (a newer randomizer run
+   * started).
+   * @param {number} gen - the `randomizerGen` snapshot this run belongs to.
+   */
   function blinkWinner(gen) {
     var el = document.querySelector('.rnd-item[data-id="' + randomizer.winnerId + '"]');
     if (!el) return;
     var blinks = 0;
+    /**
+     * Toggles the winner's highlight class once and reschedules itself, up to 4
+     * blinks.
+     */
     function blink() {
       if (gen !== randomizerGen) return;
-      if (blinks >= 4) { el.classList.add("rnd-highlight"); return; }
+      if (blinks >= 4) {
+        el.classList.add("rnd-highlight");
+        return;
+      }
       el.classList.toggle("rnd-highlight");
       blinks++;
       setTimeout(blink, 250);
@@ -1169,29 +1613,61 @@
   }
 
   // ---------- swipe ----------
-  // swipe left -> up the chain ; swipe right -> down the chain
+  /**
+   * Wires up a chain-list row's swipe gesture: left moves the item up the
+   * chain, right moves it down.
+   * @param {Element} el - the row's `<li>`.
+   * @param {string} key - list key the item currently lives in.
+   * @param {string} id - id of the item to move.
+   */
   function attachSwipe(el, key, id) {
     swipeCore(el, function (dir) {
       if (dir === "left") moveChain(key, id, -1);
       else moveChain(key, id, 1);
     });
   }
-  // purgatory: only up-swipe (left) revives to list 2
+  /**
+   * Wires up a Completed row's swipe gesture: only a left ("up") swipe does
+   * anything, reviving the item back to List 2.
+   * @param {Element} el - the row's `<li>`.
+   * @param {string} id - id of the item to revive.
+   */
   function attachSwipeUpOnly(el, id) {
     swipeCore(el, function (dir) {
       if (dir === "left") uncompleteItem(id);
     });
   }
 
+  /**
+   * Attaches the shared horizontal-swipe-to-commit gesture to a row: tracks
+   * touch movement, applies a live drag transform/opacity/tint once past a
+   * small deadzone, and on release either snaps back or commits (calling
+   * `onCommit` with "left"/"right") if the drag passed the commit threshold.
+   * @param {Element} el - the row element to attach the gesture to.
+   * @param {Function} onCommit - called with `"left"` or `"right"` when a swipe
+   *   is committed.
+   */
   function swipeCore(el, onCommit) {
-    var startX = 0, startY = 0, dx = 0, dy = 0, tracking = false, swiped = false;
+    var startX = 0;
+    var startY = 0;
+    var dx = 0;
+    var dy = 0;
+    var tracking = false;
+    var swiped = false;
     var THRESH = 80;
     var origBg = "";
     el.addEventListener("touchstart", function (e) {
       if (e.touches.length !== 1) return;
-      if (e.target.closest(".label-edit")) { tracking = false; return; }
-      tracking = true; swiped = false;
-      startX = e.touches[0].clientX; startY = e.touches[0].clientY; dx = 0; dy = 0;
+      if (e.target.closest(".label-edit")) {
+        tracking = false;
+        return;
+      }
+      tracking = true;
+      swiped = false;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      dx = 0;
+      dy = 0;
       origBg = el.style.backgroundColor;
     }, { passive: true });
     el.addEventListener("touchmove", function (e) {
@@ -1212,13 +1688,18 @@
     el.addEventListener("touchend", function (e) {
       if (!tracking) return;
       tracking = false;
-      el.style.transform = ""; el.style.opacity = "";
+      el.style.transform = "";
+      el.style.opacity = "";
       el.style.backgroundColor = origBg;
       if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > THRESH) {
         // a real swipe happened: stop the underlying button's click from firing
         var btn = e.target.closest("button");
         if (btn) {
-          var swallow = function (ev) { ev.stopPropagation(); ev.preventDefault(); btn.removeEventListener("click", swallow, true); };
+          var swallow = function (ev) {
+            ev.stopPropagation();
+            ev.preventDefault();
+            btn.removeEventListener("click", swallow, true);
+          };
           btn.addEventListener("click", swallow, true);
           setTimeout(function () { btn.removeEventListener("click", swallow, true); }, 350);
         }
@@ -1237,6 +1718,11 @@
   var atMinEl = document.getElementById("atMin");
   var nextNote = document.getElementById("nextNote");
 
+  /**
+   * Zero-pads a number below 10 to two digits.
+   * @param {number} n - the number to pad.
+   * @returns {string} the padded value, e.g. "05".
+   */
   function pad(n) {
     var prefix = "";
     if (n < 10) {
@@ -1244,25 +1730,55 @@
     }
     return prefix + n;
   }
+  /**
+   * Populates the schedule inputs (every/hour/minute) from `state`.
+   */
   function syncScheduleInputs() {
     everyEl.value = state.schedule.everyDays;
     atHourEl.value = Math.floor(state.schedule.atMinutes / 60);
     atMinEl.value = pad(state.schedule.atMinutes % 60);
   }
-  function clamp(v, lo, hi) { v = parseInt(v, 10); if (isNaN(v)) v = lo; return Math.max(lo, Math.min(hi, v)); }
+  /**
+   * Parses and clamps a raw input value into an integer range.
+   * @param {*} v - raw input value (typically a string from an input).
+   * @param {number} lo - inclusive lower bound, and fallback for NaN.
+   * @param {number} hi - inclusive upper bound.
+   * @returns {number} the clamped integer.
+   */
+  function clamp(v, lo, hi) {
+    v = parseInt(v, 10);
+    if (isNaN(v)) {
+      v = lo;
+    }
+    return Math.max(lo, Math.min(hi, v));
+  }
+  /**
+   * Handles a change on any schedule input: reads and clamps the
+   * every/hour/minute fields, writes the new schedule to `state`, and refreshes
+   * the "Next return" note.
+   */
   function onScheduleChange() {
-    var ed = parseInt(everyEl.value, 10); if (!(ed >= 1)) ed = 1;
-    state.schedule.everyDays = ed; everyEl.value = ed;
+    var ed = parseInt(everyEl.value, 10);
+    if (!(ed >= 1)) {
+      ed = 1;
+    }
+    state.schedule.everyDays = ed;
+    everyEl.value = ed;
     var h = clamp(atHourEl.value, 0, 23);
     var m = clamp(atMinEl.value, 0, 59);
-    atHourEl.value = h; atMinEl.value = pad(m);
+    atHourEl.value = h;
+    atMinEl.value = pad(m);
     state.schedule.atMinutes = h * 60 + m;
-    save(); updateNextNote();
+    save();
+    updateNextNote();
   }
   everyEl.addEventListener("change", onScheduleChange);
   atHourEl.addEventListener("change", onScheduleChange);
   atMinEl.addEventListener("change", onScheduleChange);
 
+  /**
+   * Refreshes the "Next return" note with the next scheduled boundary.
+   */
   function updateNextNote() {
     var next = nextBoundaryAfter(getNow());
     nextNote.textContent = "Next return: " + next.toLocaleString("en-CA",
@@ -1270,22 +1786,48 @@
   }
 
   // ---------- export / import ----------
+  /**
+   * Serializes the whole state object for export.
+   * @returns {string} pretty-printed JSON of `state`.
+   */
   function exportJSON() { return JSON.stringify(state, null, 2); }
+  /**
+   * Records the current moment as the last export time and refreshes the
+   * displayed "last exported" note.
+   */
   function markExported() {
     state.lastExported = getNow().toISOString();
-    save(); updateLastExported();
+    save();
+    updateLastExported();
   }
+  /**
+   * Parses and imports a JSON export, after user confirmation, fully replacing
+   * the current state on success.
+   * @param {string} text - candidate JSON text to import.
+   * @returns {boolean} true if the import succeeded.
+   */
   function importFromText(text) {
     if (!window.confirm("Import will replace everything currently in these lists. Continue?")) return;
     try {
       state = normalise(JSON.parse(text));
-      save(); syncScheduleInputs(); render();
+      save();
+      syncScheduleInputs();
+      render();
       toast("Imported.");
       return true;
-    } catch (e) { toast("That text could not be read as valid JSON."); return false; }
+    } catch (e) {
+      toast("That text could not be read as valid JSON.");
+      return false;
+    }
   }
 
   // modal helpers
+  /**
+   * Wraps arbitrary content in a modal overlay and appends it to the document,
+   * closing on a click outside the modal box.
+   * @param {Element} content - the content to place inside the modal.
+   * @returns {Element} the overlay element (call `.remove()` to close).
+   */
   function showModal(content) {
     var overlay = document.createElement("div");
     overlay.className = "modal-overlay";
@@ -1303,16 +1845,23 @@
   // Export - Copy: show JSON in a readonly textarea for manual selection
   document.getElementById("exportCopyBtn").addEventListener("click", function () {
     var frag = document.createDocumentFragment();
-    var h = document.createElement("h3"); h.textContent = "Export — select and copy"; frag.appendChild(h);
+    var h = document.createElement("h3");
+    h.textContent = "Export — select and copy";
+    frag.appendChild(h);
     var ta = document.createElement("textarea");
-    ta.className = "modal-ta"; ta.readOnly = true; ta.value = exportJSON();
+    ta.className = "modal-ta";
+    ta.readOnly = true;
+    ta.value = exportJSON();
     frag.appendChild(ta);
-    var row = document.createElement("div"); row.className = "modal-actions";
-    var close = document.createElement("button"); close.textContent = "Done";
+    var row = document.createElement("div");
+    row.className = "modal-actions";
+    var close = document.createElement("button");
+    close.textContent = "Done";
     row.appendChild(close);
     frag.appendChild(row);
     var overlay = showModal(frag);
-    ta.focus(); ta.select();
+    ta.focus();
+    ta.select();
     markExported();
     close.addEventListener("click", function () { overlay.remove(); });
   });
@@ -1325,7 +1874,9 @@
     a.href = url;
     var d = getNow();
     a.download = "lists-" + d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") + ".json";
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     markExported();
     toast("Exported.");
@@ -1333,7 +1884,10 @@
 
   // Export - Share
   document.getElementById("exportShareBtn").addEventListener("click", function () {
-    if (!navigator.share) { toast("Share not supported in this browser."); return; }
+    if (!navigator.share) {
+      toast("Share not supported in this browser.");
+      return;
+    }
     navigator.share({ title: "AutoReList backup", text: exportJSON() }).then(function () {
       markExported();
     }).catch(function () {});
@@ -1342,20 +1896,31 @@
   // Import - Paste: show empty textarea for user to paste into
   document.getElementById("importPasteBtn").addEventListener("click", function () {
     var frag = document.createDocumentFragment();
-    var h = document.createElement("h3"); h.textContent = "Import — paste JSON"; frag.appendChild(h);
+    var h = document.createElement("h3");
+    h.textContent = "Import — paste JSON";
+    frag.appendChild(h);
     var ta = document.createElement("textarea");
-    ta.className = "modal-ta"; ta.placeholder = "Paste exported JSON here…";
+    ta.className = "modal-ta";
+    ta.placeholder = "Paste exported JSON here...";
     frag.appendChild(ta);
-    var row = document.createElement("div"); row.className = "modal-actions";
-    var imp = document.createElement("button"); imp.className = "primary"; imp.textContent = "Import";
-    var cancel = document.createElement("button"); cancel.textContent = "Cancel";
-    row.appendChild(imp); row.appendChild(cancel);
+    var row = document.createElement("div");
+    row.className = "modal-actions";
+    var imp = document.createElement("button");
+    imp.className = "primary";
+    imp.textContent = "Import";
+    var cancel = document.createElement("button");
+    cancel.textContent = "Cancel";
+    row.appendChild(imp);
+    row.appendChild(cancel);
     frag.appendChild(row);
     var overlay = showModal(frag);
     ta.focus();
     imp.addEventListener("click", function () {
       var text = ta.value.trim();
-      if (!text) { toast("Nothing to import."); return; }
+      if (!text) {
+        toast("Nothing to import.");
+        return;
+      }
       if (importFromText(text)) overlay.remove();
     });
     cancel.addEventListener("click", function () { overlay.remove(); });
@@ -1364,7 +1929,8 @@
   // Import - File
   var fileInput = document.getElementById("fileInput");
   document.getElementById("importFileBtn").addEventListener("click", function () {
-    fileInput.value = ""; fileInput.click();
+    fileInput.value = "";
+    fileInput.click();
   });
   fileInput.addEventListener("change", function () {
     var f = fileInput.files && fileInput.files[0];
@@ -1374,11 +1940,22 @@
     reader.readAsText(f);
   });
 
+  /**
+   * Formats an ISO date string for the "Last exported" note.
+   * @param {string} iso - ISO date string.
+   * @returns {string} the formatted date/time.
+   */
   var lastExportedEl = document.getElementById("lastExported");
   function formatExportDate(iso) {
     return new Date(iso).toLocaleString("en-CA",
       { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
   }
+  /**
+   * Refreshes the "Last exported" note. Shows a checkmark once the export has
+   * been confirmed; otherwise shows a confirm button (marks this export as
+   * confirmed) and a revert button (rolls `lastExported` back to the last
+   * confirmed value).
+   */
   function updateLastExported() {
     lastExportedEl.innerHTML = "";
     var text = document.createElement("span");
@@ -1405,7 +1982,8 @@
       confirmBtn.setAttribute("aria-label", "Confirm this export");
       confirmBtn.addEventListener("click", function () {
         state.lastExportedConfirmed = state.lastExported;
-        save(); updateLastExported();
+        save();
+        updateLastExported();
       });
       lastExportedEl.appendChild(confirmBtn);
 
@@ -1415,13 +1993,19 @@
       revertBtn.setAttribute("aria-label", "Revert to last confirmed export");
       revertBtn.addEventListener("click", function () {
         state.lastExported = state.lastExportedConfirmed;
-        save(); updateLastExported();
+        save();
+        updateLastExported();
       });
       lastExportedEl.appendChild(revertBtn);
     }
   }
 
   // ---------- toast ----------
+  /**
+   * Shows a transient toast message, replacing and resetting the timer on any
+   * prior toast still showing.
+   * @param {string} msg - the message to display.
+   */
   var toastEl = document.getElementById("toast");
   var toastTimer = null;
   function toast(msg) {
@@ -1432,7 +2016,13 @@
   }
 
   // ---------- theme ----------
-  var THEME_KEY = "fourlist.theme";
+  var THEME_KEY = "aulists.theme";
+  /**
+   * Applies a theme preference to the document: sets `data-theme` and the
+   * `theme-color` meta tag. "system" resolves against the OS
+   * `prefers-color-scheme` media query.
+   * @param {string} pref - "dark", "light", or "system".
+   */
   function applyTheme(pref) {
     var dark;
     if (pref === "dark") dark = true;
@@ -1448,6 +2038,11 @@
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", themeColor);
   }
+  /**
+   * Boots the theme system: applies the stored (or system) preference, wires up
+   * the theme switcher buttons, and keeps "system" mode synced to live OS theme
+   * changes.
+   */
   function initTheme() {
     var pref = localStorage.getItem(THEME_KEY) || "system";
     applyTheme(pref);
@@ -1468,12 +2063,23 @@
     });
   }
 
-  // TEMP debug panel wiring — comment out along with the override block near the top of this
+  // TEMP debug panel wiring - comment out along with the override block near
+  // the top of this
   // file and #debugDatePanel in index.html when not actively testing.
+  /**
+   * Fills the debug-panel date and hour inputs from a Date.
+   * @param {Element} dateEl - the date `<input>`.
+   * @param {Element} hourEl - the hour `<input>`.
+   * @param {Date} d - the moment to populate the inputs from.
+   */
   function populateDebugNowInputs(dateEl, hourEl, d) {
     dateEl.value = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
     hourEl.value = d.getHours();
   }
+  /**
+   * Updates the debug panel's status line to reflect whether a "now" override
+   * is currently active.
+   */
   function updateDebugNowStatus() {
     var statusEl = document.getElementById("debugNowStatus");
     if (debugNowOverride) {
@@ -1483,12 +2089,21 @@
       statusEl.textContent = "Using real time.";
     }
   }
+  /**
+   * Re-runs the effects that depend on "now" after the debug override changes:
+   * refreshes the status line, purges stale trash, applies any auto-return
+   * that's now due, and re-renders.
+   */
   function applyDebugNowChange() {
     updateDebugNowStatus();
     purgeTrash();
     applyAutoReturn();
     render();
   }
+  /**
+   * Wires up the temp debug "now" panel: populates its inputs, and hooks the
+   * Set/Clear buttons to `setDebugNow` + `applyDebugNowChange`.
+   */
   function initDebugNowPanel() {
     var dateEl = document.getElementById("debugNowDate");
     var hourEl = document.getElementById("debugNowHour");
