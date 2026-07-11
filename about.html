@@ -28,6 +28,30 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v0.8 <span class="changelog-date">2026-07-10 19H</span></h3>
+    <ul>
+      <li>Checkpoint B of the item/list data model rewrite: items now carry
+      isDone, lastDone, and origin fields.</li>
+      <li>Completing an item records which list it came from (origin) and
+      when (lastDone); unchecking it from Completed now sends it back to
+      that exact list instead of always dumping it into List 2.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
+    <h3>v0.7 <span class="changelog-date">2026-07-10 07H</span></h3>
+    <ul>
+      <li>Checkpoint A of the item/list data model rewrite: items are now
+      stored once each in a single itemsById table, and every list (Today's
+      zones, Lists 2/3/3.5/4, Completed, Trash) just holds ids into it
+      instead of full copies of the item.</li>
+      <li>Pure refactor, no visible behaviour change yet — this is prep for
+      linking one item into multiple lists at once (recurring items,
+      Basics, retroactive past-day logging) in upcoming checkpoints.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v0.6.1 <span class="changelog-date">2026-07-10 07H</span></h3>
     <ul>
       <li>Massive code refactoring. (Also got mad and finally changed the
@@ -47,28 +71,39 @@
   <div class="changelog-entry">
     <h3>v0.6 <span class="changelog-date">2026-07-06 21H</span></h3>
     <ul>
-      <li>Removed every ternary operator from the codebase (autorelists.js, colourcaln.js, swipe-nav.js), expanded to if/else</li>
-      <li>All "current time" reads now go through one internal getNow() function instead of calling new Date() / Date.now() directly, in prep for recurring items and day rollover</li>
-      <li>Added a temporary debug panel (bottom of the lists page) to override "now" for testing date-dependent behaviour without waiting for real days to pass</li>
+      <li>Removed every ternary operator from the codebase (autorelists.js, 
+        colourcaln.js, swipe-nav.js), expanded to if/else</li>
+      <li>All "current time" reads now go through one internal getNow() 
+        function instead of calling new Date() / Date.now() directly, in prep for 
+        recurring items and day rollover</li>
+      <li>Added a temporary debug panel (bottom of the lists page) to 
+        override "now" for testing date-dependent behaviour without waiting 
+        for real days to pass</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.5 <span class="changelog-date">2026-07-05 21H</span></h3>
     <ul>
-      <li>List 1 is now a "Today" carousel card, styled distinctly (Colourcaln-style dark/vivid theme) from the rest of the lists</li>
-      <li>Real dates in the Today card header ("Today | Jul 05 Sun") and on placeholder past-day cards reached via the prev/next carousel arrows</li>
-      <li>Prev/next arrows peek the neighbouring day's card at the edges, with a sliding animation between days</li>
+      <li>List 1 is now a "Today" carousel card, styled distinctly 
+        (Colourcaln-style dark/vivid theme) from the rest of the lists</li>
+      <li>Real dates in the Today card header ("Today | Jul 05 Sun") and on 
+        placeholder past-day cards reached via the prev/next carousel arrows</li>
+      <li>Prev/next arrows peek the neighbouring day's card at the edges, with 
+        a sliding animation between days</li>
       <li>Hid the "Select to keep" button (no longer needed)</li>
-      <li>Fixed the item hamburger menu getting clipped or triggering a stray scrollbar when opened from inside the carousel</li>
+      <li>Fixed the item hamburger menu getting clipped or triggering a stray 
+        scrollbar when opened from inside the carousel</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.4 <span class="changelog-date">2026-07-05 19H</span></h3>
     <ul>
-      <li>Fixed swipe direction: swipe up from Day colours goes to Lists, swipe down from Lists goes to Day colours (was backwards)</li>
-      <li>Fixed a bug where one long or held swipe would commit instantly instead of requiring a second, separate swipe</li>
+      <li>Fixed swipe direction: swipe up from Day colours goes to Lists, swipe 
+        down from Lists goes to Day colours (was backwards)</li>
+      <li>Fixed a bug where one long or held swipe would commit instantly 
+        instead of requiring a second, separate swipe</li>
     </ul>
   </div>
 
@@ -83,15 +118,18 @@
     <h3>v0.2 <span class="changelog-date">2026-07-05 19H</span></h3>
     <ul>
       <li>Fixed broken page references left over from the file rename</li>
-      <li>One shared manifest + service worker, so the whole thing installs as a single "Aulists" PWA</li>
-      <li>Swipe-up / swipe-down navigation between the lists and Colourcaln pages</li>
+      <li>One shared manifest + service worker, so the whole thing installs as 
+        a single "Aulists" PWA</li>
+      <li>Swipe-up / swipe-down navigation between the lists and Colourcaln 
+        pages</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.1 <span class="changelog-date">2026-07-05 07H</span></h3>
     <ul>
-      <li>Repo created; Colourcaln and Autorelist copied in as the two starting pages</li>
+      <li>Repo created; Colourcaln and Autorelist copied in as the two starting 
+        pages</li>
       <li>New merged app icon: cyan/purple diagonal split</li>
     </ul>
   </div>

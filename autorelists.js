@@ -88,8 +88,9 @@
    */
   function freshState() {
     return {
-      version: 1,
-      items: {
+      version: 2,
+      itemsById: {},
+      lists: {
         "0": [], "1": [], "2": [], "3": [], "3.5": [], "4": [],
         completed: [], trash: []
       },
@@ -124,23 +125,6 @@
   }
 
   /**
-   * Filters and sanitizes a candidate array of item objects.
-   * @param {Array} arr - untrusted candidate array from parsed JSON.
-   * @returns {Array} a clean array of `{id, text, note?}` objects; entries
-   *   missing a string `.text` are dropped, missing ids are re-minted.
-   */
-  function cleanItems(arr) {
-    if (!Array.isArray(arr)) return [];
-    return arr
-      .filter(function (it) { return it && typeof it.text === "string"; })
-      .map(function (it) {
-        var o = { id: it.id || uid(), text: it.text };
-        if (it.note) o.note = it.note;
-        return o;
-      });
-  }
-
-  /**
    * Sanitizes an arbitrary parsed-JSON blob (from localStorage or an import)
    * into a fully-formed state object. Anything malformed, partial, or garbage
    * is dropped or defaulted rather than allowed to corrupt `state`.
@@ -150,32 +134,46 @@
   function normalise(obj) {
     var s = freshState();
     if (obj && typeof obj === "object") {
-      if (obj.items) {
-        ["0","1","2","3","3.5","4","completed"].forEach(function (k) {
-          s.items[k] = cleanItems(obj.items[k]);
+      var validIds = {};
+      if (obj.itemsById && typeof obj.itemsById === "object") {
+        Object.keys(obj.itemsById).forEach(function (id) {
+          var it = obj.itemsById[id];
+          if (!it || typeof it.text !== "string") return;
+          var o = { id: id, text: it.text, isDone: false, lastDone: null };
+          if (it.note) o.note = it.note;
+          if (typeof it.isDone === "boolean") o.isDone = it.isDone;
+          if (typeof it.lastDone === "string") o.lastDone = it.lastDone;
+          if (CHAIN.indexOf(it.origin) !== -1) o.origin = it.origin;
+          s.itemsById[id] = o;
+          validIds[id] = true;
         });
-        if (Array.isArray(obj.items.trash)) {
-          s.items.trash = obj.items.trash
-            .filter(function (it) { return it && typeof it.text === "string"; })
-            .map(function (it) {
-              var origin = "3";
-              if (CHAIN.indexOf(it.origin) !== -1 ||
-                it.origin === "completed") {
-                origin = it.origin;
-              }
-              var deletedAt = getNow().toISOString();
-              if (typeof it.deletedAt === "string") {
-                deletedAt = it.deletedAt;
-              }
-              var o = {
-                id: it.id || uid(),
-                text: it.text,
-                origin: origin,
-                deletedAt: deletedAt
-              };
-              if (it.note) o.note = it.note;
-              return o;
+      }
+      if (obj.lists) {
+        ["0", "1", "2", "3", "3.5", "4", "completed"].forEach(function (k) {
+          var arr = obj.lists[k];
+          if (!Array.isArray(arr)) return;
+          arr.forEach(function (id) {
+            if (typeof id === "string" && validIds[id]) {
+              s.lists[k].push(id);
+            }
+          });
+        });
+        if (Array.isArray(obj.lists.trash)) {
+          obj.lists.trash.forEach(function (t) {
+            if (!t || typeof t.id !== "string" || !validIds[t.id]) return;
+            var origin = "3";
+            if (CHAIN.indexOf(t.origin) !== -1 ||
+              t.origin === "completed") {
+              origin = t.origin;
+            }
+            var deletedAt = getNow().toISOString();
+            if (typeof t.deletedAt === "string") {
+              deletedAt = t.deletedAt;
+            }
+            s.lists.trash.push({
+              id: t.id, origin: origin, deletedAt: deletedAt
             });
+          });
         }
       }
       if (obj.collapsed) {
@@ -310,9 +308,9 @@
       crossed = boundary.getTime() <= now.getTime();
     }
 
-    if (crossed && state.items["2"].length > 0) {
-      state.items["1"] = state.items["1"].concat(state.items["2"]);
-      state.items["2"] = [];
+    if (crossed && state.lists["2"].length > 0) {
+      state.lists["1"] = state.lists["1"].concat(state.lists["2"]);
+      state.lists["2"] = [];
       state.lastReturn = boundary.toISOString();
       save();
       return true;
@@ -331,22 +329,31 @@
    */
   function purgeTrash() {
     var now = getNow().getTime();
-    var before = state.items.trash.length;
-    state.items.trash = state.items.trash.filter(function (t) {
+    var before = state.lists.trash.length;
+    state.lists.trash = state.lists.trash.filter(function (t) {
       return (now - new Date(t.deletedAt).getTime()) < WEEK_MS;
     });
-    if (state.items.trash.length !== before) save();
+    if (state.lists.trash.length !== before) save();
   }
 
   // ---------- item operations ----------
   /**
-   * Finds an item's index within one of the plain item-array list keys.
-   * @param {string} listKey - one of the `state.items` keys (not "trash").
+   * Finds an id's index within one of the id-array list keys.
+   * @param {string} listKey - one of the `state.lists` keys (not "trash").
    * @param {string} id - id of the item to find.
    * @returns {number} the index, or -1 if not present in that list.
    */
   function findIn(listKey, id) {
-    return state.items[listKey].findIndex(function (i) { return i.id === id; });
+    return state.lists[listKey].indexOf(id);
+  }
+
+  /**
+   * Finds a Trash entry's index by item id.
+   * @param {string} id - id of the item to find in Trash.
+   * @returns {number} the index, or -1 if not present in Trash.
+   */
+  function findInTrash(id) {
+    return state.lists.trash.findIndex(function (t) { return t.id === id; });
   }
 
   /**
@@ -364,38 +371,48 @@
     if (!toKey) return;
     var i = findIn(fromKey, id);
     if (i === -1) return;
-    var moved = state.items[fromKey].splice(i, 1)[0];
-    state.items[toKey].push(moved);
+    state.lists[fromKey].splice(i, 1);
+    state.lists[toKey].push(id);
     save();
     render();
   }
 
   /**
-   * Moves an item out of its current list and into Completed.
+   * Moves an item out of its current list and into Completed, recording where
+   * it came from (so uncomplete knows where to put it back) and when it was
+   * done.
    * @param {string} fromKey - list key the item currently lives in.
    * @param {string} id - id of the item to complete.
    */
   function completeItem(fromKey, id) {
     var i = findIn(fromKey, id);
     if (i === -1) return;
-    var moved = state.items[fromKey].splice(i, 1)[0];
-    state.items.completed.push(moved);
+    state.lists[fromKey].splice(i, 1);
+    var item = state.itemsById[id];
+    item.isDone = true;
+    item.lastDone = getNow().toISOString();
+    item.origin = fromKey;
+    state.lists.completed.push(id);
     save();
     render();
   }
 
   /**
-   * Moves an item out of Completed and back into List 2. Always List 2,
-   * regardless of which list the item was completed from - this hardcoded
-   * one-way return is the thing Checkpoint B replaces with `origin`-based
-   * routing.
+   * Moves an item out of Completed and back into its recorded `origin` list,
+   * falling back to List 2 if that list no longer exists.
    * @param {string} id - id of the item to uncomplete.
    */
   function uncompleteItem(id) {
     var i = findIn("completed", id);
     if (i === -1) return;
-    var moved = state.items.completed.splice(i, 1)[0];
-    state.items["2"].push(moved);   // one-way back to list 2
+    state.lists.completed.splice(i, 1);
+    var item = state.itemsById[id];
+    item.isDone = false;
+    var dest = "2";
+    if (state.lists[item.origin]) {
+      dest = item.origin;
+    }
+    state.lists[dest].push(id);
     save();
     render();
   }
@@ -409,13 +426,10 @@
   function trashItem(fromKey, id) {
     var i = findIn(fromKey, id);
     if (i === -1) return;
-    var moved = state.items[fromKey].splice(i, 1)[0];
-    var trashed = {
-      id: moved.id, text: moved.text,
-      origin: fromKey, deletedAt: getNow().toISOString()
-    };
-    if (moved.note) trashed.note = moved.note;
-    state.items.trash.push(trashed);
+    state.lists[fromKey].splice(i, 1);
+    state.lists.trash.push({
+      id: id, origin: fromKey, deletedAt: getNow().toISOString()
+    });
     save();
     render();
   }
@@ -426,16 +440,14 @@
    * @param {string} id - id of the item to recover.
    */
   function recoverItem(id) {
-    var i = findIn("trash", id);
+    var i = findInTrash(id);
     if (i === -1) return;
-    var t = state.items.trash.splice(i, 1)[0];
+    var t = state.lists.trash.splice(i, 1)[0];
     var dest = "3";
-    if (state.items[t.origin]) {
+    if (state.lists[t.origin]) {
       dest = t.origin;
     }
-    var recovered = { id: t.id, text: t.text };
-    if (t.note) recovered.note = t.note;
-    state.items[dest].push(recovered);
+    state.lists[dest].push(t.id);
     save();
     render();
   }
@@ -445,9 +457,9 @@
    * @param {string} id - id of the item to permanently delete.
    */
   function permaDelete(id) {
-    var i = findIn("trash", id);
+    var i = findInTrash(id);
     if (i === -1) return;
-    state.items.trash.splice(i, 1);
+    state.lists.trash.splice(i, 1);
     save();
     render();
   }
@@ -464,7 +476,7 @@
     if (i === -1) return;
     var v = newText.trim();
     if (v === "") return;            // empty = cancel, keep original
-    state.items[listKey][i].text = v;
+    state.itemsById[id].text = v;
     save();
     render();
   }
@@ -481,10 +493,10 @@
     if (i === -1) return;
     var v = newNote.trim();
     if (v) {
-      state.items[listKey][i].note = v;
+      state.itemsById[id].note = v;
       expandedNote = id;
     } else {
-      delete state.items[listKey][i].note;
+      delete state.itemsById[id].note;
       expandedNote = null;
     }
     save();
@@ -734,20 +746,21 @@
    * Fills a zone (one of the two halves of a split card) with rows for a list
    * key, or an "(empty)" placeholder if the list is empty.
    * @param {Element} ul - the `<ul class="items">` to fill.
-   * @param {string} key - the `state.items` key to render rows for.
+   * @param {string} key - the `state.lists` key to render rows for.
    * @param {boolean} [scoped] - true only for the Today card's zones, which
    *   support select-to-keep and the randomizer.
    */
   function fillZone(ul, key, scoped) {
-    var arr = state.items[key];
-    if (arr.length === 0) {
+    var ids = state.lists[key];
+    if (ids.length === 0) {
       var empty = document.createElement("li");
       empty.className = "empty";
       empty.textContent = "(empty)";
       ul.appendChild(empty);
       return;
     }
-    arr.forEach(function (item) {
+    ids.forEach(function (id) {
+      var item = state.itemsById[id];
       if (scoped && randomizer.active && randomizer.target === "today") {
         ul.appendChild(buildRandomizerRow(item));
         return;
@@ -852,7 +865,7 @@
   /**
    * Builds a full list card: head, item rows, and (unless suppressed) an adder
    * row.
-   * @param {string} key - the `state.items` key this card renders.
+   * @param {string} key - the `state.lists` key this card renders.
    * @param {string} titleText - the card's displayed title.
    * @param {Object} [opts] - see `buildHead` and `buildItems` for the full set
    *   of recognized flags (fixed, collapsible, kind, etc.).
@@ -884,7 +897,7 @@
    * Builds a card's header row: the collapse chevron, title, and whatever
    * header actions (Randomizer!/Done, Move unselected/Cancel) apply given the
    * card's mode and current select-to-keep/randomizer state.
-   * @param {string} key - the `state.items` key this header belongs to.
+   * @param {string} key - the `state.lists` key this header belongs to.
    * @param {string} titleText - the card's displayed title.
    * @param {Object} [opts] - flags: `collapsible`, `selectToKeep`,
    *   `randomizerTarget`.
@@ -955,14 +968,14 @@
         moveBtn.addEventListener("click", function () {
           ["0", "1"].forEach(function (k) {
             var keep = [];
-            state.items[k].forEach(function (item) {
-              if (selectToKeep.selected[item.id]) {
-                keep.push(item);
+            state.lists[k].forEach(function (id) {
+              if (selectToKeep.selected[id]) {
+                keep.push(id);
               } else {
-                state.items["2"].push(item);
+                state.lists["2"].push(id);
               }
             });
-            state.items[k] = keep;
+            state.lists[k] = keep;
           });
           selectToKeep.active = false;
           selectToKeep.selected = {};
@@ -994,7 +1007,9 @@
             }
             var allItems = [];
             keys.forEach(function (k) {
-              state.items[k].forEach(function (item) { allItems.push(item); });
+              state.lists[k].forEach(function (id) {
+                allItems.push(state.itemsById[id]);
+              });
             });
             if (allItems.length === 0) {
               toast("No items to randomize!");
@@ -1028,10 +1043,10 @@
       count.className = "count";
       var n;
       if (opts.countKeys) {
-        n = opts.countKeys.reduce(function (sum, k) { 
-          return sum + state.items[k].length; }, 0);
+        n = opts.countKeys.reduce(function (sum, k) {
+          return sum + state.lists[k].length; }, 0);
       } else {
-        n = state.items[key].length;
+        n = state.lists[key].length;
       }
       count.textContent = n;
       head.appendChild(count);
@@ -1044,7 +1059,7 @@
    * Builds a card's item list: an "(empty)" placeholder, or one row per item
    * using whichever row builder matches the card's current mode (randomizer,
    * trash, completed, or the default main row).
-   * @param {string} key - the `state.items` key to render rows for.
+   * @param {string} key - the `state.lists` key to render rows for.
    * @param {Object} [opts] - flags: `randomizerTarget`, `kind`.
    * @returns {Element} the assembled `<ul class="items">` element.
    */
@@ -1052,9 +1067,24 @@
     opts = opts || {};
     var ul = document.createElement("ul");
     ul.className = "items";
-    var arr = state.items[key];
 
-    if (arr.length === 0) {
+    if (opts.kind === "trash") {
+      var trashArr = state.lists.trash;
+      if (trashArr.length === 0) {
+        var emptyTrash = document.createElement("li");
+        emptyTrash.className = "empty";
+        emptyTrash.textContent = "(empty)";
+        ul.appendChild(emptyTrash);
+        return ul;
+      }
+      trashArr.forEach(function (entry) {
+        ul.appendChild(buildTrashRow(entry));
+      });
+      return ul;
+    }
+
+    var ids = state.lists[key];
+    if (ids.length === 0) {
       var empty = document.createElement("li");
       empty.className = "empty";
       empty.textContent = "(empty)";
@@ -1062,12 +1092,10 @@
       return ul;
     }
 
-    arr.forEach(function (item) {
+    ids.forEach(function (id) {
+      var item = state.itemsById[id];
       if (randomizer.active && randomizer.target === opts.randomizerTarget) {
         ul.appendChild(buildRandomizerRow(item));
-      }
-      else if (opts.kind === "trash") {
-        ul.appendChild(buildTrashRow(item));
       }
       else if (opts.kind === "completed") {
         ul.appendChild(buildCompletedRow(item));
@@ -1152,13 +1180,15 @@
   /**
    * Builds a Trash-list row: [grey label + time-to-live] [Recover] [permanent
    * delete].
-   * @param {Object} item - the item to render.
+   * @param {Object} entry - the trash entry (`{id, origin, deletedAt}`) to
+   *   render; its text/note are resolved from `state.itemsById`.
    * @returns {Element} the `<li>` row.
    */
-  function buildTrashRow(item) {
+  function buildTrashRow(entry) {
+    var item = state.itemsById[entry.id];
     var li = document.createElement("li");
     li.className = "item trash-item";
-    li.dataset.id = item.id;
+    li.dataset.id = entry.id;
 
     var wrap = document.createElement("div");
     wrap.className = "label-wrap";
@@ -1167,9 +1197,9 @@
     label.textContent = item.text;
     wrap.appendChild(label);
 
-    var days = Math.max(0, 
-      Math.ceil((WEEK_MS - (getNow().getTime() - 
-      new Date(item.deletedAt).getTime())) / (24*60*60*1000)));
+    var days = Math.max(0,
+      Math.ceil((WEEK_MS - (getNow().getTime() -
+      new Date(entry.deletedAt).getTime())) / (24*60*60*1000)));
     var ttl = document.createElement("div");
     ttl.className = "ttl";
     var dayWord = " days";
@@ -1185,12 +1215,12 @@
     var rec = document.createElement("button");
     rec.className = "recover-btn";
     rec.textContent = "Recover";
-    rec.addEventListener("click", function () { recoverItem(item.id); });
+    rec.addEventListener("click", function () { recoverItem(entry.id); });
     actions.appendChild(rec);
 
     var perm = mkMini("✕", "Delete permanently");
     perm.classList.add("trash");
-    perm.addEventListener("click", function () { permaDelete(item.id); });
+    perm.addEventListener("click", function () { permaDelete(entry.id); });
     actions.appendChild(perm);
 
     li.appendChild(actions);
@@ -1484,7 +1514,7 @@
 
   /**
    * Builds the "Add..." input + button row shown at the bottom of a list.
-   * @param {string} key - the `state.items` key new items are added to.
+   * @param {string} key - the `state.lists` key new items are added to.
    * @returns {Element} the assembled `.adder` row.
    */
   function buildAdder(key) {
@@ -1503,7 +1533,11 @@
     function commit() {
       var v = input.value.trim();
       if (!v) return;
-      state.items[key].push({ id: uid(), text: v });
+      var id = uid();
+      state.itemsById[id] = {
+        id: id, text: v, isDone: false, lastDone: null
+      };
+      state.lists[key].push(id);
       input.value = "";
       save();
       render();
@@ -1533,7 +1567,9 @@
     }
     var allItems = [];
     keys.forEach(function (k) {
-      state.items[k].forEach(function (item) { allItems.push(item); });
+      state.lists[k].forEach(function (id) {
+        allItems.push(state.itemsById[id]);
+      });
     });
     if (allItems.length === 0) return;
     if (allItems.length === 1) {
