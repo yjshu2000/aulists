@@ -28,6 +28,20 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v0.10 <span class="changelog-date">2026-07-12 14H</span></h3>
+    <ul>
+      <li>Checkpoint C: added the Basics zone (list -1) to the Today card,
+      above zone 0. Check/delete work on it like any other list; it
+      deliberately sits outside the swipe/hamburger move chain since it
+      isn't part of the 0-1-2-3-3.5-4 urgency progression, and it has no
+      adder yet since it'll be populated by Recurring items via rollover
+      (Checkpoint E) instead of typed in by hand.</li>
+      <li>Deleted all "Select to keep" code (state, row rendering, header
+      buttons, CSS) instead of just leaving it hidden/unhooked.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v0.9 <span class="changelog-date">2026-07-12 12H</span></h3>
     <ul>
       <li>Reworked checkpoint B of the item/list data model: completing an

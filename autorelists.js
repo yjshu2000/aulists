@@ -6,9 +6,10 @@
 
   // chain order for movement
   var CHAIN = ["0", "1", "2", "3", "3.5", "4"];
+  // every real list key, chain or not (used for parsing/validation, not move)
+  var LIST_KEYS = ["-1"].concat(CHAIN);
 
   var state = load();
-  var selectToKeep = { active: false, selected: {} };
   var expandedNote = null;
   var editingNote = null;
   var randomizer = {
@@ -91,7 +92,7 @@
       version: 2,
       itemsById: {},
       lists: {
-        "0": [], "1": [], "2": [], "3": [], "3.5": [], "4": [],
+        "-1": [], "0": [], "1": [], "2": [], "3": [], "3.5": [], "4": [],
         trash: []
       },
       collapsed: { "3": false, "4": true, completed: true, trash: true },
@@ -148,7 +149,7 @@
         });
       }
       if (obj.lists) {
-        ["0", "1", "2", "3", "3.5", "4"].forEach(function (k) {
+        LIST_KEYS.forEach(function (k) {
           var arr = obj.lists[k];
           if (!Array.isArray(arr)) return;
           arr.forEach(function (id) {
@@ -161,7 +162,7 @@
           obj.lists.trash.forEach(function (t) {
             if (!t || typeof t.id !== "string" || !validIds[t.id]) return;
             var origin = "3";
-            if (CHAIN.indexOf(t.origin) !== -1) {
+            if (LIST_KEYS.indexOf(t.origin) !== -1) {
               origin = t.origin;
             }
             var deletedAt = getNow().toISOString();
@@ -704,17 +705,28 @@
   }
 
   /**
-   * Builds the live Today card: its head, the two zones (lists "0" and "1")
-   * split by a divider, and the adder row (hidden while select-to-keep or the
-   * today-targeted randomizer is active).
+   * Builds the live Today card: its head, the Basics zone (list "-1", no
+   * adder of its own — populated by rollover from Recurring, not by hand),
+   * the two zones (lists "0" and "1") split by a divider, and the adder row
+   * (hidden while the today-targeted randomizer is active). Basics sits
+   * outside the randomizer/count scope.
    * @returns {Element} the assembled Today card section.
    */
   function buildTodayRealCard() {
     var today = document.createElement("section");
     today.className = "card today-card list fixed";
-    today.appendChild(buildHead("today", "Today | " + formatCardDate(0), 
-    { fixed: true, countKeys: ["0", "1"], selectToKeep: true, 
+    today.appendChild(buildHead("today", "Today | " + formatCardDate(0),
+    { fixed: true, countKeys: ["0", "1"],
       randomizerTarget: "today" }));
+
+    var zoneBasics = document.createElement("ul");
+    zoneBasics.className = "items";
+    fillZone(zoneBasics, "-1", false);
+    today.appendChild(zoneBasics);
+
+    var divBasics = document.createElement("div");
+    divBasics.className = "divider";
+    today.appendChild(divBasics);
 
     var zoneTop = document.createElement("ul");
     zoneTop.className = "items";
@@ -730,10 +742,9 @@
     fillZone(zoneBot, "1", true);
     today.appendChild(zoneBot);
 
-    if (!selectToKeep.active 
-      && !(randomizer.active && randomizer.target === "today")) {
+    if (!(randomizer.active && randomizer.target === "today")) {
       today.appendChild(buildAdder("1"));
-    } 
+    }
 
     return today;
   }
@@ -770,10 +781,10 @@
    * key, or an "(empty)" placeholder if the list is empty.
    * @param {Element} ul - the `<ul class="items">` to fill.
    * @param {string} key - the `state.lists` key to render rows for.
-   * @param {boolean} [scoped] - true only for the Today card's zones, which
-   *   support select-to-keep and the randomizer.
+   * @param {boolean} [isTodayZone] - true only for the Today card's zones,
+   *   which support the randomizer.
    */
-  function fillZone(ul, key, scoped) {
+  function fillZone(ul, key, isTodayZone) {
     var ids = state.lists[key];
     if (ids.length === 0) {
       var empty = document.createElement("li");
@@ -784,16 +795,12 @@
     }
     ids.forEach(function (id) {
       var item = state.itemsById[id];
-      if (scoped && randomizer.active && randomizer.target === "today"
+      if (isTodayZone && randomizer.active && randomizer.target === "today"
         && !item.isDone) {
         ul.appendChild(buildRandomizerRow(item));
         return;
       }
-      if (scoped && selectToKeep.active) {
-        ul.appendChild(buildSelectRow(item));
-      } else {
-        ul.appendChild(buildMainRow(key, item));
-      }
+      ul.appendChild(buildMainRow(key, item));
     });
   }
 
@@ -826,45 +833,6 @@
     }
 
     return card;
-  }
-
-  /**
-   * Builds a single item row for select-to-keep mode: a plain label with a
-   * highlighted "stk-on" state when the item is currently selected.
-   * @param {Object} item - the item to render.
-   * @returns {Element} the `<li>` row.
-   */
-  function buildSelectRow(item) {
-    var li = document.createElement("li");
-    var stkOnClass = "";
-    if (selectToKeep.selected[item.id]) {
-      stkOnClass = " stk-on";
-    }
-    li.className = "item stk-mode" + stkOnClass;
-    li.dataset.id = item.id;
-
-    var wrap = document.createElement("div");
-    wrap.className = "label-wrap";
-    var label = document.createElement("span");
-    label.className = "label";
-    label.textContent = item.text;
-    wrap.appendChild(label);
-    li.appendChild(wrap);
-
-    var box = document.createElement("span");
-    box.className = "stk-box";
-    li.appendChild(box);
-
-    li.addEventListener("click", function () {
-      if (selectToKeep.selected[item.id]) {
-        delete selectToKeep.selected[item.id];
-      } else {
-        selectToKeep.selected[item.id] = true;
-      }
-      render();
-    });
-
-    return li;
   }
 
   /**
@@ -920,12 +888,11 @@
 
   /**
    * Builds a card's header row: the collapse chevron, title, and whatever
-   * header actions (Randomizer!/Done, Move unselected/Cancel) apply given the
-   * card's mode and current select-to-keep/randomizer state.
+   * header actions (Randomizer!/Done) apply given the card's mode and
+   * current randomizer state.
    * @param {string} key - the `state.lists` key this header belongs to.
    * @param {string} titleText - the card's displayed title.
-   * @param {Object} [opts] - flags: `collapsible`, `selectToKeep`,
-   *   `randomizerTarget`.
+   * @param {Object} [opts] - flags: `collapsible`, `randomizerTarget`.
    * @returns {Element} the assembled `.list-head` element.
    */
   function buildHead(key, titleText, opts) {
@@ -965,7 +932,7 @@
     }
     head.appendChild(title);
 
-    if (opts.selectToKeep || opts.randomizerTarget) {
+    if (opts.randomizerTarget) {
       var headerActions = document.createElement("div");
       headerActions.className = "head-actions";
 
@@ -983,41 +950,6 @@
           render();
         });
         headerActions.appendChild(doneBtn);
-      } else if (selectToKeep.active) {
-        var selCount = Object.keys(selectToKeep.selected).length;
-
-        var moveBtn = document.createElement("button");
-        moveBtn.className = "head-btn primary";
-        moveBtn.textContent = "Move unselected ↓";
-        moveBtn.disabled = selCount === 0;
-        moveBtn.addEventListener("click", function () {
-          ["0", "1"].forEach(function (k) {
-            var keep = [];
-            state.lists[k].forEach(function (id) {
-              if (selectToKeep.selected[id]) {
-                keep.push(id);
-              } else {
-                state.lists["2"].push(id);
-              }
-            });
-            state.lists[k] = keep;
-          });
-          selectToKeep.active = false;
-          selectToKeep.selected = {};
-          save();
-          render();
-        });
-        headerActions.appendChild(moveBtn);
-
-        var cancelBtn = document.createElement("button");
-        cancelBtn.className = "head-btn";
-        cancelBtn.textContent = "Cancel";
-        cancelBtn.addEventListener("click", function () {
-          selectToKeep.active = false;
-          selectToKeep.selected = {};
-          render();
-        });
-        headerActions.appendChild(cancelBtn);
       } else {
         if (opts.randomizerTarget) {
           var randBtn = document.createElement("button");
@@ -1047,18 +979,6 @@
             setTimeout(function () { runRandomizerAnimation(); }, 100);
           });
           headerActions.appendChild(randBtn);
-        }
-        if (opts.selectToKeep) {
-          var enterBtn = document.createElement("button");
-          enterBtn.className = "head-btn";
-          enterBtn.textContent = "Select to keep";
-          enterBtn.style.display = "none";
-          enterBtn.addEventListener("click", function () {
-            selectToKeep.active = true;
-            selectToKeep.selected = {};
-            render();
-          });
-          headerActions.appendChild(enterBtn);
         }
       }
       head.appendChild(headerActions);
