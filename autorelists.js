@@ -92,7 +92,7 @@
       itemsById: {},
       lists: {
         "0": [], "1": [], "2": [], "3": [], "3.5": [], "4": [],
-        completed: [], trash: []
+        trash: []
       },
       collapsed: { "3": false, "4": true, completed: true, trash: true },
       schedule: { everyDays: 1, atMinutes: 0 },
@@ -143,13 +143,12 @@
           if (it.note) o.note = it.note;
           if (typeof it.isDone === "boolean") o.isDone = it.isDone;
           if (typeof it.lastDone === "string") o.lastDone = it.lastDone;
-          if (CHAIN.indexOf(it.origin) !== -1) o.origin = it.origin;
           s.itemsById[id] = o;
           validIds[id] = true;
         });
       }
       if (obj.lists) {
-        ["0", "1", "2", "3", "3.5", "4", "completed"].forEach(function (k) {
+        ["0", "1", "2", "3", "3.5", "4"].forEach(function (k) {
           var arr = obj.lists[k];
           if (!Array.isArray(arr)) return;
           arr.forEach(function (id) {
@@ -162,8 +161,7 @@
           obj.lists.trash.forEach(function (t) {
             if (!t || typeof t.id !== "string" || !validIds[t.id]) return;
             var origin = "3";
-            if (CHAIN.indexOf(t.origin) !== -1 ||
-              t.origin === "completed") {
+            if (CHAIN.indexOf(t.origin) !== -1) {
               origin = t.origin;
             }
             var deletedAt = getNow().toISOString();
@@ -357,6 +355,32 @@
   }
 
   /**
+   * Finds which chain list currently holds an id.
+   * @param {string} id - id of the item to locate.
+   * @returns {string|null} the list key it's in, or null if not found.
+   */
+  function findItemListKey(id) {
+    for (var k = 0; k < CHAIN.length; k++) {
+      if (state.lists[CHAIN[k]].indexOf(id) !== -1) {
+        return CHAIN[k];
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Collects ids of every item currently shown in the Completed view.
+   * @returns {string[]} ids where `isDone` is true and `recurrence` is not
+   *   set.
+   */
+  function completedIds() {
+    return Object.keys(state.itemsById).filter(function (id) {
+      var item = state.itemsById[id];
+      return item.isDone && !item.recurrence;
+    });
+  }
+
+  /**
    * Moves an item one step along the chain (0->1->2->3->3.5->4), in either
    * direction. No-ops if the item isn't found, or the move would fall off
    * either end of the chain.
@@ -378,41 +402,40 @@
   }
 
   /**
-   * Moves an item out of its current list and into Completed, recording where
-   * it came from (so uncomplete knows where to put it back) and when it was
-   * done.
+   * Marks an item done. An item already sitting in zone -1 or 0 stays linked
+   * where it is; anything else is unlinked from its current list and linked
+   * into zone 0.
    * @param {string} fromKey - list key the item currently lives in.
    * @param {string} id - id of the item to complete.
    */
   function completeItem(fromKey, id) {
-    var i = findIn(fromKey, id);
-    if (i === -1) return;
-    state.lists[fromKey].splice(i, 1);
     var item = state.itemsById[id];
+    if (!item) return;
     item.isDone = true;
     item.lastDone = getNow().toISOString();
-    item.origin = fromKey;
-    state.lists.completed.push(id);
+    if (fromKey !== "-1" && fromKey !== "0") {
+      var i = findIn(fromKey, id);
+      if (i !== -1) state.lists[fromKey].splice(i, 1);
+      state.lists["0"].push(id);
+    }
     save();
     render();
   }
 
   /**
-   * Moves an item out of Completed and back into its recorded `origin` list,
-   * falling back to List 2 if that list no longer exists.
+   * Marks an item not done and links it into list 2, regardless of which
+   * list it's currently linked into.
    * @param {string} id - id of the item to uncomplete.
    */
   function uncompleteItem(id) {
-    var i = findIn("completed", id);
-    if (i === -1) return;
-    state.lists.completed.splice(i, 1);
     var item = state.itemsById[id];
+    if (!item) return;
     item.isDone = false;
-    var dest = "2";
-    if (state.lists[item.origin]) {
-      dest = item.origin;
+    var fromKey = findItemListKey(id);
+    if (fromKey) {
+      state.lists[fromKey].splice(findIn(fromKey, id), 1);
     }
-    state.lists[dest].push(id);
+    state.lists["2"].push(id);
     save();
     render();
   }
@@ -761,7 +784,8 @@
     }
     ids.forEach(function (id) {
       var item = state.itemsById[id];
-      if (scoped && randomizer.active && randomizer.target === "today") {
+      if (scoped && randomizer.active && randomizer.target === "today"
+        && !item.isDone) {
         ul.appendChild(buildRandomizerRow(item));
         return;
       }
@@ -886,7 +910,8 @@
     card.className = "card list" + fixedClass + collapsedClass;
     card.appendChild(buildHead(key, titleText, opts));
     card.appendChild(buildItems(key, opts));
-    if (opts.kind !== "trash" && !(randomizer.active 
+    if (opts.kind !== "trash" && opts.kind !== "completed"
+      && !(randomizer.active
       && randomizer.target === opts.randomizerTarget)) {
         card.appendChild(buildAdder(key));
       }
@@ -1008,7 +1033,8 @@
             var allItems = [];
             keys.forEach(function (k) {
               state.lists[k].forEach(function (id) {
-                allItems.push(state.itemsById[id]);
+                var item = state.itemsById[id];
+                if (!item.isDone) allItems.push(item);
               });
             });
             if (allItems.length === 0) {
@@ -1042,7 +1068,9 @@
       var count = document.createElement("span");
       count.className = "count";
       var n;
-      if (opts.countKeys) {
+      if (opts.kind === "completed") {
+        n = completedIds().length;
+      } else if (opts.countKeys) {
         n = opts.countKeys.reduce(function (sum, k) {
           return sum + state.lists[k].length; }, 0);
       } else {
@@ -1083,7 +1111,12 @@
       return ul;
     }
 
-    var ids = state.lists[key];
+    var ids;
+    if (opts.kind === "completed") {
+      ids = completedIds();
+    } else {
+      ids = state.lists[key];
+    }
     if (ids.length === 0) {
       var empty = document.createElement("li");
       empty.className = "empty";
@@ -1136,9 +1169,18 @@
   function buildMainRow(key, item) {
     var li = document.createElement("li");
     li.className = "item";
+    if (item.isDone) {
+      li.className += " done";
+    }
     li.dataset.id = item.id;
 
-    li.appendChild(buildCheck(false, function () { completeItem(key, item.id); }));
+    var onToggle;
+    if (item.isDone) {
+      onToggle = function () { uncompleteItem(item.id); };
+    } else {
+      onToggle = function () { completeItem(key, item.id); };
+    }
+    li.appendChild(buildCheck(item.isDone, onToggle));
     if (isBuyItem(item)) li.appendChild(buildBuyTag());
     li.appendChild(buildLabel(item));
 
@@ -1163,14 +1205,16 @@
     li.className = "item done";
     li.dataset.id = item.id;
 
+    var key = findItemListKey(item.id);
+
     li.appendChild(buildCheck(true, function () { uncompleteItem(item.id); }));
     if (isBuyItem(item)) li.appendChild(buildBuyTag());
     li.appendChild(buildLabel(item));
 
     var actions = document.createElement("div");
     actions.className = "row-actions";
-    actions.appendChild(buildPencil("completed", item, li));
-    actions.appendChild(buildHamburger("completed", item));
+    actions.appendChild(buildPencil(key, item, li));
+    actions.appendChild(buildHamburger(key, item, true));
     li.appendChild(actions);
 
     attachSwipeUpOnly(li, item.id);
@@ -1389,9 +1433,10 @@
    * and torn down by `closeAllMenus`.
    * @param {string} key - list key the item currently lives in.
    * @param {Object} item - the item this menu acts on.
+   * @param {boolean} [hideMove] - suppress the Move up/down entries.
    * @returns {Element} the `.menu-anchor` wrapper containing the button.
    */
-  function buildHamburger(key, item) {
+  function buildHamburger(key, item, hideMove) {
     var wrap = document.createElement("div");
     wrap.className = "menu-anchor";
     var btn = mkMini("☰", "More options");
@@ -1410,7 +1455,7 @@
       }
       menu.className = "item-menu" + menuTodayClass;
 
-      var isChain = CHAIN.indexOf(key) !== -1;
+      var isChain = !hideMove && CHAIN.indexOf(key) !== -1;
 
       if (isChain) {
         if (key !== "0") {
@@ -1568,7 +1613,8 @@
     var allItems = [];
     keys.forEach(function (k) {
       state.lists[k].forEach(function (id) {
-        allItems.push(state.itemsById[id]);
+        var item = state.itemsById[id];
+        if (!item.isDone) allItems.push(item);
       });
     });
     if (allItems.length === 0) return;

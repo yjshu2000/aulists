@@ -28,6 +28,24 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v0.9 <span class="changelog-date">2026-07-12 12H</span></h3>
+    <ul>
+      <li>Reworked checkpoint B of the item/list data model: completing an
+      item moves it to today's zone 0 unless it's already sitting in zone -1
+      or 0; unchecking always sends it to List 2, regardless of where it
+      currently is. Items no longer carry an origin field.</li>
+      <li>Completed is now a derived filter (isDone and not recurring)
+      instead of its own stored list, matching how the Recurring view will
+      work once that lands.</li>
+      <li>Fixed a few things this uncovered along the way: a done item
+      sitting in zone 0 now renders correctly checked instead of always
+      showing unchecked, the randomizer no longer offers already-completed
+      items as candidates, and the Completed view's menu no longer offers
+      Move up/down.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v0.8 <span class="changelog-date">2026-07-10 19H</span></h3>
     <ul>
       <li>Checkpoint B of the item/list data model rewrite: items now carry
