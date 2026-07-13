@@ -28,6 +28,25 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v0.11 <span class="changelog-date">2026-07-13 06H</span></h3>
+    <ul>
+      <li>Restored the recurring-adder feature (buildRecurringAdder,
+      openNewRecurringItemEditor) and the findIn/trashItem/editItem/editNote
+      listKey-optional refactor from the crazierers branch, keeping only
+      the RECURRENCE_KINDS declaration-order fix (moved above load() so
+      validateRecurrence() no longer throws on stored recurrence data).</li>
+      <li>Fixed the Completed and Recurring views (derived filters over
+      itemsById) still showing items after they'd been deleted - they now
+      check findInTrash() too, not just isDone/recurrence.</li>
+      <li>Fixed recoverItem pushing unlinked completed/recurring items into
+      List 3 on recover instead of restoring them unlinked, the way they
+      were before being trashed.</li>
+      <li>Known bug: editing a note in List 0 is currently broken - not yet
+      investigated.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v0.10 <span class="changelog-date">2026-07-12 14H</span></h3>
     <ul>
       <li>Checkpoint C: added the Basics zone (list -1) to the Today card,
