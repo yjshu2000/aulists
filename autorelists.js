@@ -95,7 +95,9 @@
         "-1": [], "0": [], "1": [], "2": [], "3": [], "3.5": [], "4": [],
         trash: []
       },
-      collapsed: { "3": false, "4": true, completed: true, trash: true },
+      collapsed: {
+        "3": false, "4": true, completed: true, recurring: true, trash: true
+      },
       schedule: { everyDays: 1, atMinutes: 0 },
       lastReturn: null,
       lastExported: null,
@@ -144,6 +146,9 @@
           if (it.note) o.note = it.note;
           if (typeof it.isDone === "boolean") o.isDone = it.isDone;
           if (typeof it.lastDone === "string") o.lastDone = it.lastDone;
+          if (it.recurrence && validateRecurrence(it.recurrence) === null) {
+            o.recurrence = it.recurrence;
+          }
           s.itemsById[id] = o;
           validIds[id] = true;
         });
@@ -186,6 +191,11 @@
           s.collapsed.completed = true;
         } else {
           s.collapsed.completed = !!obj.collapsed.completed;
+        }
+        if (obj.collapsed.recurring === undefined) {
+          s.collapsed.recurring = true;
+        } else {
+          s.collapsed.recurring = !!obj.collapsed.recurring;
         }
         if (obj.collapsed.trash === undefined) {
           s.collapsed.trash = true;
@@ -337,12 +347,16 @@
 
   // ---------- item operations ----------
   /**
-   * Finds an id's index within one of the id-array list keys.
-   * @param {string} listKey - one of the `state.lists` keys (not "trash").
+   * Finds an id's index within one of the id-array list keys. Safe to call
+   * with a null/missing listKey (an unlinked, itemsById-only item) - returns
+   * not-found rather than throwing.
+   * @param {string|null} listKey - one of the `state.lists` keys (not
+   *   "trash"), or null if the item isn't linked into any list.
    * @param {string} id - id of the item to find.
    * @returns {number} the index, or -1 if not present in that list.
    */
   function findIn(listKey, id) {
+    if (!listKey || !state.lists[listKey]) return -1;
     return state.lists[listKey].indexOf(id);
   }
 
@@ -356,14 +370,15 @@
   }
 
   /**
-   * Finds which chain list currently holds an id.
+   * Finds which list currently holds an id, checking every real list key
+   * (chain lists plus Basics) - not just the chain.
    * @param {string} id - id of the item to locate.
    * @returns {string|null} the list key it's in, or null if not found.
    */
   function findItemListKey(id) {
-    for (var k = 0; k < CHAIN.length; k++) {
-      if (state.lists[CHAIN[k]].indexOf(id) !== -1) {
-        return CHAIN[k];
+    for (var k = 0; k < LIST_KEYS.length; k++) {
+      if (state.lists[LIST_KEYS[k]].indexOf(id) !== -1) {
+        return LIST_KEYS[k];
       }
     }
     return null;
@@ -378,6 +393,16 @@
     return Object.keys(state.itemsById).filter(function (id) {
       var item = state.itemsById[id];
       return item.isDone && !item.recurrence;
+    });
+  }
+
+  /**
+   * Collects ids of every item currently shown in the Recurring view.
+   * @returns {string[]} ids where `recurrence` is set (non-null).
+   */
+  function recurringIds() {
+    return Object.keys(state.itemsById).filter(function (id) {
+      return !!state.itemsById[id].recurrence;
     });
   }
 
@@ -442,15 +467,19 @@
   }
 
   /**
-   * Moves an item out of its current list and into Trash, recording where it
-   * came from (so Recover knows where to put it back).
-   * @param {string} fromKey - list key the item currently lives in.
+   * Moves an item out of its current list (if it's linked into one) and
+   * into Trash, recording where it came from so Recover knows where to put
+   * it back. An unlinked, itemsById-only item (fromKey null) has nothing to
+   * unlink - it just gets a trash entry with a null origin directly.
+   * @param {string|null} fromKey - list key the item currently lives in, or
+   *   null if it isn't linked into any list.
    * @param {string} id - id of the item to trash.
    */
   function trashItem(fromKey, id) {
-    var i = findIn(fromKey, id);
-    if (i === -1) return;
-    state.lists[fromKey].splice(i, 1);
+    if (fromKey) {
+      var i = findIn(fromKey, id);
+      if (i !== -1) state.lists[fromKey].splice(i, 1);
+    }
     state.lists.trash.push({
       id: id, origin: fromKey, deletedAt: getNow().toISOString()
     });
@@ -490,14 +519,14 @@
 
   /**
    * Overwrites an item's text in place, unless the trimmed replacement is empty
-   * (treated as a cancel, leaving the original text untouched).
-   * @param {string} listKey - list key the item currently lives in.
+   * (treated as a cancel, leaving the original text untouched). Works
+   * regardless of whether the item is linked into a list - its existence in
+   * `itemsById` is the only thing that matters here.
    * @param {string} id - id of the item to edit.
    * @param {string} newText - proposed replacement text, untrimmed.
    */
-  function editItem(listKey, id, newText) {
-    var i = findIn(listKey, id);
-    if (i === -1) return;
+  function editItem(id, newText) {
+    if (!state.itemsById[id]) return;
     var v = newText.trim();
     if (v === "") return;            // empty = cancel, keep original
     state.itemsById[id].text = v;
@@ -507,14 +536,13 @@
 
   /**
    * Overwrites (or clears) an item's note. A blank trimmed value deletes the
-   * `.note` field entirely rather than storing an empty string.
-   * @param {string} listKey - list key the item currently lives in.
+   * `.note` field entirely rather than storing an empty string. Works
+   * regardless of whether the item is linked into a list.
    * @param {string} id - id of the item to edit.
    * @param {string} newNote - proposed replacement note, untrimmed.
    */
-  function editNote(listKey, id, newNote) {
-    var i = findIn(listKey, id);
-    if (i === -1) return;
+  function editNote(id, newNote) {
+    if (!state.itemsById[id]) return;
     var v = newNote.trim();
     if (v) {
       state.itemsById[id].note = v;
@@ -529,11 +557,10 @@
 
   /**
    * Opens the note editor for a single item, expanding its note area.
-   * @param {string} key - list key the item currently lives in.
    * @param {Object} item - the item object being edited.
    */
-  function startNoteEdit(key, item) {
-    editingNote = { key: key, id: item.id };
+  function startNoteEdit(item) {
+    editingNote = { id: item.id };
     expandedNote = item.id;
     render();
   }
@@ -604,23 +631,13 @@
     todayWrap.appendChild(nextBtn);
 
     appEl.appendChild(todayWrap);
-    track.style.transform =
-      "translateX(" + (CAROUSEL_PEEK - carouselStepPx(viewport)) + "px)";
-
-    var currentHeight = currentSlide.getBoundingClientRect().height;
-    prevSlide.style.maxHeight = currentHeight + "px";
-    prevSlide.style.overflow = "hidden";
-    if (todayCardOffset < 0) {
-      nextSlide.style.maxHeight = currentHeight + "px";
-      nextSlide.style.overflow = "hidden";
-    }
 
     // List 2 (own card, fixed)
     appEl.appendChild(renderCard("2", "List 2", 
       {fixed: true, randomizerTarget: "2"}));
 
     // Completed purgatory (collapsible)
-    appEl.appendChild(renderCard("completed", "Completed", 
+    appEl.appendChild(renderCard("completed", "Completed",
       {collapsible: true, kind: "completed"}));
 
     // List 3: collapsible card, two zones split by a divider.
@@ -656,9 +673,26 @@
     // List 4
     appEl.appendChild(renderCard("4", "List 4", { collapsible: true }));
 
+    // Recurring view (collapsible, derived filter over itemsById)
+    appEl.appendChild(renderCard("recurring", "Recurring",
+      {collapsible: true, kind: "recurring"}));
+
     // Trash (collapsible, no count)
-    appEl.appendChild(renderCard("trash", "Trash", 
+    appEl.appendChild(renderCard("trash", "Trash",
       { collapsible: true, kind: "trash" }));
+
+    // measured last, after every card is appended, so this doesn't force
+    // layout while #app is still artificially short
+    track.style.transform =
+      "translateX(" + (CAROUSEL_PEEK - carouselStepPx(viewport)) + "px)";
+
+    var currentHeight = currentSlide.getBoundingClientRect().height;
+    prevSlide.style.maxHeight = currentHeight + "px";
+    prevSlide.style.overflow = "hidden";
+    if (todayCardOffset < 0) {
+      nextSlide.style.maxHeight = currentHeight + "px";
+      nextSlide.style.overflow = "hidden";
+    }
 
     updateNextNote();
   }
@@ -836,9 +870,9 @@
   }
 
   /**
-   * Builds a single item row for randomizer mode: a plain label (plus a buy tag
-   * when applicable), with no click handling of its own - the randomizer
-   * animation drives highlighting externally.
+   * Builds a single item row for randomizer mode: a plain label (plus a buy
+   * tag and/or recurring tag when applicable), with no click handling of its
+   * own - the randomizer animation drives highlighting externally.
    * @param {Object} item - the item to render.
    * @returns {Element} the `<li>` row.
    */
@@ -847,6 +881,7 @@
     li.className = "item rnd-item";
     li.dataset.id = item.id;
     if (isBuyItem(item)) li.appendChild(buildBuyTag());
+    if (item.recurrence) li.appendChild(buildRecurringTag());
     var label = document.createElement("span");
     label.className = "label";
     label.textContent = item.text;
@@ -878,7 +913,9 @@
     card.className = "card list" + fixedClass + collapsedClass;
     card.appendChild(buildHead(key, titleText, opts));
     card.appendChild(buildItems(key, opts));
-    if (opts.kind !== "trash" && opts.kind !== "completed"
+    if (opts.kind === "recurring") {
+      card.appendChild(buildRecurringAdder());
+    } else if (opts.kind !== "trash" && opts.kind !== "completed"
       && !(randomizer.active
       && randomizer.target === opts.randomizerTarget)) {
         card.appendChild(buildAdder(key));
@@ -990,6 +1027,8 @@
       var n;
       if (opts.kind === "completed") {
         n = completedIds().length;
+      } else if (opts.kind === "recurring") {
+        n = recurringIds().length;
       } else if (opts.countKeys) {
         n = opts.countKeys.reduce(function (sum, k) {
           return sum + state.lists[k].length; }, 0);
@@ -1034,6 +1073,8 @@
     var ids;
     if (opts.kind === "completed") {
       ids = completedIds();
+    } else if (opts.kind === "recurring") {
+      ids = recurringIds();
     } else {
       ids = state.lists[key];
     }
@@ -1052,6 +1093,9 @@
       }
       else if (opts.kind === "completed") {
         ul.appendChild(buildCompletedRow(item));
+      }
+      else if (opts.kind === "recurring") {
+        ul.appendChild(buildRecurringRow(item));
       }
       else ul.appendChild(buildMainRow(key, item));
     });
@@ -1080,8 +1124,20 @@
   }
 
   /**
-   * Builds a standard chain-list row: [check] [cart?] [label] [pencil]
-   * [hamburger], with swipe gestures attached.
+   * Builds the recurring-loop emoji tag shown next to items with recurrence
+   * set, wherever they render.
+   * @returns {Element} the tag `<span>`.
+   */
+  function buildRecurringTag() {
+    var tag = document.createElement("span");
+    tag.className = "recurring-tag";
+    tag.textContent = "🔁";
+    return tag;
+  }
+
+  /**
+   * Builds a standard chain-list row: [check] [cart?] [recur?] [label]
+   * [pencil] [hamburger], with swipe gestures attached.
    * @param {string} key - list key the item currently lives in.
    * @param {Object} item - the item to render.
    * @returns {Element} the `<li>` row.
@@ -1102,11 +1158,12 @@
     }
     li.appendChild(buildCheck(item.isDone, onToggle));
     if (isBuyItem(item)) li.appendChild(buildBuyTag());
+    if (item.recurrence) li.appendChild(buildRecurringTag());
     li.appendChild(buildLabel(item));
 
     var actions = document.createElement("div");
     actions.className = "row-actions";
-    actions.appendChild(buildPencil(key, item, li));
+    actions.appendChild(buildPencil(item, li));
     actions.appendChild(buildHamburger(key, item));
     li.appendChild(actions);
 
@@ -1133,11 +1190,45 @@
 
     var actions = document.createElement("div");
     actions.className = "row-actions";
-    actions.appendChild(buildPencil(key, item, li));
+    actions.appendChild(buildPencil(item, li));
     actions.appendChild(buildHamburger(key, item, true));
     li.appendChild(actions);
 
     attachSwipeUpOnly(li, item.id);
+    return li;
+  }
+
+  /**
+   * Builds a Recurring-view row: [greyed check] [cart?] [recur] [label]
+   * [pencil] [hamburger]. This is a filtered view over live items sitting in
+   * their real lists, not a separate list of its own, so there's no move
+   * up/down, no swipe gesture, and the checkbox is a non-interactive status
+   * display rather than an actionable one - check/uncheck happens from the
+   * item's real list instead.
+   * @param {Object} item - the item to render.
+   * @returns {Element} the `<li>` row.
+   */
+  function buildRecurringRow(item) {
+    var li = document.createElement("li");
+    li.className = "item";
+    if (item.isDone) {
+      li.className += " done";
+    }
+    li.dataset.id = item.id;
+
+    var key = findItemListKey(item.id);
+
+    li.appendChild(buildCheckDisplay(item.isDone));
+    if (isBuyItem(item)) li.appendChild(buildBuyTag());
+    li.appendChild(buildRecurringTag());
+    li.appendChild(buildLabel(item));
+
+    var actions = document.createElement("div");
+    actions.className = "row-actions";
+    actions.appendChild(buildPencil(item, li));
+    actions.appendChild(buildHamburger(key, item, true));
+    li.appendChild(actions);
+
     return li;
   }
 
@@ -1214,6 +1305,26 @@
   }
 
   /**
+   * Builds a greyed-out, non-interactive stand-in for the checkbox, used
+   * where an item's done state should show but not be toggleable
+   * @param {boolean} ticked - whether the item is currently done.
+   * @returns {Element} the check `<span>`.
+   */
+  function buildCheckDisplay(ticked) {
+    var span = document.createElement("span");
+    span.className = "check disabled";
+    var statusLabel = "Not done";
+    if (ticked) {
+      statusLabel = "Done";
+    }
+    span.setAttribute("aria-label", statusLabel);
+    var box = document.createElement("span");
+    box.className = "box";
+    span.appendChild(box);
+    return span;
+  }
+
+  /**
    * Builds an item's label area: the text (with a note marker if it has one),
    * an inline note editor when this item's note is being edited, or the
    * expanded note text when tapped open.
@@ -1264,9 +1375,8 @@
       function commit() {
         if (committed) return;
         committed = true;
-        var eKey = editingNote.key;
         editingNote = null;
-        editNote(eKey, item.id, ta.value);
+        editNote(item.id, ta.value);
       }
       ta.addEventListener("keydown", function (e) {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -1302,15 +1412,14 @@
 
   /**
    * Builds the pencil (edit) button for a row.
-   * @param {string} key - list key the item currently lives in.
    * @param {Object} item - the item this button edits.
    * @param {Element} li - the row's `<li>`, passed through to `startEdit` so it
    *   can be swapped for an inline editor.
    * @returns {Element} the pencil button.
    */
-  function buildPencil(key, item, li) {
+  function buildPencil(item, li) {
     var btn = mkMini("✎", "Edit");
-    btn.addEventListener("click", function () { startEdit(li, key, item); });
+    btn.addEventListener("click", function () { startEdit(li, item); });
     return btn;
   }
 
@@ -1399,13 +1508,17 @@
       note.textContent = "Edit note";
       note.addEventListener("click", function () {
         closeAllMenus();
-        startNoteEdit(key, item);
+        startNoteEdit(item);
       });
       menu.appendChild(note);
 
-      var recurrence = document.createElement("button");
-      recurrence.textContent = "Edit recurrence";
-      menu.appendChild(recurrence);
+      var recurrenceBtn = document.createElement("button");
+      recurrenceBtn.textContent = "Edit recurrence";
+      recurrenceBtn.addEventListener("click", function () {
+        closeAllMenus();
+        openRecurrenceEditor(item);
+      });
+      menu.appendChild(recurrenceBtn);
 
       var del = document.createElement("button");
       del.className = "danger";
@@ -1442,10 +1555,9 @@
    * Swaps an item row's label for an inline text input, wired to commit the
    * edit on Enter/blur or cancel on Escape.
    * @param {Element} li - the row's `<li>`.
-   * @param {string} key - list key the item currently lives in.
    * @param {Object} item - the item being edited.
    */
-  function startEdit(li, key, item) {
+  function startEdit(li, item) {
     var label = li.querySelector(".label");
     if (!label || li.querySelector(".label-edit")) return;
     var input = document.createElement("input");
@@ -1463,7 +1575,7 @@
     function commit() {
       if (committed) return;
       committed = true;
-      editItem(key, item.id, input.value);  // empty = cancel inside
+      editItem(item.id, input.value);  // empty = cancel inside
       if (!input.value.trim()) render();     // restore label on cancel
     }
     input.addEventListener("keydown", function (e) {
@@ -1509,6 +1621,40 @@
     }
     addBtn.addEventListener("click", commit);
     input.addEventListener("keydown", function (e) { 
+      if (e.key === "Enter") commit(); });
+    adder.appendChild(input);
+    adder.appendChild(addBtn);
+    return adder;
+  }
+
+  /**
+   * Builds the Recurring card's adder. Unlike a normal adder, committing
+   * doesn't create the item directly - it opens the recurrence editor first,
+   * and the item only gets created (not linked to any list) once a valid
+   * recurrence dict is saved there.
+   * @returns {Element} the assembled `.adder` row.
+   */
+  function buildRecurringAdder() {
+    var adder = document.createElement("div");
+    adder.className = "adder";
+    var input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "Add...";
+    input.setAttribute("aria-label", "Add a recurring item");
+    var addBtn = document.createElement("button");
+    addBtn.className = "primary";
+    addBtn.textContent = "Add Rc.";
+    /**
+     * Reads the input and, if non-blank, opens the recurrence editor for a
+     * new item with that text.
+     */
+    function commit() {
+      var v = input.value.trim();
+      if (!v) return;
+      openNewRecurringItemEditor(v);
+    }
+    addBtn.addEventListener("click", commit);
+    input.addEventListener("keydown", function (e) {
       if (e.key === "Enter") commit(); });
     adder.appendChild(input);
     adder.appendChild(addBtn);
@@ -1842,6 +1988,212 @@
     });
     document.body.appendChild(overlay);
     return overlay;
+  }
+
+  // ---------- recurrence editor ----------
+  var RECURRENCE_KINDS = ["everyNDays", "dayOfMonth", "daysOfWeek",
+    "everyNWeeksOnDays", "nthWeekdayOfMonth", "yearly", "monthOfYear"];
+
+  var RECURRENCE_SCHEMA_TEXT = [
+    "recurrence = null | {",
+    "  destination: \"-1\" | \"1\" | \"2\", paused: boolean,",
+    "  rule:",
+    "    { type: \"everyNDays\", everyDays: int }",
+    "      // recurs when (today - item.lastDone) % everyDays == 0",
+    "      // anchored to lastDone; if never completed, anchor = when",
+    "      // recurrence was turned on",
+    "  | { type: \"dayOfMonth\", days: int[] (each 1-31) }",
+    "      // recurs when today's day-of-month is in `days`",
+    "  | { type: \"daysOfWeek\", weekdays: int[] (each 0-6, 0=Sun..6=Sat) }",
+    "      // recurs when today's weekday is in `weekdays`",
+    "  | { type: \"everyNWeeksOnDays\", everyWeeks: int, weekdays: int[] (0-6),",
+    "      anchorDate: \"YYYY-MM-DD\" }",
+    "      // recurs when weekday matches AND",
+    "      // floor(weeksSince(anchorDate)) % everyWeeks == 0",
+    "  | { type: \"nthWeekdayOfMonth\", ordinal: int (1,2,3,4, or -1=last),",
+    "      weekday: int (0-6) }",
+    "      // recurs when today is the `ordinal`-th occurrence of",
+    "      // `weekday` this month",
+    "  | { type: \"yearly\", month: int (1-12), day: int (1-31),",
+    "      everyYears: int = 1, startYear?: int (required if",
+    "      everyYears > 1) }",
+    "      // recurs when month+day match AND (if everyYears>1)",
+    "      // (year - startYear) % everyYears == 0",
+    "  | { type: \"monthOfYear\", months: int[] (each 1-12), day: int (1-31) }",
+    "      // recurs when today's month is in `months` AND today's",
+    "      // day-of-month == day",
+    "}"
+  ].join("\n");
+
+  /**
+   * Structurally validates a parsed recurrence dict (does not check
+   * per-kind field values like day ranges, only the shape every kind
+   * shares).
+   * @param {*} r - the parsed value to validate.
+   * @returns {string|null} an error message, or null if valid.
+   */
+  function validateRecurrence(r) {
+    if (!r || typeof r !== "object") return "Recurrence must be an object.";
+    if (["-1", "1", "2"].indexOf(r.destination) === -1) {
+      return "destination must be \"-1\", \"1\", or \"2\".";
+    }
+    if (typeof r.paused !== "boolean") {
+      return "paused must be true or false.";
+    }
+    if (!r.rule || typeof r.rule !== "object") {
+      return "rule must be an object.";
+    }
+    if (RECURRENCE_KINDS.indexOf(r.rule.type) === -1) {
+      return "rule.type must be one of: " + RECURRENCE_KINDS.join(", ");
+    }
+    return null;
+  }
+
+  /**
+   * Opens the "Edit recurrence" modal: a readonly schema reference block
+   * plus a textarea to paste a new recurrence dict into (or leave blank
+   * to clear recurrence entirely).
+   * @param {Object} item - the item whose recurrence is being edited.
+   */
+  function openRecurrenceEditor(item) {
+    var frag = document.createDocumentFragment();
+    var h = document.createElement("h3");
+    h.textContent = "Edit recurrence";
+    frag.appendChild(h);
+
+    var schemaTa = document.createElement("textarea");
+    schemaTa.className = "modal-ta";
+    schemaTa.readOnly = true;
+    schemaTa.value = RECURRENCE_SCHEMA_TEXT;
+    frag.appendChild(schemaTa);
+
+    var label = document.createElement("p");
+    label.textContent = "Paste a recurrence dict below, or leave blank " +
+      "to clear recurrence:";
+    frag.appendChild(label);
+
+    var inputTa = document.createElement("textarea");
+    inputTa.className = "modal-ta";
+    inputTa.placeholder = "Paste dict here...";
+    if (item.recurrence) {
+      inputTa.value = JSON.stringify(item.recurrence, null, 2);
+    }
+    frag.appendChild(inputTa);
+
+    var row = document.createElement("div");
+    row.className = "modal-actions";
+    var saveBtn = document.createElement("button");
+    saveBtn.className = "primary";
+    saveBtn.textContent = "Save";
+    var cancelBtn = document.createElement("button");
+    cancelBtn.textContent = "Cancel";
+    row.appendChild(saveBtn);
+    row.appendChild(cancelBtn);
+    frag.appendChild(row);
+
+    var overlay = showModal(frag);
+    inputTa.focus();
+
+    saveBtn.addEventListener("click", function () {
+      var text = inputTa.value.trim();
+      if (!text) {
+        item.recurrence = null;
+        save();
+        render();
+        overlay.remove();
+        return;
+      }
+      var parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (e) {
+        toast("That's not valid JSON.");
+        return;
+      }
+      var err = validateRecurrence(parsed);
+      if (err) {
+        toast(err);
+        return;
+      }
+      item.recurrence = parsed;
+      save();
+      render();
+      overlay.remove();
+    });
+    cancelBtn.addEventListener("click", function () { overlay.remove(); });
+  }
+
+  /**
+   * Opens the recurrence editor for a brand-new recurring item: the item
+   * doesn't exist in `itemsById` yet, and only gets created - unlinked from
+   * every list - once a valid recurrence dict is saved here. Leaving the
+   * box blank or cancelling discards the typed text entirely; nothing is
+   * created.
+   * @param {string} text - the new item's text, already trimmed/non-empty.
+   */
+  function openNewRecurringItemEditor(text) {
+    var frag = document.createDocumentFragment();
+    var h = document.createElement("h3");
+    h.textContent = "Edit recurrence";
+    frag.appendChild(h);
+
+    var schemaTa = document.createElement("textarea");
+    schemaTa.className = "modal-ta";
+    schemaTa.readOnly = true;
+    schemaTa.value = RECURRENCE_SCHEMA_TEXT;
+    frag.appendChild(schemaTa);
+
+    var label = document.createElement("p");
+    label.textContent = "Paste a recurrence dict below, or leave blank " +
+      "to clear recurrence:";
+    frag.appendChild(label);
+
+    var inputTa = document.createElement("textarea");
+    inputTa.className = "modal-ta";
+    inputTa.placeholder = "Paste dict here...";
+    frag.appendChild(inputTa);
+
+    var row = document.createElement("div");
+    row.className = "modal-actions";
+    var saveBtn = document.createElement("button");
+    saveBtn.className = "primary";
+    saveBtn.textContent = "Save";
+    var cancelBtn = document.createElement("button");
+    cancelBtn.textContent = "Cancel";
+    row.appendChild(saveBtn);
+    row.appendChild(cancelBtn);
+    frag.appendChild(row);
+
+    var overlay = showModal(frag);
+    inputTa.focus();
+
+    saveBtn.addEventListener("click", function () {
+      var rtext = inputTa.value.trim();
+      if (!rtext) {
+        overlay.remove();
+        return;
+      }
+      var parsed;
+      try {
+        parsed = JSON.parse(rtext);
+      } catch (e) {
+        toast("That's not valid JSON.");
+        return;
+      }
+      var err = validateRecurrence(parsed);
+      if (err) {
+        toast(err);
+        return;
+      }
+      var id = uid();
+      state.itemsById[id] = {
+        id: id, text: text, isDone: false, lastDone: null, recurrence: parsed
+      };
+      save();
+      render();
+      overlay.remove();
+    });
+    cancelBtn.addEventListener("click", function () { overlay.remove(); });
   }
 
   // Export - Copy: show JSON in a readonly textarea for manual selection
