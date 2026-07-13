@@ -8,6 +8,10 @@
   var CHAIN = ["0", "1", "2", "3", "3.5", "4"];
   // every real list key, chain or not (used for parsing/validation, not move)
   var LIST_KEYS = ["-1"].concat(CHAIN);
+  // must be declared before `load()` runs below - normalise() validates
+  // stored recurrence dicts against this list on every page load
+  var RECURRENCE_KINDS = ["everyNDays", "dayOfMonth", "daysOfWeek",
+    "everyNWeeksOnDays", "nthWeekdayOfMonth", "yearly", "monthOfYear"];
 
   var state = load();
   var expandedNote = null;
@@ -347,16 +351,12 @@
 
   // ---------- item operations ----------
   /**
-   * Finds an id's index within one of the id-array list keys. Safe to call
-   * with a null/missing listKey (an unlinked, itemsById-only item) - returns
-   * not-found rather than throwing.
-   * @param {string|null} listKey - one of the `state.lists` keys (not
-   *   "trash"), or null if the item isn't linked into any list.
+   * Finds an id's index within one of the id-array list keys.
+   * @param {string} listKey - one of the `state.lists` keys (not "trash").
    * @param {string} id - id of the item to find.
    * @returns {number} the index, or -1 if not present in that list.
    */
   function findIn(listKey, id) {
-    if (!listKey || !state.lists[listKey]) return -1;
     return state.lists[listKey].indexOf(id);
   }
 
@@ -467,19 +467,15 @@
   }
 
   /**
-   * Moves an item out of its current list (if it's linked into one) and
-   * into Trash, recording where it came from so Recover knows where to put
-   * it back. An unlinked, itemsById-only item (fromKey null) has nothing to
-   * unlink - it just gets a trash entry with a null origin directly.
-   * @param {string|null} fromKey - list key the item currently lives in, or
-   *   null if it isn't linked into any list.
+   * Moves an item out of its current list and into Trash, recording where it
+   * came from (so Recover knows where to put it back).
+   * @param {string} fromKey - list key the item currently lives in.
    * @param {string} id - id of the item to trash.
    */
   function trashItem(fromKey, id) {
-    if (fromKey) {
-      var i = findIn(fromKey, id);
-      if (i !== -1) state.lists[fromKey].splice(i, 1);
-    }
+    var i = findIn(fromKey, id);
+    if (i === -1) return;
+    state.lists[fromKey].splice(i, 1);
     state.lists.trash.push({
       id: id, origin: fromKey, deletedAt: getNow().toISOString()
     });
@@ -519,14 +515,14 @@
 
   /**
    * Overwrites an item's text in place, unless the trimmed replacement is empty
-   * (treated as a cancel, leaving the original text untouched). Works
-   * regardless of whether the item is linked into a list - its existence in
-   * `itemsById` is the only thing that matters here.
+   * (treated as a cancel, leaving the original text untouched).
+   * @param {string} listKey - list key the item currently lives in.
    * @param {string} id - id of the item to edit.
    * @param {string} newText - proposed replacement text, untrimmed.
    */
-  function editItem(id, newText) {
-    if (!state.itemsById[id]) return;
+  function editItem(listKey, id, newText) {
+    var i = findIn(listKey, id);
+    if (i === -1) return;
     var v = newText.trim();
     if (v === "") return;            // empty = cancel, keep original
     state.itemsById[id].text = v;
@@ -536,13 +532,14 @@
 
   /**
    * Overwrites (or clears) an item's note. A blank trimmed value deletes the
-   * `.note` field entirely rather than storing an empty string. Works
-   * regardless of whether the item is linked into a list.
+   * `.note` field entirely rather than storing an empty string.
+   * @param {string} listKey - list key the item currently lives in.
    * @param {string} id - id of the item to edit.
    * @param {string} newNote - proposed replacement note, untrimmed.
    */
-  function editNote(id, newNote) {
-    if (!state.itemsById[id]) return;
+  function editNote(listKey, id, newNote) {
+    var i = findIn(listKey, id);
+    if (i === -1) return;
     var v = newNote.trim();
     if (v) {
       state.itemsById[id].note = v;
@@ -557,10 +554,11 @@
 
   /**
    * Opens the note editor for a single item, expanding its note area.
+   * @param {string} key - list key the item currently lives in.
    * @param {Object} item - the item object being edited.
    */
-  function startNoteEdit(item) {
-    editingNote = { id: item.id };
+  function startNoteEdit(key, item) {
+    editingNote = { key: key, id: item.id };
     expandedNote = item.id;
     render();
   }
@@ -913,9 +911,8 @@
     card.className = "card list" + fixedClass + collapsedClass;
     card.appendChild(buildHead(key, titleText, opts));
     card.appendChild(buildItems(key, opts));
-    if (opts.kind === "recurring") {
-      card.appendChild(buildRecurringAdder());
-    } else if (opts.kind !== "trash" && opts.kind !== "completed"
+    if (opts.kind !== "trash" && opts.kind !== "completed"
+      && opts.kind !== "recurring"
       && !(randomizer.active
       && randomizer.target === opts.randomizerTarget)) {
         card.appendChild(buildAdder(key));
@@ -1163,7 +1160,7 @@
 
     var actions = document.createElement("div");
     actions.className = "row-actions";
-    actions.appendChild(buildPencil(item, li));
+    actions.appendChild(buildPencil(key, item, li));
     actions.appendChild(buildHamburger(key, item));
     li.appendChild(actions);
 
@@ -1190,7 +1187,7 @@
 
     var actions = document.createElement("div");
     actions.className = "row-actions";
-    actions.appendChild(buildPencil(item, li));
+    actions.appendChild(buildPencil(key, item, li));
     actions.appendChild(buildHamburger(key, item, true));
     li.appendChild(actions);
 
@@ -1225,7 +1222,7 @@
 
     var actions = document.createElement("div");
     actions.className = "row-actions";
-    actions.appendChild(buildPencil(item, li));
+    actions.appendChild(buildPencil(key, item, li));
     actions.appendChild(buildHamburger(key, item, true));
     li.appendChild(actions);
 
@@ -1375,8 +1372,9 @@
       function commit() {
         if (committed) return;
         committed = true;
+        var eKey = editingNote.key;
         editingNote = null;
-        editNote(item.id, ta.value);
+        editNote(eKey, item.id, ta.value);
       }
       ta.addEventListener("keydown", function (e) {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -1412,14 +1410,15 @@
 
   /**
    * Builds the pencil (edit) button for a row.
+   * @param {string} key - list key the item currently lives in.
    * @param {Object} item - the item this button edits.
    * @param {Element} li - the row's `<li>`, passed through to `startEdit` so it
    *   can be swapped for an inline editor.
    * @returns {Element} the pencil button.
    */
-  function buildPencil(item, li) {
+  function buildPencil(key, item, li) {
     var btn = mkMini("✎", "Edit");
-    btn.addEventListener("click", function () { startEdit(li, item); });
+    btn.addEventListener("click", function () { startEdit(li, key, item); });
     return btn;
   }
 
@@ -1508,7 +1507,7 @@
       note.textContent = "Edit note";
       note.addEventListener("click", function () {
         closeAllMenus();
-        startNoteEdit(item);
+        startNoteEdit(key, item);
       });
       menu.appendChild(note);
 
@@ -1555,9 +1554,10 @@
    * Swaps an item row's label for an inline text input, wired to commit the
    * edit on Enter/blur or cancel on Escape.
    * @param {Element} li - the row's `<li>`.
+   * @param {string} key - list key the item currently lives in.
    * @param {Object} item - the item being edited.
    */
-  function startEdit(li, item) {
+  function startEdit(li, key, item) {
     var label = li.querySelector(".label");
     if (!label || li.querySelector(".label-edit")) return;
     var input = document.createElement("input");
@@ -1575,7 +1575,7 @@
     function commit() {
       if (committed) return;
       committed = true;
-      editItem(item.id, input.value);  // empty = cancel inside
+      editItem(key, item.id, input.value);  // empty = cancel inside
       if (!input.value.trim()) render();     // restore label on cancel
     }
     input.addEventListener("keydown", function (e) {
@@ -1621,40 +1621,6 @@
     }
     addBtn.addEventListener("click", commit);
     input.addEventListener("keydown", function (e) { 
-      if (e.key === "Enter") commit(); });
-    adder.appendChild(input);
-    adder.appendChild(addBtn);
-    return adder;
-  }
-
-  /**
-   * Builds the Recurring card's adder. Unlike a normal adder, committing
-   * doesn't create the item directly - it opens the recurrence editor first,
-   * and the item only gets created (not linked to any list) once a valid
-   * recurrence dict is saved there.
-   * @returns {Element} the assembled `.adder` row.
-   */
-  function buildRecurringAdder() {
-    var adder = document.createElement("div");
-    adder.className = "adder";
-    var input = document.createElement("input");
-    input.type = "text";
-    input.placeholder = "Add...";
-    input.setAttribute("aria-label", "Add a recurring item");
-    var addBtn = document.createElement("button");
-    addBtn.className = "primary";
-    addBtn.textContent = "Add Rc.";
-    /**
-     * Reads the input and, if non-blank, opens the recurrence editor for a
-     * new item with that text.
-     */
-    function commit() {
-      var v = input.value.trim();
-      if (!v) return;
-      openNewRecurringItemEditor(v);
-    }
-    addBtn.addEventListener("click", commit);
-    input.addEventListener("keydown", function (e) {
       if (e.key === "Enter") commit(); });
     adder.appendChild(input);
     adder.appendChild(addBtn);
@@ -1991,9 +1957,6 @@
   }
 
   // ---------- recurrence editor ----------
-  var RECURRENCE_KINDS = ["everyNDays", "dayOfMonth", "daysOfWeek",
-    "everyNWeeksOnDays", "nthWeekdayOfMonth", "yearly", "monthOfYear"];
-
   var RECURRENCE_SCHEMA_TEXT = [
     "recurrence = null | {",
     "  destination: \"-1\" | \"1\" | \"2\", paused: boolean,",
@@ -2116,79 +2079,6 @@
         return;
       }
       item.recurrence = parsed;
-      save();
-      render();
-      overlay.remove();
-    });
-    cancelBtn.addEventListener("click", function () { overlay.remove(); });
-  }
-
-  /**
-   * Opens the recurrence editor for a brand-new recurring item: the item
-   * doesn't exist in `itemsById` yet, and only gets created - unlinked from
-   * every list - once a valid recurrence dict is saved here. Leaving the
-   * box blank or cancelling discards the typed text entirely; nothing is
-   * created.
-   * @param {string} text - the new item's text, already trimmed/non-empty.
-   */
-  function openNewRecurringItemEditor(text) {
-    var frag = document.createDocumentFragment();
-    var h = document.createElement("h3");
-    h.textContent = "Edit recurrence";
-    frag.appendChild(h);
-
-    var schemaTa = document.createElement("textarea");
-    schemaTa.className = "modal-ta";
-    schemaTa.readOnly = true;
-    schemaTa.value = RECURRENCE_SCHEMA_TEXT;
-    frag.appendChild(schemaTa);
-
-    var label = document.createElement("p");
-    label.textContent = "Paste a recurrence dict below, or leave blank " +
-      "to clear recurrence:";
-    frag.appendChild(label);
-
-    var inputTa = document.createElement("textarea");
-    inputTa.className = "modal-ta";
-    inputTa.placeholder = "Paste dict here...";
-    frag.appendChild(inputTa);
-
-    var row = document.createElement("div");
-    row.className = "modal-actions";
-    var saveBtn = document.createElement("button");
-    saveBtn.className = "primary";
-    saveBtn.textContent = "Save";
-    var cancelBtn = document.createElement("button");
-    cancelBtn.textContent = "Cancel";
-    row.appendChild(saveBtn);
-    row.appendChild(cancelBtn);
-    frag.appendChild(row);
-
-    var overlay = showModal(frag);
-    inputTa.focus();
-
-    saveBtn.addEventListener("click", function () {
-      var rtext = inputTa.value.trim();
-      if (!rtext) {
-        overlay.remove();
-        return;
-      }
-      var parsed;
-      try {
-        parsed = JSON.parse(rtext);
-      } catch (e) {
-        toast("That's not valid JSON.");
-        return;
-      }
-      var err = validateRecurrence(parsed);
-      if (err) {
-        toast(err);
-        return;
-      }
-      var id = uid();
-      state.itemsById[id] = {
-        id: id, text: text, isDone: false, lastDone: null, recurrence: parsed
-      };
       save();
       render();
       overlay.remove();
