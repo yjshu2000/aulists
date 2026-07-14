@@ -16,6 +16,7 @@
   var state = load();
   var expandedNote = null;
   var editingNote = null;
+  var editingNoteMounted = false;
   var randomizer = {
     active: false,
     target: null,
@@ -581,6 +582,7 @@
    */
   function render() {
     closeAllMenus();
+    editingNoteMounted = false;
     appEl.innerHTML = "";
 
     // Today carousel: a 3-slide track (prev/current/next) always centered on
@@ -1352,7 +1354,8 @@
     }
     wrap.appendChild(label);
 
-    if (editingNote && editingNote.id === item.id) {
+    if (editingNote && editingNote.id === item.id && !editingNoteMounted) {
+      editingNoteMounted = true;
       var ta = document.createElement("textarea");
       ta.className = "item-note-edit";
       ta.value = item.note || "";
