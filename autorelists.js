@@ -2006,8 +2006,7 @@
     "  rule:",
     "    { type: \"everyNDays\", everyDays: int }",
     "      // recurs when (today - item.lastDone) % everyDays == 0",
-    "      // anchored to lastDone; if never completed, anchor = when",
-    "      // recurrence was turned on",
+    "      // anchored to lastDone.",
     "  | { type: \"dayOfMonth\", days: int[] (each 1-31) }",
     "      // recurs when today's day-of-month is in `days`",
     "  | { type: \"daysOfWeek\", weekdays: int[] (each 0-6, 0=Sun..6=Sat) }",
@@ -2056,12 +2055,18 @@
   }
 
   /**
-   * Opens the "Edit recurrence" modal: a readonly schema reference block
-   * plus a textarea to paste a new recurrence dict into (or leave blank
-   * to clear recurrence entirely).
-   * @param {Object} item - the item whose recurrence is being edited.
+   * Builds the shared "Edit recurrence" modal: a readonly schema reference
+   * block plus a textarea to paste a recurrence dict into (or leave blank).
+   * Parsing/validation is handled here; callers only receive the outcome.
+   * @param {Object} opts
+   * @param {string} [opts.prefill] - initial textarea contents.
+   * @param {function} opts.onBlank - called when Save is hit with blank
+   *   input; must perform whatever state change/save/render blank implies.
+   * @param {function(Object)} opts.onSave - called with the parsed,
+   *   validated recurrence dict when Save is hit with valid input; must
+   *   perform whatever state change/save/render applies.
    */
-  function openRecurrenceEditor(item) {
+  function buildRecurrenceModal(opts) {
     var frag = document.createDocumentFragment();
     var h = document.createElement("h3");
     h.textContent = "Edit recurrence";
@@ -2081,8 +2086,8 @@
     var inputTa = document.createElement("textarea");
     inputTa.className = "modal-ta";
     inputTa.placeholder = "Paste dict here...";
-    if (item.recurrence) {
-      inputTa.value = JSON.stringify(item.recurrence, null, 2);
+    if (opts.prefill) {
+      inputTa.value = opts.prefill;
     }
     frag.appendChild(inputTa);
 
@@ -2103,9 +2108,7 @@
     saveBtn.addEventListener("click", function () {
       var text = inputTa.value.trim();
       if (!text) {
-        item.recurrence = null;
-        save();
-        render();
+        opts.onBlank();
         overlay.remove();
         return;
       }
@@ -2121,12 +2124,38 @@
         toast(err);
         return;
       }
-      item.recurrence = parsed;
-      save();
-      render();
+      opts.onSave(parsed);
       overlay.remove();
     });
     cancelBtn.addEventListener("click", function () { overlay.remove(); });
+  }
+
+  /**
+   * Opens the "Edit recurrence" modal for an existing item. Blank input
+   * clears the item's recurrence; valid input replaces it.
+   * @param {Object} item - the item whose recurrence is being edited.
+   */
+  function openRecurrenceEditor(item) {
+    var prefill;
+    if (item.recurrence) {
+      prefill = JSON.stringify(item.recurrence, null, 2);
+    }
+    buildRecurrenceModal({
+      prefill: prefill,
+      onBlank: function () {
+        item.recurrence = null;
+        save();
+        render();
+      },
+      onSave: function (parsed) {
+        item.recurrence = parsed;
+        if (item.lastDone === null) {
+          item.lastDone = getNow().toISOString();
+        }
+        save();
+        render();
+      }
+    });
   }
 
   /**
@@ -2138,68 +2167,18 @@
    * @param {string} text - the new item's text, already trimmed/non-empty.
    */
   function openNewRecurringItemEditor(text) {
-    var frag = document.createDocumentFragment();
-    var h = document.createElement("h3");
-    h.textContent = "Edit recurrence";
-    frag.appendChild(h);
-
-    var schemaTa = document.createElement("textarea");
-    schemaTa.className = "modal-ta";
-    schemaTa.readOnly = true;
-    schemaTa.value = RECURRENCE_SCHEMA_TEXT;
-    frag.appendChild(schemaTa);
-
-    var label = document.createElement("p");
-    label.textContent = "Paste a recurrence dict below, or leave blank " +
-      "to clear recurrence:";
-    frag.appendChild(label);
-
-    var inputTa = document.createElement("textarea");
-    inputTa.className = "modal-ta";
-    inputTa.placeholder = "Paste dict here...";
-    frag.appendChild(inputTa);
-
-    var row = document.createElement("div");
-    row.className = "modal-actions";
-    var saveBtn = document.createElement("button");
-    saveBtn.className = "primary";
-    saveBtn.textContent = "Save";
-    var cancelBtn = document.createElement("button");
-    cancelBtn.textContent = "Cancel";
-    row.appendChild(saveBtn);
-    row.appendChild(cancelBtn);
-    frag.appendChild(row);
-
-    var overlay = showModal(frag);
-    inputTa.focus();
-
-    saveBtn.addEventListener("click", function () {
-      var rtext = inputTa.value.trim();
-      if (!rtext) {
-        overlay.remove();
-        return;
+    buildRecurrenceModal({
+      onBlank: function () {},
+      onSave: function (parsed) {
+        var id = uid();
+        state.itemsById[id] = {
+          id: id, text: text, isDone: false,
+          lastDone: getNow().toISOString(), recurrence: parsed
+        };
+        save();
+        render();
       }
-      var parsed;
-      try {
-        parsed = JSON.parse(rtext);
-      } catch (e) {
-        toast("That's not valid JSON.");
-        return;
-      }
-      var err = validateRecurrence(parsed);
-      if (err) {
-        toast(err);
-        return;
-      }
-      var id = uid();
-      state.itemsById[id] = {
-        id: id, text: text, isDone: false, lastDone: null, recurrence: parsed
-      };
-      save();
-      render();
-      overlay.remove();
     });
-    cancelBtn.addEventListener("click", function () { overlay.remove(); });
   }
 
   // Export - Copy: show JSON in a readonly textarea for manual selection
