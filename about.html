@@ -28,6 +28,18 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v0.14 <span class="changelog-date">2026-07-17 06H</span></h3>
+    <ul>
+      <li>Checkpoint G: permanent delete (explicit and TTL purge) now removes
+        the itemsById record.</li>
+      <li>Dangling ogItemId references in past day snapshots normalized to null
+        on purge.</li>
+      <li>Completed and Recurring views automatically stop showing permanently
+        deleted items.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v0.13 <span class="changelog-date">2026-07-17 06H</span></h3>
     <ul>
       <li>Checkpoint F: past day cards show real snapshot data from rollover

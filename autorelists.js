@@ -355,10 +355,35 @@
   function purgeTrash() {
     var now = getNow().getTime();
     var before = state.lists.trash.length;
-    state.lists.trash = state.lists.trash.filter(function (t) {
-      return (now - new Date(t.deletedAt).getTime()) < WEEK_MS;
+    var keep = [];
+    state.lists.trash.forEach(function (t) {
+      if ((now - new Date(t.deletedAt).getTime()) < WEEK_MS) {
+        keep.push(t);
+      } else {
+        delete state.itemsById[t.id];
+      }
     });
-    if (state.lists.trash.length !== before) save();
+    state.lists.trash = keep;
+    if (keep.length !== before) {
+      normalizeDanglingOgItemIds();
+      save();
+    }
+  }
+
+  function normalizeDanglingOgItemIds() {
+    Object.keys(state.pastDaysByDate).forEach(
+      function (dateKey) {
+        var day = state.pastDaysByDate[dateKey];
+        PAST_ZONE_KEYS.forEach(function (zone) {
+          day[zone].forEach(function (pi) {
+            if (pi.ogItemId
+              && !state.itemsById[pi.ogItemId]) {
+              pi.ogItemId = null;
+            }
+          });
+        });
+      }
+    );
   }
 
   // ----------------------- rollover (compute on open) ------------------------
@@ -744,6 +769,8 @@
     var i = findInTrash(id);
     if (i === -1) return;
     state.lists.trash.splice(i, 1);
+    delete state.itemsById[id];
+    normalizeDanglingOgItemIds();
     save();
     render();
   }
