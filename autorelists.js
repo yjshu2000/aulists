@@ -8,10 +8,11 @@
   var CHAIN = ["0", "1", "2", "3", "3.5", "4"];
   // every real list key, chain or not (used for parsing/validation, not move)
   var LIST_KEYS = ["-1"].concat(CHAIN);
-  // must be declared before `load()` runs below - normalise() validates
-  // stored recurrence dicts against this list on every page load
+  // stored recurrence dicts against this list
   var RECURRENCE_KINDS = ["everyNDays", "dayOfMonth", "daysOfWeek",
     "everyNWeeksOnDays", "nthWeekdayOfMonth", "yearly", "monthOfYear"];
+  var PAST_ZONE_KEYS = ["-1", "0", "1"];  // stored past-day snapshots
+  var DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
   var state = load();
   var expandedNote = null;
@@ -25,8 +26,8 @@
     done: false
   };
   var randomizerGen = 0;
-  var todayCardOffset = 0; // 0 = today; negative = carousel test steps into the
-                           // past
+  var todayCardOffset = 0; // 0 = today; negative = carousel test steps into
+                           // the past
   var carouselAnimating = false;
   var CAROUSEL_PEEK = 20; // must match .today-nav width / left/right in
                           // style-minim.css
@@ -100,6 +101,8 @@
         "-1": [], "0": [], "1": [], "2": [], "3": [], "3.5": [], "4": [],
         trash: []
       },
+      pastDaysByDate: {},
+      todayDateKey: null,
       collapsed: {
         "3": false, "4": true, completed: true, recurring: true, trash: true
       },
@@ -215,6 +218,11 @@
         if (am >= 0 && am < 1440) s.schedule.atMinutes = am;
       }
       if (typeof obj.lastReturn === "string") s.lastReturn = obj.lastReturn;
+      s.pastDaysByDate = sanitizePastDaysByDate(obj.pastDaysByDate);
+      if (typeof obj.todayDateKey === "string" &&
+        DATE_KEY_RE.test(obj.todayDateKey)) {
+        s.todayDateKey = obj.todayDateKey;
+      }
       if (typeof obj.lastExported === "string") {
         s.lastExported = obj.lastExported;
       }
@@ -233,7 +241,7 @@
     catch (e) { toast("Could not save to this browser's storage."); }
   }
 
-  // ---------- schedule (compute on open) ----------
+  // ----------------------- schedule (compute on open) ------------------------
   /**
    * Returns the schedule boundary (midnight + `atMin` minutes) for a given
    * calendar day, ignoring whatever time-of-day `date` itself carries.
@@ -336,7 +344,7 @@
     return false;
   }
 
-  // ---------- trash purge (compute on open) ----------
+  // ---------------------- trash purge (compute on open) ----------------------
   /**
    * Permanently drops any trash entries older than the 7-day TTL (`WEEK_MS`).
    * Safe to call repeatedly; only saves if something changed.
@@ -350,7 +358,220 @@
     if (state.lists.trash.length !== before) save();
   }
 
-  // ---------- item operations ----------
+  // ----------------------- rollover (compute on open) ------------------------
+  /**
+   * Formats a Date as the local "YYYY-MM-DD" key used for both
+   * `state.pastDaysByDate` entries and `state.todayDateKey`.
+   * @param {Date} date - the date to key.
+   * @returns {string} the date key.
+   */
+  function dateKeyFor(date) {
+    return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" +
+      pad(date.getDate());
+  }
+
+  /**
+   * Parses a "YYYY-MM-DD" date key back into a local midnight Date.
+   * @param {string} key - a date key as produced by `dateKeyFor`.
+   * @returns {Date} the corresponding local midnight.
+   */
+  function parseDateKey(key) {
+    var parts = key.split("-");
+    return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1,
+      parseInt(parts[2], 10));
+  }
+
+  /**
+   * Whole number of calendar days from `a` to `b`, ignoring time-of-day.
+   * @param {Date} a - start date.
+   * @param {Date} b - end date.
+   * @returns {number} days between them; negative if `b` is before `a`.
+   */
+  function daysBetween(a, b) {
+    var ms = boundaryAt(b, 0).getTime() - boundaryAt(a, 0).getTime();
+    return Math.round(ms / (24 * 60 * 60 * 1000));
+  }
+
+  /**
+   * Sanitizes an arbitrary parsed-JSON `pastDaysByDate` blob into a
+   * fully-formed one, the same defensive role `normalise` plays for the rest
+   * of state. Malformed dates, zones, or entries are dropped rather than
+   * allowed to corrupt state.
+   * @param {*} raw - parsed JSON, untrusted.
+   * @returns {Object} a complete, safe-to-use `pastDaysByDate` map.
+   */
+  function sanitizePastDaysByDate(raw) {
+    var out = {};
+    if (!raw || typeof raw !== "object") return out;
+    Object.keys(raw).forEach(function (dateKey) {
+      if (!DATE_KEY_RE.test(dateKey)) return;
+      var src = raw[dateKey];
+      if (!src || typeof src !== "object") return;
+      var day = { "-1": [], "0": [], "1": [] };
+      PAST_ZONE_KEYS.forEach(function (zone) {
+        var arr = src[zone];
+        if (!Array.isArray(arr)) return;
+        arr.forEach(function (pi) {
+          if (!pi || typeof pi.text !== "string") return;
+          var o = { ogItemId: null, text: pi.text, isDone: !!pi.isDone };
+          if (typeof pi.ogItemId === "string") o.ogItemId = pi.ogItemId;
+          if (typeof pi.note === "string" && pi.note) o.note = pi.note;
+          day[zone].push(o);
+        });
+      });
+      out[dateKey] = day;
+    });
+    return out;
+  }
+
+  /**
+   * Freezes a snapshot of today's three zones (-1/0/1) into
+   * `state.pastDaysByDate` under `dateKey`, as PastItems linked back to their
+   * live item only via `ogItemId`. Overwrites any existing entry for that
+   * date.
+   * @param {string} dateKey - the date key the closing day snapshots under.
+   */
+  function snapshotTodayZones(dateKey) {
+    var day = { "-1": [], "0": [], "1": [] };
+    PAST_ZONE_KEYS.forEach(function (zone) {
+      state.lists[zone].forEach(function (id) {
+        var item = state.itemsById[id];
+        if (!item) return;
+        var pastItem = { ogItemId: id, text: item.text, isDone: item.isDone };
+        if (item.note) pastItem.note = item.note;
+        day[zone].push(pastItem);
+      });
+    });
+    state.pastDaysByDate[dateKey] = day;
+  }
+
+  /**
+   * Finds the 1-based occurrence of `date`'s weekday within its month, plus
+   * whether it's the last such occurrence - the two pieces
+   * `nthWeekdayOfMonth` rules need.
+   * @param {Date} date - the date to inspect.
+   * @returns {{occurrence: number, isLast: boolean}}
+   */
+  function nthWeekdayInfo(date) {
+    var occurrence = Math.floor((date.getDate() - 1) / 7) + 1;
+    var lastOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0)
+      .getDate();
+    return {
+      occurrence: occurrence,
+      isLast: date.getDate() + 7 > lastOfMonth
+    };
+  }
+
+  /**
+   * Evaluates whether a recurrence rule fires on `date`, per the semantics
+   * documented in `RECURRENCE_SCHEMA_TEXT`.
+   * @param {Object} rule - the item's `recurrence.rule`.
+   * @param {Object} item - the owning item (for `lastDone`, used by
+   *   `everyNDays`).
+   * @param {Date} date - the calendar day being evaluated.
+   * @returns {boolean} true if the rule fires on `date`.
+   */
+  function ruleFires(rule, item, date) {
+    var sinceDone, weeksSince, info;
+    switch (rule.type) {
+      case "everyNDays":
+        if (!item.lastDone) return true;
+        sinceDone = daysBetween(new Date(item.lastDone), date);
+        return sinceDone >= 0 && sinceDone % rule.everyDays === 0;
+      case "dayOfMonth":
+        return rule.days.indexOf(date.getDate()) !== -1;
+      case "daysOfWeek":
+        return rule.weekdays.indexOf(date.getDay()) !== -1;
+      case "everyNWeeksOnDays":
+        if (rule.weekdays.indexOf(date.getDay()) === -1) return false;
+        weeksSince = Math.floor(
+          daysBetween(parseDateKey(rule.anchorDate), date) / 7);
+        return weeksSince >= 0 && weeksSince % rule.everyWeeks === 0;
+      case "nthWeekdayOfMonth":
+        if (date.getDay() !== rule.weekday) return false;
+        info = nthWeekdayInfo(date);
+        if (rule.ordinal === -1) return info.isLast;
+        return info.occurrence === rule.ordinal;
+      case "yearly":
+        if (date.getMonth() + 1 !== rule.month ||
+          date.getDate() !== rule.day) {
+          return false;
+        }
+        if (!rule.everyYears || rule.everyYears <= 1) return true;
+        return (date.getFullYear() - rule.startYear) % rule.everyYears === 0;
+      case "monthOfYear":
+        return rule.months.indexOf(date.getMonth() + 1) !== -1 &&
+          date.getDate() === rule.day;
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Links every due, unpaused, currently-unlinked recurring item into its
+   * `destination` list for `newDay`. Items still linked somewhere (carried
+   * forward because they weren't done) are left alone - relinking would
+   * duplicate them.
+   * @param {Date} newDay - the day rollover is producing.
+   */
+  function placeRecurringItems(newDay) {
+    recurringIds().forEach(function (id) {
+      var item = state.itemsById[id];
+      var rec = item.recurrence;
+      if (rec.paused) return;
+      if (findItemListKey(id) !== null) return;
+      if (!ruleFires(rec.rule, item, newDay)) return;
+      item.isDone = false;
+      state.lists[rec.destination].push(id);
+    });
+  }
+
+  /**
+   * Rolls one calendar day over: snapshots -1/0/1 into `pastDaysByDate` for
+   * the closing day, clears Basics entirely, drops done items from 0/1 (not-
+   * done items carry forward untouched), then places due recurring items
+   * into their destinations for the day that follows.
+   * @param {Date} closingDay - the day being closed out.
+   */
+  function rolloverOneDay(closingDay) {
+    snapshotTodayZones(dateKeyFor(closingDay));
+    state.lists["-1"] = [];
+    ["0", "1"].forEach(function (zone) {
+      state.lists[zone] = state.lists[zone].filter(function (id) {
+        return !state.itemsById[id].isDone;
+      });
+    });
+    placeRecurringItems(stepDays(closingDay, 1));
+  }
+
+  /**
+   * Checks whether one or more calendar-day boundaries have been crossed
+   * since the last time this ran, and if so, rolls over each of them in
+   * order. Safe to call repeatedly (e.g. on every app-open/visibility-
+   * change) - it's a no-op if still the same day, and never rewinds if the
+   * clock (real or debug-overridden) moves backward.
+   * @returns {boolean} true if at least one day was rolled over.
+   */
+  function applyRollover() {
+    var todayKey = dateKeyFor(getNow());
+    if (!state.todayDateKey) {
+      state.todayDateKey = todayKey;
+      save();
+      return false;
+    }
+    var cursor = parseDateKey(state.todayDateKey);
+    var todayDate = parseDateKey(todayKey);
+    if (todayDate.getTime() <= cursor.getTime()) return false;
+    while (cursor.getTime() < todayDate.getTime()) {
+      rolloverOneDay(cursor);
+      cursor = stepDays(cursor, 1);
+    }
+    state.todayDateKey = todayKey;
+    save();
+    return true;
+  }
+
+  // ----------------------------- item operations -----------------------------
   /**
    * Finds an id's index within one of the id-array list keys. Safe to call
    * with a null/missing listKey (an unlinked, itemsById-only item) - returns
@@ -572,7 +793,7 @@
     render();
   }
 
-  // ---------- rendering ----------
+  // -------------------------------- rendering --------------------------------
   var appEl = document.getElementById("app");
 
   /**
@@ -1290,7 +1511,7 @@
     return li;
   }
 
-  // ---- shared row pieces ----
+  // ---------------------------- shared row pieces ----------------------------
   /**
    * Builds the checkbox button shared by main and completed rows.
    * @param {boolean} ticked - whether to render it already checked.
@@ -1670,7 +1891,7 @@
     return adder;
   }
 
-  // ---------- randomizer animation ----------
+  // -------------------------- randomizer animation ---------------------------
   /**
    * Runs the randomizer's slot-machine-style highlight animation: picks a
    * winner up front, then ticks through items with slowing timing until it
@@ -1769,7 +1990,7 @@
     setTimeout(function () { if (gen === randomizerGen) blink(); }, 200);
   }
 
-  // ---------- swipe ----------
+  // ---------------------------------- swipe ----------------------------------
   /**
    * Wires up a chain-list row's swipe gesture: left moves the item up the
    * chain, right moves it down.
@@ -1869,7 +2090,7 @@
     });
   }
 
-  // ---------- schedule UI ----------
+  // ------------------------------- schedule UI -------------------------------
   var everyEl = document.getElementById("every");
   var atHourEl = document.getElementById("atHour");
   var atMinEl = document.getElementById("atMin");
@@ -1942,7 +2163,7 @@
       { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
   }
 
-  // ---------- export / import ----------
+  // ----------------------------- export / import -----------------------------
   /**
    * Serializes the whole state object for export.
    * @returns {string} pretty-printed JSON of `state`.
@@ -1999,10 +2220,10 @@
     return overlay;
   }
 
-  // ---------- recurrence editor ----------
+  // ---------------------------- recurrence editor ----------------------------
   var RECURRENCE_SCHEMA_TEXT = [
     "recurrence = null | {",
-    "  destination: \"-1\" | \"1\" | \"2\", paused: boolean,",
+    "  destination: \"-1\" | \"1\" | \"3\", paused: boolean,",
     "  rule:",
     "    { type: \"everyNDays\", everyDays: int }",
     "      // recurs when (today - item.lastDone) % everyDays == 0",
@@ -2039,8 +2260,8 @@
    */
   function validateRecurrence(r) {
     if (!r || typeof r !== "object") return "Recurrence must be an object.";
-    if (["-1", "1", "2"].indexOf(r.destination) === -1) {
-      return "destination must be \"-1\", \"1\", or \"2\".";
+    if (["-1", "1", "3"].indexOf(r.destination) === -1) {
+      return "destination must be \"-1\", \"1\", or \"3\".";
     }
     if (typeof r.paused !== "boolean") {
       return "paused must be true or false.";
@@ -2143,6 +2364,9 @@
     buildRecurrenceModal({
       prefill: prefill,
       onBlank: function () {
+        if (item.recurrence && findItemListKey(item.id) === null) {
+          state.lists[item.recurrence.destination].push(item.id);
+        }
         item.recurrence = null;
         save();
         render();
@@ -2339,7 +2563,7 @@
     }
   }
 
-  // ---------- toast ----------
+  // ---------------------------------- toast ----------------------------------
   /**
    * Shows a transient toast message, replacing and resetting the timer on any
    * prior toast still showing.
@@ -2354,7 +2578,7 @@
     toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2200);
   }
 
-  // ---------- theme ----------
+  // ---------------------------------- theme ----------------------------------
   var THEME_KEY = "aulists.theme";
   /**
    * Applies a theme preference to the document: sets `data-theme` and the
@@ -2436,6 +2660,7 @@
   function applyDebugNowChange() {
     updateDebugNowStatus();
     purgeTrash();
+    applyRollover();
     applyAutoReturn();
     render();
   }
@@ -2473,10 +2698,11 @@
     updateDebugNowStatus();
   }
 
-  // ---------- boot ----------
+  // ---------------------------------- boot -----------------------------------
   initTheme();
   initDebugNowPanel();
   purgeTrash();
+  applyRollover();
   applyAutoReturn();
   syncScheduleInputs();
   updateLastExported();
@@ -2485,6 +2711,7 @@
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden) {
       purgeTrash();
+      applyRollover();
       var moved = applyAutoReturn();
       render();
     }
