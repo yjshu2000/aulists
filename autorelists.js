@@ -18,6 +18,9 @@
   var expandedNote = null;
   var editingNote = null;
   var editingNoteMounted = false;
+  var expandedPastNote = null;
+  var editingPastNote = null;
+  var editingPastNoteMounted = false;
   var randomizer = {
     active: false,
     target: null,
@@ -793,6 +796,78 @@
     render();
   }
 
+  function pastNoteKey(dateKey, zone, idx) {
+    return dateKey + ":" + zone + ":" + idx;
+  }
+
+  function togglePastItemDone(dateKey, zone, idx) {
+    var day = state.pastDaysByDate[dateKey];
+    if (!day || !day[zone] || !day[zone][idx]) return;
+    day[zone][idx].isDone = !day[zone][idx].isDone;
+    save();
+    render();
+  }
+
+  function editPastItemText(dateKey, zone, idx, newText) {
+    var v = newText.trim();
+    if (!v) return;
+    var day = state.pastDaysByDate[dateKey];
+    if (!day || !day[zone] || !day[zone][idx]) return;
+    day[zone][idx].text = v;
+    save();
+    render();
+  }
+
+  function editPastItemNote(dateKey, zone, idx, newNote) {
+    var day = state.pastDaysByDate[dateKey];
+    if (!day || !day[zone] || !day[zone][idx]) return;
+    var v = newNote.trim();
+    if (v) {
+      day[zone][idx].note = v;
+      expandedPastNote = pastNoteKey(
+        dateKey, zone, idx
+      );
+    } else {
+      delete day[zone][idx].note;
+      expandedPastNote = null;
+    }
+    save();
+    render();
+  }
+
+  function deletePastItem(dateKey, zone, idx) {
+    var day = state.pastDaysByDate[dateKey];
+    if (!day || !day[zone]) return;
+    day[zone].splice(idx, 1);
+    save();
+    render();
+  }
+
+  function addPastItem(dateKey, text) {
+    var v = text.trim();
+    if (!v) return;
+    if (!state.pastDaysByDate[dateKey]) {
+      state.pastDaysByDate[dateKey] = {
+        "-1": [], "0": [], "1": []
+      };
+    }
+    state.pastDaysByDate[dateKey]["0"].push({
+      ogItemId: null, text: v, isDone: false
+    });
+    save();
+    render();
+  }
+
+  function startPastNoteEdit(dateKey, zone, idx) {
+    editingPastNote = {
+      dateKey: dateKey, zone: zone, idx: idx
+    };
+    expandedPastNote = pastNoteKey(
+      dateKey, zone, idx
+    );
+    render();
+  }
+
   // -------------------------------- rendering --------------------------------
   var appEl = document.getElementById("app");
 
@@ -804,6 +879,7 @@
   function render() {
     closeAllMenus();
     editingNoteMounted = false;
+    editingPastNoteMounted = false;
     appEl.innerHTML = "";
 
     // Today carousel: a 3-slide track (prev/current/next) always centered on
@@ -964,7 +1040,7 @@
    */
   function buildCardForOffset(offset) {
     if (offset === 0) return buildTodayRealCard();
-    return buildPlaceholderDayCard(offset);
+    return buildPastDayCard(offset);
   }
 
   /**
@@ -1067,20 +1143,21 @@
     });
   }
 
-  /**
-   * Builds a placeholder carousel day card for testing only: a bare,
-   * always-empty card with no real data behind it yet.
-   * @param {number} offset - days from today this placeholder stands in for;
-   *   used only to label the card.
-   * @returns {Element} the placeholder card section.
-   */
-  function buildPlaceholderDayCard(offset) {
+  function buildPastDayCard(offset) {
+    var d = getNow();
+    d.setDate(d.getDate() + offset);
+    var dateKey = dateKeyFor(d);
+    var day = state.pastDaysByDate[dateKey];
+
     var card = document.createElement("section");
     card.className = "card today-card list fixed";
-    card.appendChild(buildHead("todayPlaceholder", formatCardDate(offset), { 
-      fixed: true, noCount: true }));
+    card.appendChild(buildHead(
+      "past:" + dateKey,
+      formatCardDate(offset),
+      { fixed: true, noCount: true }
+    ));
 
-    for (var i = 0; i < 3; i++) {
+    PAST_ZONE_KEYS.forEach(function (zone, i) {
       if (i > 0) {
         var div = document.createElement("div");
         div.className = "divider";
@@ -1088,14 +1165,252 @@
       }
       var ul = document.createElement("ul");
       ul.className = "items";
-      var empty = document.createElement("li");
-      empty.className = "empty";
-      empty.textContent = "(empty)";
-      ul.appendChild(empty);
+      var items = day ? day[zone] : [];
+      if (items.length === 0) {
+        var empty = document.createElement("li");
+        empty.className = "empty";
+        empty.textContent = "(empty)";
+        ul.appendChild(empty);
+      } else {
+        items.forEach(function (pi, idx) {
+          ul.appendChild(
+            buildPastItemRow(dateKey, zone, idx, pi)
+          );
+        });
+      }
       card.appendChild(ul);
+    });
+
+    card.appendChild(buildPastItemAdder(dateKey));
+    return card;
+  }
+
+  function buildPastItemRow(
+    dateKey, zone, idx, pastItem
+  ) {
+    var li = document.createElement("li");
+    li.className = "item";
+    if (pastItem.isDone) {
+      li.className += " done";
+    }
+    var noteKey = pastNoteKey(dateKey, zone, idx);
+    li.dataset.pastNote = noteKey;
+
+    li.appendChild(buildCheck(
+      pastItem.isDone,
+      function () {
+        togglePastItemDone(dateKey, zone, idx);
+      }
+    ));
+    if (isBuyItem(pastItem)) {
+      li.appendChild(buildBuyTag());
     }
 
-    return card;
+    var wrap = document.createElement("div");
+    wrap.className = "label-wrap";
+
+    var label = document.createElement("span");
+    label.className = "label";
+    label.textContent = pastItem.text;
+    if (pastItem.note) {
+      var marker = document.createElement("span");
+      marker.className = "note-marker";
+      marker.textContent = "*";
+      label.appendChild(marker);
+    }
+    wrap.appendChild(label);
+
+    if (editingPastNote
+      && editingPastNote.dateKey === dateKey
+      && editingPastNote.zone === zone
+      && editingPastNote.idx === idx
+      && !editingPastNoteMounted) {
+      editingPastNoteMounted = true;
+      var ta = document.createElement("textarea");
+      ta.className = "item-note-edit";
+      ta.value = pastItem.note || "";
+      ta.placeholder = "Add a note...";
+      ta.rows = 1;
+      wrap.appendChild(ta);
+      var autoSize = function () {
+        ta.style.height = "auto";
+        ta.style.height = ta.scrollHeight + "px";
+      };
+      ta.addEventListener("input", autoSize);
+      setTimeout(function () {
+        autoSize();
+        ta.focus();
+        ta.setSelectionRange(
+          ta.value.length, ta.value.length
+        );
+      }, 0);
+      var committed = false;
+      var commit = function () {
+        if (committed) return;
+        committed = true;
+        editingPastNote = null;
+        editPastItemNote(
+          dateKey, zone, idx, ta.value
+        );
+      };
+      ta.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          commit();
+        } else if (e.key === "Escape") {
+          committed = true;
+          editingPastNote = null;
+          render();
+        }
+      });
+      ta.addEventListener("blur", commit);
+    } else if (pastItem.note
+      && expandedPastNote === noteKey) {
+      var noteEl = document.createElement("div");
+      noteEl.className = "item-note";
+      noteEl.textContent = pastItem.note;
+      wrap.appendChild(noteEl);
+    }
+
+    wrap.addEventListener("click", function (e) {
+      if (e.target.closest("button")
+        || e.target.closest(".label-edit")
+        || e.target.closest(".item-note-edit")) {
+        return;
+      }
+      if (!pastItem.note) return;
+      if (expandedPastNote === noteKey) {
+        expandedPastNote = null;
+      } else {
+        expandedPastNote = noteKey;
+      }
+      render();
+    });
+
+    li.appendChild(wrap);
+
+    var actions = document.createElement("div");
+    actions.className = "row-actions";
+
+    var pencil = mkMini("✎", "Edit");
+    pencil.addEventListener("click", function () {
+      startPastEdit(
+        li, dateKey, zone, idx, pastItem
+      );
+    });
+    actions.appendChild(pencil);
+
+    actions.appendChild(
+      buildPastHamburger(dateKey, zone, idx)
+    );
+
+    li.appendChild(actions);
+    return li;
+  }
+
+  function startPastEdit(
+    li, dateKey, zone, idx, pastItem
+  ) {
+    var label = li.querySelector(".label");
+    if (!label || li.querySelector(".label-edit")) {
+      return;
+    }
+    var input = document.createElement("input");
+    input.className = "label-edit";
+    input.type = "text";
+    input.value = pastItem.text;
+    label.replaceWith(input);
+    input.focus();
+    input.setSelectionRange(
+      input.value.length, input.value.length
+    );
+    var committed = false;
+    var commit = function () {
+      if (committed) return;
+      committed = true;
+      editPastItemText(
+        dateKey, zone, idx, input.value
+      );
+      if (!input.value.trim()) render();
+    };
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        commit();
+      } else if (e.key === "Escape") {
+        committed = true;
+        render();
+      }
+    });
+    input.addEventListener("blur", commit);
+  }
+
+  function buildPastHamburger(dateKey, zone, idx) {
+    var wrap = document.createElement("div");
+    wrap.className = "menu-anchor";
+    var btn = mkMini("☰", "More options");
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (menuOpenBtn === btn) {
+        closeAllMenus();
+        return;
+      }
+      closeAllMenus();
+      menuOpenBtn = btn;
+      var menu = document.createElement("div");
+      menu.className = "item-menu";
+
+      var note = document.createElement("button");
+      note.textContent = "Edit note";
+      note.addEventListener("click", function () {
+        closeAllMenus();
+        startPastNoteEdit(dateKey, zone, idx);
+      });
+      menu.appendChild(note);
+
+      var del = document.createElement("button");
+      del.className = "danger";
+      del.textContent = "Delete";
+      del.addEventListener("click", function () {
+        closeAllMenus();
+        deletePastItem(dateKey, zone, idx);
+      });
+      menu.appendChild(del);
+
+      var rect = btn.getBoundingClientRect();
+      menu.style.top = (rect.bottom + 4) + "px";
+      menu.style.right =
+        (window.innerWidth - rect.right) + "px";
+      document.body.appendChild(menu);
+    });
+    wrap.appendChild(btn);
+    return wrap;
+  }
+
+  function buildPastItemAdder(dateKey) {
+    var adder = document.createElement("div");
+    adder.className = "adder";
+    var input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "Add...";
+    input.setAttribute(
+      "aria-label", "Add a past item"
+    );
+    var addBtn = document.createElement("button");
+    addBtn.className = "primary";
+    addBtn.textContent = "Add";
+    var commit = function () {
+      var v = input.value.trim();
+      if (!v) return;
+      addPastItem(dateKey, v);
+      input.value = "";
+    };
+    addBtn.addEventListener("click", commit);
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") commit();
+    });
+    adder.appendChild(input);
+    adder.appendChild(addBtn);
+    return adder;
   }
 
   /**
@@ -1679,9 +1994,19 @@
   }
   document.addEventListener("click", function (e) {
     if (!e.target.closest(".menu-anchor")) closeAllMenus();
-    if (expandedNote && !editingNote 
-      && !e.target.closest(".item[data-id=\"" + expandedNote + "\"]")) {
+    if (expandedNote && !editingNote
+      && !e.target.closest(
+        ".item[data-id=\"" + expandedNote + "\"]"
+      )) {
       expandedNote = null;
+      render();
+    }
+    if (expandedPastNote && !editingPastNote
+      && !e.target.closest(
+        ".item[data-past-note=\""
+        + expandedPastNote + "\"]"
+      )) {
+      expandedPastNote = null;
       render();
     }
   });
