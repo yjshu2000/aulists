@@ -9,8 +9,8 @@
   // every real list key, chain or not (used for parsing/validation, not move)
   var LIST_KEYS = ["-1"].concat(CHAIN);
   // stored recurrence dicts against this list
-  var RECURRENCE_KINDS = ["everyNDays", "dayOfMonth", "daysOfWeek",
-    "everyNWeeksOnDays", "nthWeekdayOfMonth", "yearly", "monthOfYear"];
+  var RECURRENCE_KINDS = ["everyNDays", "everyNWeeksOnDays", "dayOfMonth",
+    "nthWeekdayOfMonth", "monthOfYear", "yearly"];
   var PAST_ZONE_KEYS = ["-1", "0", "1"];  // stored past-day snapshots
   var DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -370,6 +370,10 @@
     }
   }
 
+  /**
+   * Clears `ogItemId` on any past-day snapshot entry whose referenced
+   * item no longer exists in `itemsById` (e.g. after permanent delete).
+   */
   function normalizeDanglingOgItemIds() {
     Object.keys(state.pastDaysByDate).forEach(
       function (dateKey) {
@@ -508,8 +512,6 @@
         return sinceDone >= 0 && sinceDone % rule.everyDays === 0;
       case "dayOfMonth":
         return rule.days.indexOf(date.getDate()) !== -1;
-      case "daysOfWeek":
-        return rule.weekdays.indexOf(date.getDay()) !== -1;
       case "everyNWeeksOnDays":
         if (rule.weekdays.indexOf(date.getDay()) === -1) return false;
         weeksSince = Math.floor(
@@ -823,10 +825,23 @@
     render();
   }
 
+  /**
+   * Builds the key used to track which past-item note is expanded.
+   * @param {string} dateKey - the past day's date key.
+   * @param {string} zone - the zone within that day.
+   * @param {number} idx - index of the item within the zone array.
+   * @returns {string} the composite key.
+   */
   function pastNoteKey(dateKey, zone, idx) {
     return dateKey + ":" + zone + ":" + idx;
   }
 
+  /**
+   * Toggles the done state of a single past-day snapshot item.
+   * @param {string} dateKey - the past day's date key.
+   * @param {string} zone - the zone within that day.
+   * @param {number} idx - index of the item within the zone array.
+   */
   function togglePastItemDone(dateKey, zone, idx) {
     var day = state.pastDaysByDate[dateKey];
     if (!day || !day[zone] || !day[zone][idx]) return;
@@ -835,6 +850,14 @@
     render();
   }
 
+  /**
+   * Overwrites a past-day snapshot item's text. No-op if the trimmed
+   * text is empty.
+   * @param {string} dateKey - the past day's date key.
+   * @param {string} zone - the zone within that day.
+   * @param {number} idx - index of the item within the zone array.
+   * @param {string} newText - the replacement text.
+   */
   function editPastItemText(dateKey, zone, idx, newText) {
     var v = newText.trim();
     if (!v) return;
@@ -845,6 +868,14 @@
     render();
   }
 
+  /**
+   * Sets or clears a past-day snapshot item's note. A blank/whitespace
+   * `newNote` deletes the note field entirely.
+   * @param {string} dateKey - the past day's date key.
+   * @param {string} zone - the zone within that day.
+   * @param {number} idx - index of the item within the zone array.
+   * @param {string} newNote - the replacement note text.
+   */
   function editPastItemNote(dateKey, zone, idx, newNote) {
     var day = state.pastDaysByDate[dateKey];
     if (!day || !day[zone] || !day[zone][idx]) return;
@@ -862,6 +893,12 @@
     render();
   }
 
+  /**
+   * Removes a single item from a past-day snapshot zone.
+   * @param {string} dateKey - the past day's date key.
+   * @param {string} zone - the zone within that day.
+   * @param {number} idx - index of the item within the zone array.
+   */
   function deletePastItem(dateKey, zone, idx) {
     var day = state.pastDaysByDate[dateKey];
     if (!day || !day[zone]) return;
@@ -870,6 +907,13 @@
     render();
   }
 
+  /**
+   * Adds a new manual (non-recurring-derived) item to a past day's
+   * zone "0", creating the day's snapshot record if it doesn't exist
+   * yet. No-op if the trimmed text is empty.
+   * @param {string} dateKey - the past day's date key.
+   * @param {string} text - the new item's text.
+   */
   function addPastItem(dateKey, text) {
     var v = text.trim();
     if (!v) return;
@@ -885,6 +929,12 @@
     render();
   }
 
+  /**
+   * Opens the note editor for a single past-day snapshot item.
+   * @param {string} dateKey - the past day's date key.
+   * @param {string} zone - the zone within that day.
+   * @param {number} idx - index of the item within the zone array.
+   */
   function startPastNoteEdit(dateKey, zone, idx) {
     editingPastNote = {
       dateKey: dateKey, zone: zone, idx: idx
@@ -1002,14 +1052,11 @@
     list3.appendChild(buildAdder("3.5"));
     appEl.appendChild(list3);
 
-    // List 4
     appEl.appendChild(renderCard("4", "List 4", { collapsible: true }));
 
-    // Recurring view (collapsible, derived filter over itemsById)
     appEl.appendChild(renderCard("recurring", "Recurring",
       {collapsible: true, kind: "recurring"}));
 
-    // Trash (collapsible, no count)
     appEl.appendChild(renderCard("trash", "Trash",
       { collapsible: true, kind: "trash" }));
 
@@ -1170,6 +1217,12 @@
     });
   }
 
+  /**
+   * Builds a fixed, non-swipeable card for a past day's snapshot, with
+   * one zone per `PAST_ZONE_KEYS` and an adder row at the bottom.
+   * @param {number} offset - day offset from today (negative = past).
+   * @returns {Element} the card `<section>`.
+   */
   function buildPastDayCard(offset) {
     var d = getNow();
     d.setDate(d.getDate() + offset);
@@ -1212,6 +1265,15 @@
     return card;
   }
 
+  /**
+   * Builds a single row for a past-day snapshot item: checkbox, label
+   * (with inline note editing/expansion), edit pencil, and hamburger menu.
+   * @param {string} dateKey - the past day's date key.
+   * @param {string} zone - the zone within that day.
+   * @param {number} idx - index of the item within the zone array.
+   * @param {Object} pastItem - the snapshot item to render.
+   * @returns {Element} the `<li>` row.
+   */
   function buildPastItemRow(
     dateKey, zone, idx, pastItem
   ) {
@@ -1335,6 +1397,14 @@
     return li;
   }
 
+  /**
+   * Swaps a past-item row's label for an editable text input in place.
+   * @param {Element} li - the row element containing the label.
+   * @param {string} dateKey - the past day's date key.
+   * @param {string} zone - the zone within that day.
+   * @param {number} idx - index of the item within the zone array.
+   * @param {Object} pastItem - the snapshot item being edited.
+   */
   function startPastEdit(
     li, dateKey, zone, idx, pastItem
   ) {
@@ -1371,6 +1441,14 @@
     input.addEventListener("blur", commit);
   }
 
+  /**
+   * Builds the "more options" menu button for a past-item row, with
+   * "Edit note" and "Delete" actions.
+   * @param {string} dateKey - the past day's date key.
+   * @param {string} zone - the zone within that day.
+   * @param {number} idx - index of the item within the zone array.
+   * @returns {Element} the menu-anchor wrapper.
+   */
   function buildPastHamburger(dateKey, zone, idx) {
     var wrap = document.createElement("div");
     wrap.className = "menu-anchor";
@@ -1413,6 +1491,12 @@
     return wrap;
   }
 
+  /**
+   * Builds the text-input + "Add" button row for adding a manual item
+   * to a past day's zone "0".
+   * @param {string} dateKey - the past day's date key.
+   * @returns {Element} the adder row.
+   */
   function buildPastItemAdder(dateKey) {
     var adder = document.createElement("div");
     adder.className = "adder";
@@ -2580,26 +2664,24 @@
     "    { type: \"everyNDays\", everyDays: int }",
     "      // recurs when (today - item.lastDone) % everyDays == 0",
     "      // anchored to lastDone.",
-    "  | { type: \"dayOfMonth\", days: int[] (each 1-31) }",
-    "      // recurs when today's day-of-month is in `days`",
-    "  | { type: \"daysOfWeek\", weekdays: int[] (each 0-6, 0=Sun..6=Sat) }",
-    "      // recurs when today's weekday is in `weekdays`",
     "  | { type: \"everyNWeeksOnDays\", everyWeeks: int, weekdays: int[] (0-6),",
     "      anchorDate: \"YYYY-MM-DD\" }",
     "      // recurs when weekday matches AND",
     "      // floor(weeksSince(anchorDate)) % everyWeeks == 0",
+    "  | { type: \"dayOfMonth\", days: int[] (each 1-31) }",
+    "      // recurs when today's day-of-month is in `days`",
     "  | { type: \"nthWeekdayOfMonth\", ordinal: int (1,2,3,4, or -1=last),",
     "      weekday: int (0-6) }",
     "      // recurs when today is the `ordinal`-th occurrence of",
     "      // `weekday` this month",
+    "  | { type: \"monthOfYear\", months: int[] (each 1-12), day: int (1-31) }",
+    "      // recurs when today's month is in `months` AND today's",
+    "      // day-of-month == day",
     "  | { type: \"yearly\", month: int (1-12), day: int (1-31),",
     "      everyYears: int = 1, startYear?: int (required if",
     "      everyYears > 1) }",
     "      // recurs when month+day match AND (if everyYears>1)",
     "      // (year - startYear) % everyYears == 0",
-    "  | { type: \"monthOfYear\", months: int[] (each 1-12), day: int (1-31) }",
-    "      // recurs when today's month is in `months` AND today's",
-    "      // day-of-month == day",
     "}"
   ].join("\n");
 
@@ -2627,106 +2709,1264 @@
     return null;
   }
 
+  // ---------------- recurrence-editor GUI component builders ----------------
+
+  // per-kind labels shown as the type dropdown's option text
+  var TYPE_LABELS = {
+    everyNDays:
+      "every N days",
+    everyNWeeksOnDays:
+      "specific days of week",
+    dayOfMonth:
+      "specific days of month",
+    nthWeekdayOfMonth:
+      "Nth weekday of the month",
+    monthOfYear:
+      "specific months of year",
+    yearly:
+      "yearly on date"
+  };
+
   /**
-   * Builds the shared "Edit recurrence" modal: a readonly schema reference
-   * block plus a textarea to paste a recurrence dict into (or leave blank).
-   * Parsing/validation is handled here; callers only receive the outcome.
+   * Builds a 3-way segmented toggle for the recurrence destination
+   * list key ("-1", "1", or "3").
+   * @returns {{el: Element, getValue: function(): (string|null),
+   *   setValue: function(string)}} the control.
+   */
+  function buildDestToggle() {
+    var vals = ["-1", "1", "3"];
+    var wrap = document.createElement("div");
+    wrap.className = "rec-dest-toggle";
+    var btns = [];
+    for (var i = 0; i < vals.length; i++) {
+      var b = document.createElement(
+        "button"
+      );
+      b.type = "button";
+      b.className = "rec-dest-opt";
+      b.textContent = vals[i];
+      b.dataset.val = vals[i];
+      btns.push(b);
+      wrap.appendChild(b);
+    }
+    wrap.addEventListener(
+      "click",
+      function (e) {
+        var opt = e.target.closest(
+          ".rec-dest-opt"
+        );
+        if (!opt) return;
+        var wasActive = opt.classList.contains(
+          "active"
+        );
+        btns.forEach(function (b) {
+          b.classList.remove("active");
+        });
+        if (!wasActive) {
+          opt.classList.add("active");
+        }
+      }
+    );
+    return {
+      el: wrap,
+      getValue: function () {
+        var a =
+          wrap.querySelector(".active");
+        if (a) return a.dataset.val;
+        return null;
+      },
+      setValue: function (v) {
+        var idx = vals.indexOf(v);
+        if (idx === -1) return;
+        btns.forEach(function (b) {
+          b.classList.remove("active");
+        });
+        btns[idx].classList.add("active");
+      }
+    };
+  }
+
+  /**
+   * Builds a toggle button switching a recurrence between "Ongoing"
+   * and "Paused" display states.
+   * @returns {{el: Element, getValue: function(): boolean,
+   *   setValue: function(boolean)}} the control.
+   */
+  function buildPauseToggle() {
+    var btn = document.createElement(
+      "button"
+    );
+    btn.type = "button";
+    btn.className =
+      "rec-pause-toggle ongoing";
+    btn.textContent = "Ongoing";
+    var paused = false;
+    function refresh() {
+      if (paused) {
+        btn.className =
+          "rec-pause-toggle paused";
+        btn.textContent = "Paused";
+      } else {
+        btn.className =
+          "rec-pause-toggle ongoing";
+        btn.textContent = "Ongoing";
+      }
+    }
+    btn.addEventListener(
+      "click",
+      function () {
+        paused = !paused;
+        refresh();
+      }
+    );
+    return {
+      el: btn,
+      getValue: function () {
+        return paused;
+      },
+      setValue: function (v) {
+        paused = !!v;
+        refresh();
+      }
+    };
+  }
+
+  /**
+   * Builds a row of Su-Sa weekday buttons, either single-select
+   * (radio-like) or multi-select (toggle) depending on `multi`.
+   * @param {boolean} multi - true for multi-select, false for
+   *   single-select.
+   * @returns {{el: Element,
+   *   getValue: function(): (number|number[]|null),
+   *   setValue: function((number|number[]))}} the control.
+   */
+  function buildWeekdayPicker(multi) {
+    var DAYS = [
+      "Su", "Mo", "Tu", "We",
+      "Th", "Fr", "Sa"
+    ];
+    var wrap = document.createElement("div");
+    wrap.className = "rec-weekday-slider";
+    var btns = [];
+    for (var i = 0; i < 7; i++) {
+      var b = document.createElement(
+        "button"
+      );
+      b.type = "button";
+      b.className = "rec-weekday-opt";
+      b.textContent = DAYS[i];
+      b.dataset.day = i;
+      btns.push(b);
+      wrap.appendChild(b);
+    }
+    wrap.addEventListener(
+      "click",
+      function (e) {
+        var opt = e.target.closest(
+          ".rec-weekday-opt"
+        );
+        if (!opt) return;
+        if (multi) {
+          opt.classList.toggle("selected");
+          return;
+        }
+        var wasSelected = opt.classList.contains(
+          "selected"
+        );
+        btns.forEach(function (b) {
+          b.classList.remove("selected");
+        });
+        if (!wasSelected) {
+          opt.classList.add("selected");
+        }
+      }
+    );
+    return {
+      el: wrap,
+      getValue: function () {
+        if (multi) {
+          return btns
+            .filter(function (b) {
+              return b.classList.contains(
+                "selected"
+              );
+            })
+            .map(function (b) {
+              return parseInt(
+                b.dataset.day
+              );
+            });
+        }
+        var sel =
+          wrap.querySelector(".selected");
+        if (!sel) return null;
+        return parseInt(sel.dataset.day);
+      },
+      setValue: function (val) {
+        btns.forEach(function (b) {
+          b.classList.remove("selected");
+        });
+        if (multi && Array.isArray(val)) {
+          val.forEach(function (d) {
+            if (btns[d]) {
+              btns[d].classList.add(
+                "selected"
+              );
+            }
+          });
+        } else if (
+          !multi && val != null
+        ) {
+          if (btns[val]) {
+            btns[val].classList.add(
+              "selected"
+            );
+          }
+        }
+      }
+    };
+  }
+
+  /**
+   * Builds a single-select picker for the ordinal (1st/2nd/3rd/4th/
+   * Last) used by the nth-weekday-of-month recurrence rule.
+   * @returns {{el: Element, getValue: function(): (number|null),
+   *   setValue: function(number)}} the control.
+   */
+  function buildOrdinalPicker() {
+    var LBL = [
+      "1st", "2nd", "3rd", "4th", "Last"
+    ];
+    var VALS = [1, 2, 3, 4, -1];
+    var wrap = document.createElement("div");
+    wrap.className = "rec-ordinal-slider";
+    var btns = [];
+    for (var i = 0; i < LBL.length; i++) {
+      var b = document.createElement(
+        "button"
+      );
+      b.type = "button";
+      b.className = "rec-ordinal-opt";
+      b.textContent = LBL[i];
+      b.dataset.val = VALS[i];
+      btns.push(b);
+      wrap.appendChild(b);
+    }
+    wrap.addEventListener(
+      "click",
+      function (e) {
+        var opt = e.target.closest(
+          ".rec-ordinal-opt"
+        );
+        if (!opt) return;
+        var wasSelected = opt.classList.contains(
+          "selected"
+        );
+        btns.forEach(function (b) {
+          b.classList.remove("selected");
+        });
+        if (!wasSelected) {
+          opt.classList.add("selected");
+        }
+      }
+    );
+    return {
+      el: wrap,
+      getValue: function () {
+        var sel =
+          wrap.querySelector(".selected");
+        if (!sel) return null;
+        return parseInt(sel.dataset.val);
+      },
+      setValue: function (v) {
+        btns.forEach(function (b) {
+          b.classList.remove("selected");
+        });
+        var idx = VALS.indexOf(v);
+        if (idx !== -1) {
+          btns[idx].classList.add(
+            "selected"
+          );
+        }
+      }
+    };
+  }
+
+  /**
+   * Builds a 35-cell calendar-style grid of day-of-month buttons
+   * (1-31, with leading/trailing blanks), multi-selectable.
+   * @returns {{el: Element, getValue: function(): number[],
+   *   setValue: function(number[])}} the control.
+   */
+  function buildDomGrid() {
+    var wrap = document.createElement("div");
+    wrap.className = "rec-dom-grid";
+    var cells = [];
+    for (var i = 0; i < 35; i++) {
+      var c = document.createElement(
+        "button"
+      );
+      c.type = "button";
+      c.className = "rec-dom-cell";
+      if (i < 2 || i > 32) {
+        c.classList.add("blank");
+      } else {
+        var day = i - 1;
+        c.textContent = day;
+        c.dataset.day = day;
+      }
+      cells.push(c);
+      wrap.appendChild(c);
+    }
+    wrap.addEventListener(
+      "click",
+      function (e) {
+        var cell = e.target.closest(
+          ".rec-dom-cell:not(.blank)"
+        );
+        if (!cell) return;
+        cell.classList.toggle("selected");
+      }
+    );
+    return {
+      el: wrap,
+      getValue: function () {
+        var sel = [];
+        cells.forEach(function (c) {
+          if (
+            c.classList.contains(
+              "selected"
+            ) && c.dataset.day
+          ) {
+            sel.push(
+              parseInt(c.dataset.day)
+            );
+          }
+        });
+        return sel.sort(function (a, b) {
+          return a - b;
+        });
+      },
+      setValue: function (days) {
+        cells.forEach(function (c) {
+          c.classList.remove("selected");
+        });
+        if (!Array.isArray(days)) return;
+        days.forEach(function (d) {
+          var idx = d + 1;
+          if (cells[idx]) {
+            cells[idx].classList.add(
+              "selected"
+            );
+          }
+        });
+      }
+    };
+  }
+
+  /**
+   * Builds a 12-cell Jan-Dec month grid, either single-select or
+   * multi-select depending on `multi`.
+   * @param {boolean} multi - true for multi-select, false for
+   *   single-select.
+   * @returns {{el: Element,
+   *   getValue: function(): (number|number[]|null),
+   *   setValue: function((number|number[]))}} the control.
+   */
+  function buildMonthGrid(multi) {
+    var MO = [
+      "Jan", "Feb", "Mar", "Apr",
+      "May", "Jun", "Jul", "Aug",
+      "Sep", "Oct", "Nov", "Dec"
+    ];
+    var wrap = document.createElement("div");
+    wrap.className = "rec-month-grid";
+    var cells = [];
+    for (var i = 0; i < 12; i++) {
+      var c = document.createElement(
+        "button"
+      );
+      c.type = "button";
+      c.className = "rec-month-cell";
+      c.textContent = MO[i];
+      c.dataset.month = i + 1;
+      cells.push(c);
+      wrap.appendChild(c);
+    }
+    wrap.addEventListener(
+      "click",
+      function (e) {
+        var cell = e.target.closest(
+          ".rec-month-cell"
+        );
+        if (!cell) return;
+        if (multi) {
+          cell.classList.toggle("selected");
+          return;
+        }
+        var wasSelected = cell.classList.contains(
+          "selected"
+        );
+        cells.forEach(function (c) {
+          c.classList.remove("selected");
+        });
+        if (!wasSelected) {
+          cell.classList.add("selected");
+        }
+      }
+    );
+    return {
+      el: wrap,
+      getValue: function () {
+        if (multi) {
+          return cells
+            .filter(function (c) {
+              return c.classList.contains(
+                "selected"
+              );
+            })
+            .map(function (c) {
+              return parseInt(
+                c.dataset.month
+              );
+            });
+        }
+        var sel =
+          wrap.querySelector(".selected");
+        if (!sel) return null;
+        return parseInt(sel.dataset.month);
+      },
+      setValue: function (val) {
+        cells.forEach(function (c) {
+          c.classList.remove("selected");
+        });
+        if (multi && Array.isArray(val)) {
+          val.forEach(function (m) {
+            if (cells[m - 1]) {
+              cells[m - 1].classList.add(
+                "selected"
+              );
+            }
+          });
+        } else if (
+          !multi && val != null
+        ) {
+          if (cells[val - 1]) {
+            cells[val - 1].classList.add(
+              "selected"
+            );
+          }
+        }
+      }
+    };
+  }
+
+  // ------------------- type-specific field-group builders --------------------
+
+  /**
+   * Builds the field group for the "everyNDays" recurrence rule: an
+   * interval input plus a "last done" date, used to seed/override
+   * the item's `lastDone` when the rule is saved.
+   * @param {string} [lastDone] - ISO date string to prefill the
+   *   "last done" input from.
+   * @returns {{el: Element, readRule: function(): (Object|null),
+   *   populateRule: function(Object),
+   *   getLastDone: function(): (string|null),
+   *   setLastDone: function(string)}} the field group.
+   */
+  function buildEveryNDaysFields(lastDone) {
+    var wrap = document.createElement("div");
+    wrap.className = "rec-field-group";
+    var r1 = document.createElement("div");
+    r1.className = "rec-inline";
+    var l1 = document.createElement("span");
+    l1.className = "rec-label";
+    l1.textContent = "Every";
+    var inp = document.createElement("input");
+    inp.type = "number";
+    inp.min = "1";
+    inp.max = "99";
+    inp.value = "1";
+    var l2 = document.createElement("span");
+    l2.className = "rec-label";
+    l2.textContent = "days";
+    r1.appendChild(l1);
+    r1.appendChild(inp);
+    r1.appendChild(l2);
+    wrap.appendChild(r1);
+    var r2 = document.createElement("div");
+    r2.className = "rec-inline";
+    var l3 = document.createElement("span");
+    l3.className = "rec-label";
+    l3.textContent = "Last done:";
+    var dInp = document.createElement(
+      "input"
+    );
+    dInp.type = "date";
+    dInp.className = "rec-date-input";
+    if (lastDone) {
+      dInp.value = lastDone.slice(0, 10);
+    }
+    r2.appendChild(l3);
+    r2.appendChild(dInp);
+    wrap.appendChild(r2);
+    return {
+      el: wrap,
+      readRule: function () {
+        var v = parseInt(inp.value);
+        if (isNaN(v) || v < 1) {
+          return null;
+        }
+        return {
+          type: "everyNDays",
+          everyDays: v
+        };
+      },
+      populateRule: function (rule) {
+        if (rule.everyDays != null) {
+          inp.value = rule.everyDays;
+        }
+      },
+      getLastDone: function () {
+        if (!dInp.value) return null;
+        return dInp.value +
+          "T00:00:00.000Z";
+      },
+      setLastDone: function (ld) {
+        if (ld) {
+          dInp.value = ld.slice(0, 10);
+        }
+      }
+    };
+  }
+
+  /**
+   * Builds the field group for the "dayOfMonth" recurrence rule: a
+   * day-of-month grid.
+   * @returns {{el: Element, readRule: function(): (Object|null),
+   *   populateRule: function(Object)}} the field group.
+   */
+  function buildDayOfMonthFields() {
+    var wrap = document.createElement("div");
+    wrap.className = "rec-field-group";
+    var lbl = document.createElement("span");
+    lbl.className = "rec-label";
+    lbl.textContent = "Days of month:";
+    wrap.appendChild(lbl);
+    var grid = buildDomGrid();
+    wrap.appendChild(grid.el);
+    return {
+      el: wrap,
+      readRule: function () {
+        var days = grid.getValue();
+        if (!days.length) return null;
+        return {
+          type: "dayOfMonth",
+          days: days
+        };
+      },
+      populateRule: function (rule) {
+        if (rule.days) {
+          grid.setValue(rule.days);
+        }
+      }
+    };
+  }
+
+  /**
+   * Builds the field group for the "everyNWeeksOnDays" recurrence
+   * rule: a week interval, a multi-select weekday picker, and an
+   * anchor date used to determine which weeks count.
+   * @returns {{el: Element, readRule: function(): (Object|null),
+   *   populateRule: function(Object)}} the field group.
+   */
+  function buildEveryNWeeksFields() {
+    var wrap = document.createElement("div");
+    wrap.className = "rec-field-group";
+    var r1 = document.createElement("div");
+    r1.className = "rec-inline";
+    var l1 = document.createElement("span");
+    l1.className = "rec-label";
+    l1.textContent = "Every";
+    var wInp = document.createElement(
+      "input"
+    );
+    wInp.type = "number";
+    wInp.min = "1";
+    wInp.max = "99";
+    wInp.value = "1";
+    var l2 = document.createElement("span");
+    l2.className = "rec-label";
+    l2.textContent = "weeks on:";
+    r1.appendChild(l1);
+    r1.appendChild(wInp);
+    r1.appendChild(l2);
+    wrap.appendChild(r1);
+    var picker = buildWeekdayPicker(true);
+    wrap.appendChild(picker.el);
+    var r2 = document.createElement("div");
+    r2.className = "rec-inline";
+    var l3 = document.createElement("span");
+    l3.className = "rec-label";
+    l3.textContent = "Anchor date:";
+    var aInp = document.createElement(
+      "input"
+    );
+    aInp.type = "date";
+    aInp.className = "rec-date-input";
+    aInp.value = dateKeyFor(getNow());
+    r2.appendChild(l3);
+    r2.appendChild(aInp);
+    wrap.appendChild(r2);
+    function syncAnchorDisabled() {
+      aInp.disabled = parseInt(wInp.value) === 1;
+    }
+    syncAnchorDisabled();
+    wInp.addEventListener("input", syncAnchorDisabled);
+    return {
+      el: wrap,
+      readRule: function () {
+        var w = parseInt(wInp.value);
+        if (isNaN(w) || w < 1) {
+          return null;
+        }
+        var wds = picker.getValue();
+        if (!wds.length) return null;
+        if (!aInp.value) return null;
+        return {
+          type: "everyNWeeksOnDays",
+          everyWeeks: w,
+          weekdays: wds,
+          anchorDate: aInp.value
+        };
+      },
+      populateRule: function (rule) {
+        if (rule.everyWeeks != null) {
+          wInp.value = rule.everyWeeks;
+        }
+        if (rule.weekdays) {
+          picker.setValue(rule.weekdays);
+        }
+        if (rule.anchorDate) {
+          aInp.value = rule.anchorDate;
+        }
+        syncAnchorDisabled();
+      }
+    };
+  }
+
+  /**
+   * Builds the field group for the "nthWeekdayOfMonth" recurrence
+   * rule: an ordinal picker paired with a single-select weekday
+   * picker.
+   * @returns {{el: Element, readRule: function(): (Object|null),
+   *   populateRule: function(Object)}} the field group.
+   */
+  function buildNthWeekdayFields() {
+    var wrap = document.createElement("div");
+    wrap.className = "rec-field-group";
+    var l1 = document.createElement("span");
+    l1.className = "rec-label";
+    l1.textContent = "The";
+    wrap.appendChild(l1);
+    var ord = buildOrdinalPicker();
+    wrap.appendChild(ord.el);
+    var wd = buildWeekdayPicker(false);
+    wrap.appendChild(wd.el);
+    var l2 = document.createElement("span");
+    l2.className = "rec-label";
+    l2.textContent = "of the month";
+    wrap.appendChild(l2);
+    return {
+      el: wrap,
+      readRule: function () {
+        var o = ord.getValue();
+        var w = wd.getValue();
+        if (o === null || w === null) {
+          return null;
+        }
+        return {
+          type: "nthWeekdayOfMonth",
+          ordinal: o,
+          weekday: w
+        };
+      },
+      populateRule: function (rule) {
+        if (rule.ordinal != null) {
+          ord.setValue(rule.ordinal);
+        }
+        if (rule.weekday != null) {
+          wd.setValue(rule.weekday);
+        }
+      }
+    };
+  }
+
+  /**
+   * Builds the field group for the "yearly" recurrence rule: a year
+   * interval, a single-select month, a day-of-month number, and a
+   * starting year. `everyYears`/`startYear` are only included in the
+   * read rule when the interval is greater than 1.
+   * @returns {{el: Element, readRule: function(): (Object|null),
+   *   populateRule: function(Object)}} the field group.
+   */
+  function buildYearlyFields() {
+    var wrap = document.createElement("div");
+    wrap.className = "rec-field-group";
+    var r1 = document.createElement("div");
+    r1.className = "rec-inline";
+    var l1 = document.createElement("span");
+    l1.className = "rec-label";
+    l1.textContent = "Every";
+    var yrsInp = document.createElement(
+      "input"
+    );
+    yrsInp.type = "number";
+    yrsInp.min = "1";
+    yrsInp.max = "99";
+    yrsInp.value = "1";
+    var l2 = document.createElement("span");
+    l2.className = "rec-label";
+    l2.textContent = "years";
+    r1.appendChild(l1);
+    r1.appendChild(yrsInp);
+    r1.appendChild(l2);
+    wrap.appendChild(r1);
+    var l3 = document.createElement("span");
+    l3.className = "rec-label";
+    l3.textContent = "on";
+    wrap.appendChild(l3);
+    var months = buildMonthGrid(false);
+    wrap.appendChild(months.el);
+    var r2 = document.createElement("div");
+    r2.className = "rec-inline";
+    var l4 = document.createElement("span");
+    l4.className = "rec-label";
+    l4.textContent = "Day:";
+    var dayInp = document.createElement(
+      "input"
+    );
+    dayInp.type = "number";
+    dayInp.min = "1";
+    dayInp.max = "31";
+    dayInp.value = "1";
+    r2.appendChild(l4);
+    r2.appendChild(dayInp);
+    wrap.appendChild(r2);
+    var r3 = document.createElement("div");
+    r3.className = "rec-inline";
+    var l5 = document.createElement("span");
+    l5.className = "rec-label";
+    l5.textContent = "Starting year:";
+    var syrInp = document.createElement(
+      "input"
+    );
+    syrInp.type = "number";
+    syrInp.value = new Date()
+      .getFullYear().toString();
+    r3.appendChild(l5);
+    r3.appendChild(syrInp);
+    wrap.appendChild(r3);
+    return {
+      el: wrap,
+      readRule: function () {
+        var m = months.getValue();
+        if (m === null) return null;
+        var d = parseInt(dayInp.value);
+        if (isNaN(d) || d < 1 || d > 31) {
+          return null;
+        }
+        var ey = parseInt(yrsInp.value);
+        if (isNaN(ey) || ey < 1) {
+          return null;
+        }
+        var rule = {
+          type: "yearly",
+          month: m,
+          day: d
+        };
+        if (ey > 1) {
+          rule.everyYears = ey;
+          var sy = parseInt(syrInp.value);
+          if (isNaN(sy)) return null;
+          rule.startYear = sy;
+        }
+        return rule;
+      },
+      populateRule: function (rule) {
+        if (rule.month != null) {
+          months.setValue(rule.month);
+        }
+        if (rule.day != null) {
+          dayInp.value = rule.day;
+        }
+        if (rule.everyYears != null) {
+          yrsInp.value = rule.everyYears;
+        }
+        if (rule.startYear != null) {
+          syrInp.value = rule.startYear;
+        }
+      }
+    };
+  }
+
+  /**
+   * Builds the field group for the "monthOfYear" recurrence rule: a
+   * multi-select month grid and a day-of-month number.
+   * @returns {{el: Element, readRule: function(): (Object|null),
+   *   populateRule: function(Object)}} the field group.
+   */
+  function buildMonthOfYearFields() {
+    var wrap = document.createElement("div");
+    wrap.className = "rec-field-group";
+    var l1 = document.createElement("span");
+    l1.className = "rec-label";
+    l1.textContent = "Months:";
+    wrap.appendChild(l1);
+    var months = buildMonthGrid(true);
+    wrap.appendChild(months.el);
+    var r1 = document.createElement("div");
+    r1.className = "rec-inline";
+    var l2 = document.createElement("span");
+    l2.className = "rec-label";
+    l2.textContent = "on day:";
+    var dayInp = document.createElement(
+      "input"
+    );
+    dayInp.type = "number";
+    dayInp.min = "1";
+    dayInp.max = "31";
+    dayInp.value = "1";
+    r1.appendChild(l2);
+    r1.appendChild(dayInp);
+    wrap.appendChild(r1);
+    return {
+      el: wrap,
+      readRule: function () {
+        var ms = months.getValue();
+        if (!ms.length) return null;
+        var d = parseInt(dayInp.value);
+        if (isNaN(d) || d < 1 || d > 31) {
+          return null;
+        }
+        return {
+          type: "monthOfYear",
+          months: ms,
+          day: d
+        };
+      },
+      populateRule: function (rule) {
+        if (rule.months) {
+          months.setValue(rule.months);
+        }
+        if (rule.day != null) {
+          dayInp.value = rule.day;
+        }
+      }
+    };
+  }
+
+  // ------------------- GUI panel (assembles all controls) --------------------
+
+  /**
+   * Assembles the full GUI recurrence-editing panel: destination
+   * toggle, pause toggle, rule-type select, and the matching field
+   * group shown/hidden per selected type.
+   * @param {Object} [prefillRec] - a validated recurrence dict to
+   *   populate the panel from, or null/undefined for a blank panel.
+   * @param {string} [ld] - ISO "last done" date to seed the
+   *   everyNDays field group's date input from.
+   * @returns {{el: Element, read: function(): (Object|null),
+   *   populate: function(Object),
+   *   getLastDone: function(): (string|null),
+   *   setLastDone: function(string)}} the panel.
+   */
+  function buildGuiPanel(prefillRec, ld) {
+    var panel = document.createElement("div");
+    panel.className = "rec-gui-panel active";
+    var box = document.createElement("div");
+    box.className = "rec-form-box";
+
+    var topRow = document.createElement("div");
+    topRow.className = "rec-top-row";
+    var destGroup = document.createElement(
+      "div"
+    );
+    destGroup.className = "rec-dest-group";
+    var destLbl = document.createElement(
+      "span"
+    );
+    destLbl.className = "rec-label";
+    destLbl.textContent = "dest:";
+    var dest = buildDestToggle();
+    destGroup.appendChild(destLbl);
+    destGroup.appendChild(dest.el);
+    var pause = buildPauseToggle();
+    topRow.appendChild(destGroup);
+    topRow.appendChild(pause.el);
+    box.appendChild(topRow);
+
+    var typeRow = document.createElement(
+      "div"
+    );
+    typeRow.className = "rec-type-row";
+    var typeLbl = document.createElement(
+      "span"
+    );
+    typeLbl.className = "rec-label";
+    typeLbl.textContent = "type:";
+    typeRow.appendChild(typeLbl);
+    var tSel = document.createElement(
+      "select"
+    );
+    tSel.className = "rec-type-select";
+    var ph = document.createElement("option");
+    ph.value = "";
+    ph.textContent = "(Select)";
+    ph.selected = true;
+    tSel.appendChild(ph);
+    RECURRENCE_KINDS.forEach(function (k) {
+      var o = document.createElement(
+        "option"
+      );
+      o.value = k;
+      o.textContent = TYPE_LABELS[k];
+      tSel.appendChild(o);
+    });
+    typeRow.appendChild(tSel);
+    box.appendChild(typeRow);
+
+    var fieldsWrap = document.createElement(
+      "div"
+    );
+    fieldsWrap.className = "rec-fields";
+    var evND = buildEveryNDaysFields(ld);
+    var nWk = buildEveryNWeeksFields();
+    var domF = buildDayOfMonthFields();
+    var nWd = buildNthWeekdayFields();
+    var moY = buildMonthOfYearFields();
+    var yrF = buildYearlyFields();
+    var fMap = {
+      everyNDays: evND,
+      everyNWeeksOnDays: nWk,
+      dayOfMonth: domF,
+      nthWeekdayOfMonth: nWd,
+      monthOfYear: moY,
+      yearly: yrF
+    };
+    RECURRENCE_KINDS.forEach(function (k) {
+      fieldsWrap.appendChild(fMap[k].el);
+    });
+    box.appendChild(fieldsWrap);
+
+    function showKind(kind) {
+      RECURRENCE_KINDS.forEach(function (k) {
+        if (k === kind) {
+          fMap[k].el.classList.add(
+            "active"
+          );
+        } else {
+          fMap[k].el.classList.remove(
+            "active"
+          );
+        }
+      });
+    }
+    tSel.addEventListener(
+      "change",
+      function () { showKind(tSel.value); }
+    );
+
+    panel.appendChild(box);
+
+    function populate(rec) {
+      if (!rec) return;
+      if (rec.destination) {
+        dest.setValue(rec.destination);
+      }
+      if (rec.paused != null) {
+        pause.setValue(rec.paused);
+      }
+      if (rec.rule && rec.rule.type) {
+        tSel.value = rec.rule.type;
+        showKind(rec.rule.type);
+        var fg = fMap[rec.rule.type];
+        if (fg && fg.populateRule) {
+          fg.populateRule(rec.rule);
+        }
+      }
+    }
+    if (prefillRec) populate(prefillRec);
+
+    return {
+      el: panel,
+      read: function () {
+        var kind = tSel.value;
+        if (!kind) return null;
+        var fg = fMap[kind];
+        if (!fg) return null;
+        var rule = fg.readRule();
+        if (!rule) return null;
+        return {
+          destination: dest.getValue(),
+          paused: pause.getValue(),
+          rule: rule
+        };
+      },
+      populate: populate,
+      getLastDone: function () {
+        return evND.getLastDone();
+      },
+      setLastDone: function (v) {
+        evND.setLastDone(v);
+      }
+    };
+  }
+
+  // ------------------------- tabbed recurrence modal --------------------------
+
+  /**
+   * Builds the shared "Edit recurrence" modal with two tabs: a GUI
+   * panel (`buildGuiPanel`) and a raw JSON textarea, kept in sync
+   * when switching tabs. Parsing/validation is handled here; callers
+   * only receive the outcome.
    * @param {Object} opts
-   * @param {string} [opts.prefill] - initial textarea contents.
-   * @param {function} opts.onBlank - called when Save is hit with blank
-   *   input; must perform whatever state change/save/render blank implies.
-   * @param {function(Object)} opts.onSave - called with the parsed,
-   *   validated recurrence dict when Save is hit with valid input; must
-   *   perform whatever state change/save/render applies.
+   * @param {string} [opts.prefill] - initial JSON textarea contents
+   *   / GUI panel prefill source.
+   * @param {string} [opts.lastDone] - ISO date to seed the GUI
+   *   panel's "last done" input from.
+   * @param {function} opts.onBlank - called when Save is hit with
+   *   blank JSON input; must perform whatever state change/save/
+   *   render blank implies.
+   * @param {function(Object, string=)} opts.onSave - called with the
+   *   parsed, validated recurrence dict (and, when saved from the
+   *   GUI tab, a possibly-updated "last done" ISO date) when Save is
+   *   hit with valid input; must perform whatever state change/save/
+   *   render applies.
    */
   function buildRecurrenceModal(opts) {
-    var frag = document.createDocumentFragment();
+    var frag =
+      document.createDocumentFragment();
     var h = document.createElement("h3");
     h.textContent = "Edit recurrence";
     frag.appendChild(h);
 
-    var schemaTa = document.createElement("textarea");
+    var content = document.createElement(
+      "div"
+    );
+    content.className = "rec-content";
+
+    var prefillRec = null;
+    if (opts.prefill) {
+      try {
+        var p = JSON.parse(opts.prefill);
+        if (!validateRecurrence(p)) {
+          prefillRec = p;
+        }
+      } catch (ignore) {}
+    }
+
+    var gui = buildGuiPanel(
+      prefillRec, opts.lastDone
+    );
+    content.appendChild(gui.el);
+
+    var jsonPanel = document.createElement(
+      "div"
+    );
+    jsonPanel.className = "rec-json-panel";
+    var schemaTa = document.createElement(
+      "textarea"
+    );
     schemaTa.className = "modal-ta";
     schemaTa.readOnly = true;
     schemaTa.value = RECURRENCE_SCHEMA_TEXT;
-    frag.appendChild(schemaTa);
-
-    var label = document.createElement("p");
-    label.textContent = "Paste a recurrence dict below, or leave blank " +
-      "to clear recurrence:";
-    frag.appendChild(label);
-
-    var inputTa = document.createElement("textarea");
+    jsonPanel.appendChild(schemaTa);
+    var lbl = document.createElement("p");
+    lbl.textContent =
+      "Paste a recurrence dict below, or " +
+      "leave blank to clear recurrence:";
+    jsonPanel.appendChild(lbl);
+    var inputTa = document.createElement(
+      "textarea"
+    );
     inputTa.className = "modal-ta";
-    inputTa.placeholder = "Paste dict here...";
+    inputTa.placeholder =
+      "Paste dict here...";
     if (opts.prefill) {
       inputTa.value = opts.prefill;
     }
-    frag.appendChild(inputTa);
+    jsonPanel.appendChild(inputTa);
+    content.appendChild(jsonPanel);
+    frag.appendChild(content);
 
-    var row = document.createElement("div");
-    row.className = "modal-actions";
-    var saveBtn = document.createElement("button");
+    var bar = document.createElement("div");
+    bar.className = "rec-tab-bar";
+    var guiTab = document.createElement(
+      "button"
+    );
+    guiTab.type = "button";
+    guiTab.className = "rec-tab active";
+    guiTab.textContent = "GUI";
+    var jsonTab = document.createElement(
+      "button"
+    );
+    jsonTab.type = "button";
+    jsonTab.className = "rec-tab";
+    jsonTab.textContent = "JSON";
+    var spacer = document.createElement(
+      "div"
+    );
+    spacer.className = "spacer";
+    var saveBtn = document.createElement(
+      "button"
+    );
     saveBtn.className = "primary";
     saveBtn.textContent = "Save";
-    var cancelBtn = document.createElement("button");
+    var cancelBtn = document.createElement(
+      "button"
+    );
     cancelBtn.textContent = "Cancel";
-    row.appendChild(saveBtn);
-    row.appendChild(cancelBtn);
-    frag.appendChild(row);
+    bar.appendChild(guiTab);
+    bar.appendChild(jsonTab);
+    bar.appendChild(spacer);
+    bar.appendChild(saveBtn);
+    bar.appendChild(cancelBtn);
+    frag.appendChild(bar);
 
     var overlay = showModal(frag);
-    inputTa.focus();
 
-    saveBtn.addEventListener("click", function () {
-      var text = inputTa.value.trim();
-      if (!text) {
-        opts.onBlank();
+    guiTab.addEventListener(
+      "click",
+      function () {
+        var txt = inputTa.value.trim();
+        if (txt) {
+          try {
+            var pr = JSON.parse(txt);
+            if (!validateRecurrence(pr)) {
+              gui.populate(pr);
+            }
+          } catch (ignore) {}
+        }
+        guiTab.classList.add("active");
+        jsonTab.classList.remove("active");
+        gui.el.classList.add("active");
+        jsonPanel.classList.remove("active");
+      }
+    );
+
+    jsonTab.addEventListener(
+      "click",
+      function () {
+        var rec = gui.read();
+        if (rec) {
+          inputTa.value = JSON.stringify(
+            rec, null, 2
+          );
+        }
+        jsonTab.classList.add("active");
+        guiTab.classList.remove("active");
+        jsonPanel.classList.add("active");
+        gui.el.classList.remove("active");
+        inputTa.focus();
+      }
+    );
+
+    saveBtn.addEventListener(
+      "click",
+      function () {
+        var isGui =
+          guiTab.classList.contains(
+            "active"
+          );
+        if (isGui) {
+          var rec = gui.read();
+          if (!rec) {
+            toast(
+              "Fill in all required " +
+              "fields."
+            );
+            return;
+          }
+          var err =
+            validateRecurrence(rec);
+          if (err) {
+            toast(err);
+            return;
+          }
+          opts.onSave(
+            rec, gui.getLastDone()
+          );
+          overlay.remove();
+          return;
+        }
+        var text = inputTa.value.trim();
+        if (!text) {
+          opts.onBlank();
+          overlay.remove();
+          return;
+        }
+        var parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch (e) {
+          toast(
+            "That's not valid JSON."
+          );
+          return;
+        }
+        var jerr =
+          validateRecurrence(parsed);
+        if (jerr) {
+          toast(jerr);
+          return;
+        }
+        opts.onSave(parsed);
         overlay.remove();
-        return;
       }
-      var parsed;
-      try {
-        parsed = JSON.parse(text);
-      } catch (e) {
-        toast("That's not valid JSON.");
-        return;
-      }
-      var err = validateRecurrence(parsed);
-      if (err) {
-        toast(err);
-        return;
-      }
-      opts.onSave(parsed);
-      overlay.remove();
-    });
-    cancelBtn.addEventListener("click", function () { overlay.remove(); });
+    );
+    cancelBtn.addEventListener(
+      "click",
+      function () { overlay.remove(); }
+    );
   }
 
   /**
-   * Opens the "Edit recurrence" modal for an existing item. Blank input
-   * clears the item's recurrence; valid input replaces it.
+   * Opens the "Edit recurrence" modal for an existing item. Blank
+   * input clears the item's recurrence; valid input replaces it.
    * @param {Object} item - the item whose recurrence is being edited.
    */
   function openRecurrenceEditor(item) {
     var prefill;
     if (item.recurrence) {
-      prefill = JSON.stringify(item.recurrence, null, 2);
+      prefill = JSON.stringify(
+        item.recurrence, null, 2
+      );
     }
     buildRecurrenceModal({
       prefill: prefill,
+      lastDone: item.lastDone,
       onBlank: function () {
-        if (item.recurrence && findItemListKey(item.id) === null) {
-          state.lists[item.recurrence.destination].push(item.id);
+        if (
+          item.recurrence &&
+          findItemListKey(item.id) === null
+        ) {
+          var d =
+            item.recurrence.destination;
+          state.lists[d].push(item.id);
         }
         item.recurrence = null;
         save();
         render();
       },
-      onSave: function (parsed) {
+      onSave: function (parsed, newLD) {
         item.recurrence = parsed;
         if (item.lastDone === null) {
-          item.lastDone = getNow().toISOString();
+          item.lastDone =
+            getNow().toISOString();
+        }
+        if (newLD) {
+          item.lastDone = newLD;
         }
         save();
         render();
@@ -2735,21 +3975,28 @@
   }
 
   /**
-   * Opens the recurrence editor for a brand-new recurring item: the item
-   * doesn't exist in `itemsById` yet, and only gets created - unlinked from
-   * every list - once a valid recurrence dict is saved here. Leaving the
-   * box blank or cancelling discards the typed text entirely; nothing is
-   * created.
-   * @param {string} text - the new item's text, already trimmed/non-empty.
+   * Opens the recurrence editor for a brand-new recurring item: the
+   * item doesn't exist in `itemsById` yet, and only gets created -
+   * unlinked from every list - once a valid recurrence dict is saved
+   * here. Leaving the box blank or cancelling discards the typed
+   * text entirely; nothing is created.
+   * @param {string} text - the new item's text, already
+   *   trimmed/non-empty.
    */
   function openNewRecurringItemEditor(text) {
     buildRecurrenceModal({
+      lastDone: getNow().toISOString(),
       onBlank: function () {},
-      onSave: function (parsed) {
+      onSave: function (parsed, newLD) {
         var id = uid();
+        var ld = newLD ||
+          getNow().toISOString();
         state.itemsById[id] = {
-          id: id, text: text, isDone: false,
-          lastDone: getNow().toISOString(), recurrence: parsed
+          id: id,
+          text: text,
+          isDone: false,
+          lastDone: ld,
+          recurrence: parsed
         };
         save();
         render();
