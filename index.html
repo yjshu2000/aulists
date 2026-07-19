@@ -16,6 +16,7 @@
 <body>
   <header class="app">
     <h1>Lists</h1>
+    <button id="refreshBtn" class="mini">Refresh</button>
   </header>
 
   <input type="file" id="fileInput" accept="application/json,.json" hidden>
@@ -71,6 +72,12 @@
     <button id="debugNowClearBtn">Use real time</button>
     <p id="debugNowStatus"></p>
   </section>
+
+  <div class="undo-redo-pill" id="undoRedoPill">
+    <div class="boundary-confirm" id="boundaryConfirm"></div>
+    <button id="undoBtn" class="ur-btn" aria-label="Undo" disabled>&#8630;</button>
+    <button id="redoBtn" class="ur-btn" aria-label="Redo" disabled>&#8631;</button>
+  </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 

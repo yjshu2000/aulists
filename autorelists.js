@@ -15,6 +15,83 @@
   var DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
   var state = load();
+  var undoStack = [];
+  var redoStack = [];
+  var UNDO_CAP = 60;
+
+  function snapshotState() {
+    return JSON.parse(JSON.stringify(state));
+  }
+
+  var pendingBoundary = null;
+
+  function pushUndo(label) {
+    undoStack.push({
+      snapshot: snapshotState(),
+      label: label
+    });
+    if (undoStack.length > UNDO_CAP) {
+      undoStack.shift();
+    }
+    redoStack = [];
+    refreshUndoRedoButtons();
+  }
+
+  function pushBoundary(label) {
+    undoStack.push({
+      snapshot: snapshotState(),
+      label: label,
+      isBoundary: true
+    });
+    if (undoStack.length > UNDO_CAP) {
+      undoStack.shift();
+    }
+    redoStack = [];
+    refreshUndoRedoButtons();
+  }
+
+  function step(direction) {
+    var from;
+    var to;
+    var prefix;
+    if (direction === "undo") {
+      from = undoStack;
+      to = redoStack;
+      prefix = "Undid: ";
+    } else {
+      from = redoStack;
+      to = undoStack;
+      prefix = "Redid: ";
+    }
+    if (!from.length) return;
+    var top = from[from.length - 1];
+    if (top.isBoundary &&
+      !(pendingBoundary &&
+        pendingBoundary.direction === direction)) {
+      pendingBoundary = { direction: direction };
+      showBoundaryConfirm(direction, top.label);
+      return;
+    }
+    pendingBoundary = null;
+    hideBoundaryConfirm();
+    var entry = from.pop();
+    to.push({
+      snapshot: snapshotState(),
+      label: entry.label,
+      isBoundary: entry.isBoundary
+    });
+    state = entry.snapshot;
+    save();
+    syncScheduleInputs();
+    updateLastExported();
+    render();
+    refreshUndoRedoButtons();
+    toast(prefix + entry.label);
+  }
+
+  function undo() { step("undo"); }
+  function redo() { step("redo"); }
+
   var expandedNote = null;
   var editingNote = null;
   var editingNoteMounted = false;
@@ -111,8 +188,7 @@
       },
       schedule: { everyDays: 1, atMinutes: 0 },
       lastReturn: null,
-      lastExported: null,
-      lastExportedConfirmed: null
+      lastExported: null
     };
   }
 
@@ -229,9 +305,6 @@
       if (typeof obj.lastExported === "string") {
         s.lastExported = obj.lastExported;
       }
-      if (typeof obj.lastExportedConfirmed === "string") {
-        s.lastExportedConfirmed = obj.lastExportedConfirmed;
-      }
     }
     return s;
   }
@@ -334,6 +407,7 @@
     }
 
     if (crossed && state.lists["2"].length > 0) {
+      pushBoundary("List 2→1 transfer");
       state.lists["1"] = state.lists["1"].concat(state.lists["2"]);
       state.lists["2"] = [];
       state.lastReturn = boundary.toISOString();
@@ -593,6 +667,7 @@
     var todayDate = parseDateKey(todayKey);
     if (todayDate.getTime() <= cursor.getTime()) return false;
     while (cursor.getTime() < todayDate.getTime()) {
+      pushBoundary("Rollover");
       rolloverOneDay(cursor);
       cursor = stepDays(cursor, 1);
     }
@@ -693,6 +768,7 @@
   function completeItem(fromKey, id) {
     var item = state.itemsById[id];
     if (!item) return;
+    pushUndo("Complete item");
     item.isDone = true;
     item.lastDone = getNow().toISOString();
     if (fromKey !== "-1" && fromKey !== "0") {
@@ -712,6 +788,7 @@
   function uncompleteItem(id) {
     var item = state.itemsById[id];
     if (!item) return;
+    pushUndo("Uncomplete item");
     item.isDone = false;
     var fromKey = findItemListKey(id);
     if (fromKey) {
@@ -732,6 +809,7 @@
    * @param {string} id - id of the item to trash.
    */
   function trashItem(fromKey, id) {
+    pushUndo("Trash item");
     if (fromKey) {
       var i = findIn(fromKey, id);
       if (i !== -1) state.lists[fromKey].splice(i, 1);
@@ -752,6 +830,7 @@
   function recoverItem(id) {
     var i = findInTrash(id);
     if (i === -1) return;
+    pushUndo("Untrash item");
     var t = state.lists.trash.splice(i, 1)[0];
     var item = state.itemsById[t.id];
     if (state.lists[t.origin]) {
@@ -770,6 +849,7 @@
   function permaDelete(id) {
     var i = findInTrash(id);
     if (i === -1) return;
+    pushUndo("Permadelete item");
     state.lists.trash.splice(i, 1);
     delete state.itemsById[id];
     normalizeDanglingOgItemIds();
@@ -788,7 +868,8 @@
   function editItem(id, newText) {
     if (!state.itemsById[id]) return;
     var v = newText.trim();
-    if (v === "") return;            // empty = cancel, keep original
+    if (v === "") return;
+    pushUndo("Edit item text");
     state.itemsById[id].text = v;
     save();
     render();
@@ -803,6 +884,7 @@
    */
   function editNote(id, newNote) {
     if (!state.itemsById[id]) return;
+    pushUndo("Edit item note");
     var v = newNote.trim();
     if (v) {
       state.itemsById[id].note = v;
@@ -845,6 +927,7 @@
   function togglePastItemDone(dateKey, zone, idx) {
     var day = state.pastDaysByDate[dateKey];
     if (!day || !day[zone] || !day[zone][idx]) return;
+    pushUndo("Toggle past item done");
     day[zone][idx].isDone = !day[zone][idx].isDone;
     save();
     render();
@@ -863,6 +946,7 @@
     if (!v) return;
     var day = state.pastDaysByDate[dateKey];
     if (!day || !day[zone] || !day[zone][idx]) return;
+    pushUndo("Edit past item text");
     day[zone][idx].text = v;
     save();
     render();
@@ -879,6 +963,7 @@
   function editPastItemNote(dateKey, zone, idx, newNote) {
     var day = state.pastDaysByDate[dateKey];
     if (!day || !day[zone] || !day[zone][idx]) return;
+    pushUndo("Edit past item note");
     var v = newNote.trim();
     if (v) {
       day[zone][idx].note = v;
@@ -902,6 +987,7 @@
   function deletePastItem(dateKey, zone, idx) {
     var day = state.pastDaysByDate[dateKey];
     if (!day || !day[zone]) return;
+    pushUndo("Delete past item");
     day[zone].splice(idx, 1);
     save();
     render();
@@ -917,6 +1003,7 @@
   function addPastItem(dateKey, text) {
     var v = text.trim();
     if (!v) return;
+    pushUndo("Add past item");
     if (!state.pastDaysByDate[dateKey]) {
       state.pastDaysByDate[dateKey] = {
         "-1": [], "0": [], "1": []
@@ -2276,6 +2363,7 @@
     function commit() {
       var v = input.value.trim();
       if (!v) return;
+      pushUndo("Add item");
       var id = uid();
       state.itemsById[id] = {
         id: id, text: v, isDone: false, lastDone: null
@@ -2572,6 +2660,7 @@
    * the "Next return" note.
    */
   function onScheduleChange() {
+    pushUndo("Edit return schedule");
     var ed = parseInt(everyEl.value, 10);
     if (!(ed >= 1)) {
       ed = 1;
@@ -2610,6 +2699,7 @@
    * displayed "last exported" note.
    */
   function markExported() {
+    pushUndo("Mark exported");
     state.lastExported = getNow().toISOString();
     save();
     updateLastExported();
@@ -2621,8 +2711,12 @@
    * @returns {boolean} true if the import succeeded.
    */
   function importFromText(text) {
-    if (!window.confirm("Import will replace everything currently in these lists. Continue?")) return;
+    if (!window.confirm(
+      "Import will replace everything currently " +
+      "in these lists. Continue?"
+    )) return;
     try {
+      pushUndo("Import");
       state = normalise(JSON.parse(text));
       save();
       syncScheduleInputs();
@@ -3947,6 +4041,7 @@
       prefill: prefill,
       lastDone: item.lastDone,
       onBlank: function () {
+        pushUndo("Edit recurrence");
         if (
           item.recurrence &&
           findItemListKey(item.id) === null
@@ -3960,6 +4055,7 @@
         render();
       },
       onSave: function (parsed, newLD) {
+        pushUndo("Edit recurrence");
         item.recurrence = parsed;
         if (item.lastDone === null) {
           item.lastDone =
@@ -3988,6 +4084,7 @@
       lastDone: getNow().toISOString(),
       onBlank: function () {},
       onSave: function (parsed, newLD) {
+        pushUndo("Add recurring item");
         var id = uid();
         var ld = newLD ||
           getNow().toISOString();
@@ -4119,46 +4216,12 @@
    * confirmed value).
    */
   function updateLastExported() {
-    lastExportedEl.innerHTML = "";
-    var text = document.createElement("span");
-    var confirmed = state.lastExported && state.lastExported === state.lastExportedConfirmed;
-
     if (state.lastExported) {
-      text.textContent = "Last exported: " + formatExportDate(state.lastExported);
+      lastExportedEl.textContent =
+        "Last exported: " +
+        formatExportDate(state.lastExported);
     } else {
-      text.textContent = "Never exported";
-    }
-    lastExportedEl.appendChild(text);
-
-    if (state.lastExported && confirmed) {
-      var check = document.createElement("span");
-      check.className = "export-confirmed";
-      check.textContent = "✓";
-      lastExportedEl.appendChild(check);
-    }
-
-    if (state.lastExported && !confirmed) {
-      var confirmBtn = document.createElement("button");
-      confirmBtn.className = "export-action confirm";
-      confirmBtn.textContent = "✓";
-      confirmBtn.setAttribute("aria-label", "Confirm this export");
-      confirmBtn.addEventListener("click", function () {
-        state.lastExportedConfirmed = state.lastExported;
-        save();
-        updateLastExported();
-      });
-      lastExportedEl.appendChild(confirmBtn);
-
-      var revertBtn = document.createElement("button");
-      revertBtn.className = "export-action revert";
-      revertBtn.textContent = "✕";
-      revertBtn.setAttribute("aria-label", "Revert to last confirmed export");
-      revertBtn.addEventListener("click", function () {
-        state.lastExported = state.lastExportedConfirmed;
-        save();
-        updateLastExported();
-      });
-      lastExportedEl.appendChild(revertBtn);
+      lastExportedEl.textContent = "Never exported";
     }
   }
 
@@ -4311,8 +4374,87 @@
     if (!document.hidden) {
       purgeTrash();
       applyRollover();
-      var moved = applyAutoReturn();
+      applyAutoReturn();
       render();
+      refreshUndoRedoButtons();
     }
   });
+
+  // undo/redo pill wiring
+  var undoBtn = document.getElementById("undoBtn");
+  var redoBtn = document.getElementById("redoBtn");
+  var boundaryConfirmEl =
+    document.getElementById("boundaryConfirm");
+
+  function refreshUndoRedoButtons() {
+    if (!undoBtn) return;
+    undoBtn.disabled = undoStack.length === 0;
+    redoBtn.disabled = redoStack.length === 0;
+  }
+
+  function showBoundaryConfirm(direction, label) {
+    var prefix;
+    if (direction === "undo") {
+      prefix = "Undoing over: ";
+    } else {
+      prefix = "Redoing over: ";
+    }
+    boundaryConfirmEl.textContent = prefix + label;
+    boundaryConfirmEl.classList.add("show");
+    if (direction === "undo") {
+      undoBtn.classList.add("confirm-pending");
+    } else {
+      redoBtn.classList.add("confirm-pending");
+    }
+    showBoundaryCancelOverlay();
+  }
+
+  function hideBoundaryConfirm() {
+    boundaryConfirmEl.classList.remove("show");
+    undoBtn.classList.remove("confirm-pending");
+    redoBtn.classList.remove("confirm-pending");
+    removeBoundaryCancelOverlay();
+  }
+
+  var boundaryCancelOverlay = null;
+
+  function showBoundaryCancelOverlay() {
+    boundaryCancelOverlay = document.createElement("div");
+    boundaryCancelOverlay.className = "boundary-overlay";
+    boundaryCancelOverlay.addEventListener("click", function () {
+      pendingBoundary = null;
+      hideBoundaryConfirm();
+      removeBoundaryCancelOverlay();
+    });
+    document.body.appendChild(boundaryCancelOverlay);
+  }
+
+  function removeBoundaryCancelOverlay() {
+    if (boundaryCancelOverlay) {
+      boundaryCancelOverlay.remove();
+      boundaryCancelOverlay = null;
+    }
+  }
+
+  function withCooldown(fn) {
+    return function () {
+      if (undoBtn.classList.contains("cooldown")) return;
+      fn();
+      undoBtn.classList.add("cooldown");
+      redoBtn.classList.add("cooldown");
+      setTimeout(function () {
+        undoBtn.classList.remove("cooldown");
+        redoBtn.classList.remove("cooldown");
+      }, 500);
+    };
+  }
+  undoBtn.addEventListener("click", withCooldown(undo));
+  redoBtn.addEventListener("click", withCooldown(redo));
+  refreshUndoRedoButtons();
+
+  // refresh button
+  document.getElementById("refreshBtn")
+    .addEventListener("click", function () {
+      location.reload();
+    });
 })();
