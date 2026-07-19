@@ -5,7 +5,7 @@
   var WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
   // chain order for movement
-  var CHAIN = ["0", "1", "2", "3", "3.5", "4"];
+  var CHAIN = ["0", "1", "2", "2.5", "3", "4"];
   // every real list key, chain or not (used for parsing/validation, not move)
   var LIST_KEYS = ["-1"].concat(CHAIN);
   // stored recurrence dicts against this list
@@ -178,7 +178,7 @@
       version: 2,
       itemsById: {},
       lists: {
-        "-1": [], "0": [], "1": [], "2": [], "3": [], "3.5": [], "4": [],
+        "-1": [], "0": [], "1": [], "2": [], "2.5": [], "3": [], "4": [],
         trash: []
       },
       pastDaysByDate: {},
@@ -738,7 +738,7 @@
   }
 
   /**
-   * Moves an item one step along the chain (0->1->2->3->3.5->4), in either
+   * Moves an item one step along the chain (0->1->2->2.5->3->4), in either
    * direction. No-ops if the item isn't found, or the move would fall off
    * either end of the chain.
    * @param {string} fromKey - chain key the item currently lives in.
@@ -794,7 +794,7 @@
     if (fromKey) {
       state.lists[fromKey].splice(findIn(fromKey, id), 1);
     }
-    state.lists["2"].push(id);
+    state.lists["2.5"].push(id);
     save();
     render();
   }
@@ -1037,8 +1037,8 @@
 
   /**
    * Rebuilds the entire `#app` DOM tree from the current in-memory `state` -
-   * the Today carousel, List 2, Completed, List 3 (with its two zones), List 4,
-   * and Trash. Called after any state mutation.
+   * the Today carousel, List 2 (with its two zones, 2 and 2.5), Completed,
+   * List 3, List 4, and Trash. Called after any state mutation.
    */
   function render() {
     closeAllMenus();
@@ -1101,45 +1101,44 @@
 
     appEl.appendChild(todayWrap);
 
-    // List 2 (own card, fixed)
-    appEl.appendChild(renderCard("2", "List 2", 
-      {fixed: true, randomizerTarget: "2"}));
+    // List 2: fixed card, two zones (2 top, 2.5 bottom) split by
+    // a divider, with Randomizer on zone 2.
+    var list2 = document.createElement("section");
+    list2.className = "card list fixed";
+    list2.appendChild(buildHead("2", "List 2", {
+      randomizerTarget: "2",
+      countKeys: ["2", "2.5"]
+    }));
+
+    list2.appendChild(buildItems("2", {
+      randomizerTarget: "2"
+    }));
+
+    var div2 = document.createElement("div");
+    div2.className = "divider";
+    list2.appendChild(div2);
+
+    var zone25 = document.createElement("ul");
+    zone25.className = "items";
+    fillZone(zone25, "2.5");
+    list2.appendChild(zone25);
+
+    if (!(randomizer.active
+      && randomizer.target === "2")) {
+      list2.appendChild(buildAdder("2.5"));
+    }
+    appEl.appendChild(list2);
 
     // Completed purgatory (collapsible)
     appEl.appendChild(renderCard("completed", "Completed",
       {collapsible: true, kind: "completed"}));
 
-    // List 3: collapsible card, two zones split by a divider.
-    // Above the divider = backend "3" (closer to list 2), below = backend
-    // "3.5" (further, but not list 4 far).
-    var collapsed3 = state.collapsed["3"];
-    var list3 = document.createElement("section");
-    var list3CollapsedClass = "";
-    if (collapsed3) {
-      list3CollapsedClass = " collapsed";
-    }
-    list3.className = "card list" + list3CollapsedClass;
-    list3.appendChild(buildHead("3", "List 3", 
-      { collapsible: true, countKeys: ["3", "3.5"] }));
+    // List 3 (single-zone, collapsible)
+    appEl.appendChild(renderCard("3", "List 3",
+      { collapsible: true }));
 
-    var zone3Top = document.createElement("ul");
-    zone3Top.className = "items";
-    fillZone(zone3Top, "3");
-    list3.appendChild(zone3Top);
-
-    var div3 = document.createElement("div");
-    div3.className = "divider";
-    list3.appendChild(div3);
-
-    var zone3Bot = document.createElement("ul");
-    zone3Bot.className = "items";
-    fillZone(zone3Bot, "3.5");
-    list3.appendChild(zone3Bot);
-
-    list3.appendChild(buildAdder("3.5"));
-    appEl.appendChild(list3);
-
-    appEl.appendChild(renderCard("4", "List 4", { collapsible: true }));
+    appEl.appendChild(renderCard("4", "List 4",
+      { collapsible: true }));
 
     appEl.appendChild(renderCard("recurring", "Recurring",
       {collapsible: true, kind: "recurring"}));
@@ -2753,7 +2752,7 @@
   // ---------------------------- recurrence editor ----------------------------
   var RECURRENCE_SCHEMA_TEXT = [
     "recurrence = null | {",
-    "  destination: \"-1\" | \"1\" | \"3\", paused: boolean,",
+    "  destination: \"-1\" | \"1\" | \"2.5\", paused: boolean,",
     "  rule:",
     "    { type: \"everyNDays\", everyDays: int }",
     "      // recurs when (today - item.lastDone) % everyDays == 0",
@@ -2788,8 +2787,8 @@
    */
   function validateRecurrence(r) {
     if (!r || typeof r !== "object") return "Recurrence must be an object.";
-    if (["-1", "1", "3"].indexOf(r.destination) === -1) {
-      return "destination must be \"-1\", \"1\", or \"3\".";
+    if (["-1", "1", "2.5"].indexOf(r.destination) === -1) {
+      return "destination must be \"-1\", \"1\", or \"2.5\".";
     }
     if (typeof r.paused !== "boolean") {
       return "paused must be true or false.";
@@ -2823,12 +2822,12 @@
 
   /**
    * Builds a 3-way segmented toggle for the recurrence destination
-   * list key ("-1", "1", or "3").
+   * list key ("-1", "1", or "2.5").
    * @returns {{el: Element, getValue: function(): (string|null),
    *   setValue: function(string)}} the control.
    */
   function buildDestToggle() {
-    var vals = ["-1", "1", "3"];
+    var vals = ["-1", "1", "2.5"];
     var wrap = document.createElement("div");
     wrap.className = "rec-dest-toggle";
     var btns = [];
