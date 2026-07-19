@@ -1,4 +1,4 @@
-const CACHE = 'aulists-v1';
+const CACHE = 'aulists-v2';
 const SHELL = [
   './',
   './index.html',
