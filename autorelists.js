@@ -9,8 +9,8 @@
   // every real list key, chain or not (used for parsing/validation, not move)
   var LIST_KEYS = ["-1"].concat(CHAIN);
   // stored recurrence dicts against this list
-  var RECURRENCE_KINDS = ["everyNDays", "everyNWeeksOnDays", "dayOfMonth",
-    "nthWeekdayOfMonth", "monthOfYear", "yearly"];
+  var RECURRENCE_KINDS = ["daily", "everyNDays", "everyNWeeksOnDays",
+    "dayOfMonth", "nthWeekdayOfMonth", "monthOfYear", "yearly"];
   var PAST_ZONE_KEYS = ["-1", "0", "1"];  // stored past-day snapshots
   var DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -580,6 +580,8 @@
   function ruleFires(rule, item, date) {
     var sinceDone, weeksSince, info;
     switch (rule.type) {
+      case "daily":
+        return true;
       case "everyNDays":
         if (!item.lastDone) return true;
         sinceDone = daysBetween(new Date(item.lastDone), date);
@@ -2754,7 +2756,9 @@
     "recurrence = null | {",
     "  destination: \"-1\" | \"1\" | \"2.5\", paused: boolean,",
     "  rule:",
-    "    { type: \"everyNDays\", everyDays: int }",
+    "    { type: \"daily\" }",
+    "      // fires every single day unconditionally",
+    "  | { type: \"everyNDays\", everyDays: int }",
     "      // recurs when (today - item.lastDone) % everyDays == 0",
     "      // anchored to lastDone.",
     "  | { type: \"everyNWeeksOnDays\", everyWeeks: int, weekdays: int[] (0-6),",
@@ -2806,6 +2810,8 @@
 
   // per-kind labels shown as the type dropdown's option text
   var TYPE_LABELS = {
+    daily:
+      "daily",
     everyNDays:
       "every N days",
     everyNWeeksOnDays:
@@ -3267,6 +3273,22 @@
    *   getLastDone: function(): (string|null),
    *   setLastDone: function(string)}} the field group.
    */
+  function buildDailyFields() {
+    var wrap = document.createElement("div");
+    wrap.className = "rec-field-group";
+    var lbl = document.createElement("span");
+    lbl.className = "rec-label";
+    lbl.textContent = "daily";
+    wrap.appendChild(lbl);
+    return {
+      el: wrap,
+      readRule: function () {
+        return { type: "daily" };
+      },
+      populateRule: function () {}
+    };
+  }
+
   function buildEveryNDaysFields(lastDone) {
     var wrap = document.createElement("div");
     wrap.className = "rec-field-group";
@@ -3733,6 +3755,7 @@
       "div"
     );
     fieldsWrap.className = "rec-fields";
+    var dly = buildDailyFields();
     var evND = buildEveryNDaysFields(ld);
     var nWk = buildEveryNWeeksFields();
     var domF = buildDayOfMonthFields();
@@ -3740,6 +3763,7 @@
     var moY = buildMonthOfYearFields();
     var yrF = buildYearlyFields();
     var fMap = {
+      daily: dly,
       everyNDays: evND,
       everyNWeeksOnDays: nWk,
       dayOfMonth: domF,
