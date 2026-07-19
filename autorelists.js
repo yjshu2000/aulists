@@ -4118,6 +4118,7 @@
           lastDone: ld,
           recurrence: parsed
         };
+        state.lists[parsed.destination].push(id);
         save();
         render();
       }
