@@ -187,7 +187,7 @@ button.refresh {
 .head-btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
 .head-btn:disabled { opacity: 0.4; cursor: default; }
 
-/* shared zone divider: a thin light line between two zones in a split card */
+/* shared list divider: a thin light line between two lists in a split card */
 .list .divider { height: 1px; background: var(--divider); margin: 0 12px; }
 .list.collapsed .divider { display: none; }
 

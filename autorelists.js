@@ -11,7 +11,7 @@
   // stored recurrence dicts against this list
   var RECURRENCE_KINDS = ["daily", "everyNDays", "everyNWeeksOnDays",
     "dayOfMonth", "nthWeekdayOfMonth", "monthOfYear", "yearly"];
-  var PAST_ZONE_KEYS = ["-1", "0", "1"];  // stored past-day snapshots
+  var PAST_LIST_KEYS = ["-1", "0", "1"];  // stored past-day snapshots
   var DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
   var state = load();
@@ -452,8 +452,8 @@
     Object.keys(state.pastDaysByDate).forEach(
       function (dateKey) {
         var day = state.pastDaysByDate[dateKey];
-        PAST_ZONE_KEYS.forEach(function (zone) {
-          day[zone].forEach(function (pi) {
+        PAST_LIST_KEYS.forEach(function (listKey) {
+          day[listKey].forEach(function (pi) {
             if (pi.ogItemId
               && !state.itemsById[pi.ogItemId]) {
               pi.ogItemId = null;
@@ -501,7 +501,7 @@
   /**
    * Sanitizes an arbitrary parsed-JSON `pastDaysByDate` blob into a
    * fully-formed one, the same defensive role `normalise` plays for the rest
-   * of state. Malformed dates, zones, or entries are dropped rather than
+   * of state. Malformed dates, lists, or entries are dropped rather than
    * allowed to corrupt state.
    * @param {*} raw - parsed JSON, untrusted.
    * @returns {Object} a complete, safe-to-use `pastDaysByDate` map.
@@ -514,15 +514,15 @@
       var src = raw[dateKey];
       if (!src || typeof src !== "object") return;
       var day = { "-1": [], "0": [], "1": [] };
-      PAST_ZONE_KEYS.forEach(function (zone) {
-        var arr = src[zone];
+      PAST_LIST_KEYS.forEach(function (listKey) {
+        var arr = src[listKey];
         if (!Array.isArray(arr)) return;
         arr.forEach(function (pi) {
           if (!pi || typeof pi.text !== "string") return;
           var o = { ogItemId: null, text: pi.text, isDone: !!pi.isDone };
           if (typeof pi.ogItemId === "string") o.ogItemId = pi.ogItemId;
           if (typeof pi.note === "string" && pi.note) o.note = pi.note;
-          day[zone].push(o);
+          day[listKey].push(o);
         });
       });
       out[dateKey] = day;
@@ -531,21 +531,21 @@
   }
 
   /**
-   * Freezes a snapshot of today's three zones (-1/0/1) into
+   * Freezes a snapshot of today's three lists (-1/0/1) into
    * `state.pastDaysByDate` under `dateKey`, as PastItems linked back to their
    * live item only via `ogItemId`. Overwrites any existing entry for that
    * date.
    * @param {string} dateKey - the date key the closing day snapshots under.
    */
-  function snapshotTodayZones(dateKey) {
+  function snapshotTodayLists(dateKey) {
     var day = { "-1": [], "0": [], "1": [] };
-    PAST_ZONE_KEYS.forEach(function (zone) {
-      state.lists[zone].forEach(function (id) {
+    PAST_LIST_KEYS.forEach(function (listKey) {
+      state.lists[listKey].forEach(function (id) {
         var item = state.itemsById[id];
         if (!item) return;
         var pastItem = { ogItemId: id, text: item.text, isDone: item.isDone };
         if (item.note) pastItem.note = item.note;
-        day[zone].push(pastItem);
+        day[listKey].push(pastItem);
       });
     });
     state.pastDaysByDate[dateKey] = day;
@@ -634,16 +634,16 @@
 
   /**
    * Rolls one calendar day over: snapshots -1/0/1 into `pastDaysByDate` for
-   * the closing day, clears Basics entirely, drops done items from 0/1 (not-
+   * the closing day, clears list -1 entirely, drops done items from 0/1 (not-
    * done items carry forward untouched), then places due recurring items
    * into their destinations for the day that follows.
    * @param {Date} closingDay - the day being closed out.
    */
   function rolloverOneDay(closingDay) {
-    snapshotTodayZones(dateKeyFor(closingDay));
+    snapshotTodayLists(dateKeyFor(closingDay));
     state.lists["-1"] = [];
-    ["0", "1"].forEach(function (zone) {
-      state.lists[zone] = state.lists[zone].filter(function (id) {
+    ["0", "1"].forEach(function (listKey) {
+      state.lists[listKey] = state.lists[listKey].filter(function (id) {
         return !state.itemsById[id].isDone;
       });
     });
@@ -761,9 +761,9 @@
   }
 
   /**
-   * Marks an item done. An item already sitting in zone -1 or 0 stays linked
+   * Marks an item done. An item already sitting in list -1 or 0 stays linked
    * where it is; anything else is unlinked from its current list and linked
-   * into zone 0.
+   * into list 0.
    * @param {string} fromKey - list key the item currently lives in.
    * @param {string} id - id of the item to complete.
    */
@@ -912,25 +912,25 @@
   /**
    * Builds the key used to track which past-item note is expanded.
    * @param {string} dateKey - the past day's date key.
-   * @param {string} zone - the zone within that day.
-   * @param {number} idx - index of the item within the zone array.
+   * @param {string} listKey - the list within that day.
+   * @param {number} idx - index of the item within the list array.
    * @returns {string} the composite key.
    */
-  function pastNoteKey(dateKey, zone, idx) {
-    return dateKey + ":" + zone + ":" + idx;
+  function pastNoteKey(dateKey, listKey, idx) {
+    return dateKey + ":" + listKey + ":" + idx;
   }
 
   /**
    * Toggles the done state of a single past-day snapshot item.
    * @param {string} dateKey - the past day's date key.
-   * @param {string} zone - the zone within that day.
-   * @param {number} idx - index of the item within the zone array.
+   * @param {string} listKey - the list within that day.
+   * @param {number} idx - index of the item within the list array.
    */
-  function togglePastItemDone(dateKey, zone, idx) {
+  function togglePastItemDone(dateKey, listKey, idx) {
     var day = state.pastDaysByDate[dateKey];
-    if (!day || !day[zone] || !day[zone][idx]) return;
+    if (!day || !day[listKey] || !day[listKey][idx]) return;
     pushUndo("Toggle past item done");
-    day[zone][idx].isDone = !day[zone][idx].isDone;
+    day[listKey][idx].isDone = !day[listKey][idx].isDone;
     save();
     render();
   }
@@ -939,17 +939,17 @@
    * Overwrites a past-day snapshot item's text. No-op if the trimmed
    * text is empty.
    * @param {string} dateKey - the past day's date key.
-   * @param {string} zone - the zone within that day.
-   * @param {number} idx - index of the item within the zone array.
+   * @param {string} listKey - the list within that day.
+   * @param {number} idx - index of the item within the list array.
    * @param {string} newText - the replacement text.
    */
-  function editPastItemText(dateKey, zone, idx, newText) {
+  function editPastItemText(dateKey, listKey, idx, newText) {
     var v = newText.trim();
     if (!v) return;
     var day = state.pastDaysByDate[dateKey];
-    if (!day || !day[zone] || !day[zone][idx]) return;
+    if (!day || !day[listKey] || !day[listKey][idx]) return;
     pushUndo("Edit past item text");
-    day[zone][idx].text = v;
+    day[listKey][idx].text = v;
     save();
     render();
   }
@@ -958,22 +958,22 @@
    * Sets or clears a past-day snapshot item's note. A blank/whitespace
    * `newNote` deletes the note field entirely.
    * @param {string} dateKey - the past day's date key.
-   * @param {string} zone - the zone within that day.
-   * @param {number} idx - index of the item within the zone array.
+   * @param {string} listKey - the list within that day.
+   * @param {number} idx - index of the item within the list array.
    * @param {string} newNote - the replacement note text.
    */
-  function editPastItemNote(dateKey, zone, idx, newNote) {
+  function editPastItemNote(dateKey, listKey, idx, newNote) {
     var day = state.pastDaysByDate[dateKey];
-    if (!day || !day[zone] || !day[zone][idx]) return;
+    if (!day || !day[listKey] || !day[listKey][idx]) return;
     pushUndo("Edit past item note");
     var v = newNote.trim();
     if (v) {
-      day[zone][idx].note = v;
+      day[listKey][idx].note = v;
       expandedPastNote = pastNoteKey(
-        dateKey, zone, idx
+        dateKey, listKey, idx
       );
     } else {
-      delete day[zone][idx].note;
+      delete day[listKey][idx].note;
       expandedPastNote = null;
     }
     save();
@@ -981,23 +981,23 @@
   }
 
   /**
-   * Removes a single item from a past-day snapshot zone.
+   * Removes a single item from a past-day snapshot list.
    * @param {string} dateKey - the past day's date key.
-   * @param {string} zone - the zone within that day.
-   * @param {number} idx - index of the item within the zone array.
+   * @param {string} listKey - the list within that day.
+   * @param {number} idx - index of the item within the list array.
    */
-  function deletePastItem(dateKey, zone, idx) {
+  function deletePastItem(dateKey, listKey, idx) {
     var day = state.pastDaysByDate[dateKey];
-    if (!day || !day[zone]) return;
+    if (!day || !day[listKey]) return;
     pushUndo("Delete past item");
-    day[zone].splice(idx, 1);
+    day[listKey].splice(idx, 1);
     save();
     render();
   }
 
   /**
    * Adds a new manual (non-recurring-derived) item to a past day's
-   * zone "0", creating the day's snapshot record if it doesn't exist
+   * list "0", creating the day's snapshot record if it doesn't exist
    * yet. No-op if the trimmed text is empty.
    * @param {string} dateKey - the past day's date key.
    * @param {string} text - the new item's text.
@@ -1021,15 +1021,15 @@
   /**
    * Opens the note editor for a single past-day snapshot item.
    * @param {string} dateKey - the past day's date key.
-   * @param {string} zone - the zone within that day.
-   * @param {number} idx - index of the item within the zone array.
+   * @param {string} listKey - the list within that day.
+   * @param {number} idx - index of the item within the list array.
    */
-  function startPastNoteEdit(dateKey, zone, idx) {
+  function startPastNoteEdit(dateKey, listKey, idx) {
     editingPastNote = {
-      dateKey: dateKey, zone: zone, idx: idx
+      dateKey: dateKey, listKey: listKey, idx: idx
     };
     expandedPastNote = pastNoteKey(
-      dateKey, zone, idx
+      dateKey, listKey, idx
     );
     render();
   }
@@ -1039,7 +1039,7 @@
 
   /**
    * Rebuilds the entire `#app` DOM tree from the current in-memory `state` -
-   * the Today carousel, List 2 (with its two zones, 2 and 2.5), Completed,
+   * the Today carousel, List 2 (with its two lists, 2 and 2.5), Completed,
    * List 3, List 4, and Trash. Called after any state mutation.
    */
   function render() {
@@ -1103,8 +1103,8 @@
 
     appEl.appendChild(todayWrap);
 
-    // List 2: fixed card, two zones (2 top, 2.5 bottom) split by
-    // a divider, with Randomizer on zone 2.
+    // List 2: fixed card, two lists (2 top, 2.5 bottom) split by
+    // a divider, with Randomizer on list 2.
     var list2 = document.createElement("section");
     list2.className = "card list fixed";
     list2.appendChild(buildHead("2", "List 2", {
@@ -1120,10 +1120,10 @@
     div2.className = "divider";
     list2.appendChild(div2);
 
-    var zone25 = document.createElement("ul");
-    zone25.className = "items";
-    fillZone(zone25, "2.5");
-    list2.appendChild(zone25);
+    var list2_5 = document.createElement("ul");
+    list2_5.className = "items";
+    fillList(list2_5, "2.5", true);
+    list2.appendChild(list2_5);
 
     if (!(randomizer.active
       && randomizer.target === "2")) {
@@ -1135,7 +1135,7 @@
     appEl.appendChild(renderCard("completed", "Completed",
       {collapsible: true, kind: "completed"}));
 
-    // List 3 (single-zone, collapsible)
+    // List 3 (single-list, collapsible)
     appEl.appendChild(renderCard("3", "List 3",
       { collapsible: true }));
 
@@ -1206,11 +1206,11 @@
   }
 
   /**
-   * Builds the live Today card: its head, the Basics zone (list "-1", no
-   * adder of its own — populated by rollover from Recurring, not by hand),
-   * the two zones (lists "0" and "1") split by a divider, and the adder row
-   * (hidden while the today-targeted randomizer is active). Basics sits
-   * outside the randomizer/count scope.
+   * Builds the live Today card: its head, list "-1" (no adder of its own —
+   * populated by rollover from Recurring, not by hand), the two lists
+   * ("0" and "1") split by a divider, and the adder row (hidden while the
+   * today-targeted randomizer is active). List "-1" sits outside the
+   * randomizer/count scope.
    * @returns {Element} the assembled Today card section.
    */
   function buildTodayRealCard() {
@@ -1220,28 +1220,28 @@
     { fixed: true, countKeys: ["0", "1"],
       randomizerTarget: "today" }));
 
-    var zoneBasics = document.createElement("ul");
-    zoneBasics.className = "items";
-    fillZone(zoneBasics, "-1", false);
-    today.appendChild(zoneBasics);
+    var list_1 = document.createElement("ul");
+    list_1.className = "items";
+    fillList(list_1, "-1", false);
+    today.appendChild(list_1);
 
     var divBasics = document.createElement("div");
     divBasics.className = "divider";
     today.appendChild(divBasics);
 
-    var zoneTop = document.createElement("ul");
-    zoneTop.className = "items";
-    fillZone(zoneTop, "0", true);
-    today.appendChild(zoneTop);
+    var list0 = document.createElement("ul");
+    list0.className = "items";
+    fillList(list0, "0", true);
+    today.appendChild(list0);
 
     var div = document.createElement("div");
     div.className = "divider";
     today.appendChild(div);
 
-    var zoneBot = document.createElement("ul");
-    zoneBot.className = "items";
-    fillZone(zoneBot, "1", true);
-    today.appendChild(zoneBot);
+    var list1 = document.createElement("ul");
+    list1.className = "items";
+    fillList(list1, "1", true);
+    today.appendChild(list1);
 
     if (!(randomizer.active && randomizer.target === "today")) {
       today.appendChild(buildAdder("1"));
@@ -1278,14 +1278,14 @@
   }
 
   /**
-   * Fills a zone (one of the two halves of a split card) with rows for a list
-   * key, or an "(empty)" placeholder if the list is empty.
+   * Fills a list (one of the compartments of a split card) with rows for a
+   * list key, or an "(empty)" placeholder if the list is empty.
    * @param {Element} ul - the `<ul class="items">` to fill.
    * @param {string} key - the `state.lists` key to render rows for.
-   * @param {boolean} [isTodayZone] - true only for the Today card's zones,
-   *   which support the randomizer.
+   * @param {boolean} [isRandomizerList] - true for lists that support the
+   *   randomizer (lists 0/1 on the Today card, list 2.5 on List 2).
    */
-  function fillZone(ul, key, isTodayZone) {
+  function fillList(ul, key, isRandomizerList) {
     var ids = state.lists[key];
     if (ids.length === 0) {
       var empty = document.createElement("li");
@@ -1294,10 +1294,11 @@
       ul.appendChild(empty);
       return;
     }
+    var listTarget = (key === "2.5") ? "2" : "today";
     ids.forEach(function (id) {
       var item = state.itemsById[id];
-      if (isTodayZone && randomizer.active && randomizer.target === "today"
-        && !item.isDone) {
+      if (isRandomizerList && randomizer.active
+        && randomizer.target === listTarget && !item.isDone) {
         ul.appendChild(buildRandomizerRow(item));
         return;
       }
@@ -1307,7 +1308,7 @@
 
   /**
    * Builds a fixed, non-swipeable card for a past day's snapshot, with
-   * one zone per `PAST_ZONE_KEYS` and an adder row at the bottom.
+   * one list per `PAST_LIST_KEYS` and an adder row at the bottom.
    * @param {number} offset - day offset from today (negative = past).
    * @returns {Element} the card `<section>`.
    */
@@ -1325,7 +1326,7 @@
       { fixed: true, noCount: true }
     ));
 
-    PAST_ZONE_KEYS.forEach(function (zone, i) {
+    PAST_LIST_KEYS.forEach(function (listKey, i) {
       if (i > 0) {
         var div = document.createElement("div");
         div.className = "divider";
@@ -1333,7 +1334,7 @@
       }
       var ul = document.createElement("ul");
       ul.className = "items";
-      var items = day ? day[zone] : [];
+      var items = day ? day[listKey] : [];
       if (items.length === 0) {
         var empty = document.createElement("li");
         empty.className = "empty";
@@ -1342,7 +1343,7 @@
       } else {
         items.forEach(function (pi, idx) {
           ul.appendChild(
-            buildPastItemRow(dateKey, zone, idx, pi)
+            buildPastItemRow(dateKey, listKey, idx, pi)
           );
         });
       }
@@ -1357,26 +1358,26 @@
    * Builds a single row for a past-day snapshot item: checkbox, label
    * (with inline note editing/expansion), edit pencil, and hamburger menu.
    * @param {string} dateKey - the past day's date key.
-   * @param {string} zone - the zone within that day.
-   * @param {number} idx - index of the item within the zone array.
+   * @param {string} listKey - the list within that day.
+   * @param {number} idx - index of the item within the list array.
    * @param {Object} pastItem - the snapshot item to render.
    * @returns {Element} the `<li>` row.
    */
   function buildPastItemRow(
-    dateKey, zone, idx, pastItem
+    dateKey, listKey, idx, pastItem
   ) {
     var li = document.createElement("li");
     li.className = "item";
     if (pastItem.isDone) {
       li.className += " done";
     }
-    var noteKey = pastNoteKey(dateKey, zone, idx);
+    var noteKey = pastNoteKey(dateKey, listKey, idx);
     li.dataset.pastNote = noteKey;
 
     li.appendChild(buildCheck(
       pastItem.isDone,
       function () {
-        togglePastItemDone(dateKey, zone, idx);
+        togglePastItemDone(dateKey, listKey, idx);
       }
     ));
     if (isBuyItem(pastItem)) {
@@ -1399,7 +1400,7 @@
 
     if (editingPastNote
       && editingPastNote.dateKey === dateKey
-      && editingPastNote.zone === zone
+      && editingPastNote.listKey === listKey
       && editingPastNote.idx === idx
       && !editingPastNoteMounted) {
       editingPastNoteMounted = true;
@@ -1427,7 +1428,7 @@
         committed = true;
         editingPastNote = null;
         editPastItemNote(
-          dateKey, zone, idx, ta.value
+          dateKey, listKey, idx, ta.value
         );
       };
       ta.addEventListener("keydown", function (e) {
@@ -1472,13 +1473,13 @@
     var pencil = mkMini("✎", "Edit");
     pencil.addEventListener("click", function () {
       startPastEdit(
-        li, dateKey, zone, idx, pastItem
+        li, dateKey, listKey, idx, pastItem
       );
     });
     actions.appendChild(pencil);
 
     actions.appendChild(
-      buildPastHamburger(dateKey, zone, idx)
+      buildPastHamburger(dateKey, listKey, idx)
     );
 
     li.appendChild(actions);
@@ -1489,12 +1490,12 @@
    * Swaps a past-item row's label for an editable text input in place.
    * @param {Element} li - the row element containing the label.
    * @param {string} dateKey - the past day's date key.
-   * @param {string} zone - the zone within that day.
-   * @param {number} idx - index of the item within the zone array.
+   * @param {string} listKey - the list within that day.
+   * @param {number} idx - index of the item within the list array.
    * @param {Object} pastItem - the snapshot item being edited.
    */
   function startPastEdit(
-    li, dateKey, zone, idx, pastItem
+    li, dateKey, listKey, idx, pastItem
   ) {
     var label = li.querySelector(".label");
     if (!label || li.querySelector(".label-edit")) {
@@ -1514,7 +1515,7 @@
       if (committed) return;
       committed = true;
       editPastItemText(
-        dateKey, zone, idx, input.value
+        dateKey, listKey, idx, input.value
       );
       if (!input.value.trim()) render();
     };
@@ -1533,11 +1534,11 @@
    * Builds the "more options" menu button for a past-item row, with
    * "Edit note" and "Delete" actions.
    * @param {string} dateKey - the past day's date key.
-   * @param {string} zone - the zone within that day.
-   * @param {number} idx - index of the item within the zone array.
+   * @param {string} listKey - the list within that day.
+   * @param {number} idx - index of the item within the list array.
    * @returns {Element} the menu-anchor wrapper.
    */
-  function buildPastHamburger(dateKey, zone, idx) {
+  function buildPastHamburger(dateKey, listKey, idx) {
     var wrap = document.createElement("div");
     wrap.className = "menu-anchor";
     var btn = mkMini("☰", "More options");
@@ -1556,7 +1557,7 @@
       note.textContent = "Edit note";
       note.addEventListener("click", function () {
         closeAllMenus();
-        startPastNoteEdit(dateKey, zone, idx);
+        startPastNoteEdit(dateKey, listKey, idx);
       });
       menu.appendChild(note);
 
@@ -1565,7 +1566,7 @@
       del.textContent = "Delete";
       del.addEventListener("click", function () {
         closeAllMenus();
-        deletePastItem(dateKey, zone, idx);
+        deletePastItem(dateKey, listKey, idx);
       });
       menu.appendChild(del);
 
@@ -1581,7 +1582,7 @@
 
   /**
    * Builds the text-input + "Add" button row for adding a manual item
-   * to a past day's zone "0".
+   * to a past day's list "0".
    * @param {string} dateKey - the past day's date key.
    * @returns {Element} the adder row.
    */
@@ -1736,12 +1737,7 @@
           randBtn.className = "head-btn";
           randBtn.textContent = "Randomizer!";
           randBtn.addEventListener("click", function () {
-            var keys;
-            if (opts.randomizerTarget === "today") {
-              keys = ["0", "1"];
-            } else {
-              keys = [opts.randomizerTarget];
-            }
+            var keys = randomizerKeys(opts.randomizerTarget);
             var allItems = [];
             keys.forEach(function (k) {
               state.lists[k].forEach(function (id) {
@@ -2418,6 +2414,19 @@
 
   // -------------------------- randomizer animation ---------------------------
   /**
+   * Maps a randomizer target to the list keys it draws from. "today" pools 
+   * list 0 and list 1; "2" pools list 2 and list 2.5; anything else is just 
+   * itself.
+   * @param {string} target - a randomizerTarget value ("today", "2", ...).
+   * @returns {string[]} the list keys to pool together.
+   */
+  function randomizerKeys(target) {
+    if (target === "today") return ["0", "1"];
+    if (target === "2") return ["2", "2.5"];
+    return [target];
+  }
+
+  /**
    * Runs the randomizer's slot-machine-style highlight animation: picks a
    * winner up front, then ticks through items with slowing timing until it
    * lands on the winner. A no-op if the target list is empty; skips straight to
@@ -2425,12 +2434,7 @@
    */
   function runRandomizerAnimation() {
     var gen = ++randomizerGen;
-    var keys;
-    if (randomizer.target === "today") {
-      keys = ["0", "1"];
-    } else {
-      keys = [randomizer.target];
-    }
+    var keys = randomizerKeys(randomizer.target);
     var allItems = [];
     keys.forEach(function (k) {
       state.lists[k].forEach(function (id) {

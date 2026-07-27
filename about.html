@@ -28,46 +28,49 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v1.0.2 <span class="changelog-date">2026-07-27 00H</span></h3>
+    <ul>
+      <li>Fixed the List 2 randomizer: it now pools list 2 and list 2.5 together instead of only drawing from list 2, and list 2.5's rows now flash correctly during the animation too.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
+    <h3>v1.0.1 <span class="changelog-date">2026-07-26 23H</span></h3>
+    <ul>
+      <li>Made Claude rename all its horrible stupid instances of using "zone" which made absolutely zero fvcking sense when they were LITERALLY LISTS I DON'T KNOW WHY IT'S SO STUPID AND INVENTED A TERM I NEVER USED. DISGUSTING.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v1 <span class="changelog-date">2026-07-19 14H</span></h3>
     <ul>
-      <li>New version whole number bcuz we pushed to main
-        yippee :3</li>
-      <li>(undeserved probably) (lol) (it's still beta as
-        hell)</li>
+      <li>New version whole number bcuz we pushed to main yippee :3</li>
+      <li>(undeserved probably) (lol) (it's still beta as hell)</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.17 <span class="changelog-date">2026-07-19 13H</span></h3>
     <ul>
-      <li>Checkpoint J: renamed list 3/3.5 to list 2.5/3. List 2
-        card now holds two zones (2 top, 2.5 bottom) with
-        Randomizer on zone 2; List 3 is now a single-zone
-        collapsible card.</li>
-      <li>Uncomplete now lands items in list 2.5 instead of
-        list 2.</li>
-      <li>Recurrence destination enum updated: "3" replaced by
-        "2.5" in schema text, validation, and GUI toggle.</li>
+      <li>Checkpoint J: renamed list 3/3.5 to list 2.5/3. List 2 card now holds two zones (2 top, 2.5 bottom) with Randomizer on zone 2; List 3 is now a single-zone collapsible card.</li>
+      <li>Uncomplete now lands items in list 2.5 instead of list 2.</li>
+      <li>Recurrence destination enum updated: "3" replaced by "2.5" in schema text, validation, and GUI toggle.</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.16.1 <span class="changelog-date">2026-07-19 03H</span></h3>
     <ul>
-      <li>haha silly CRLF ghost (changed all CRLF to LF in
-        autorelists)</li>
+      <li>haha silly CRLF ghost (changed all CRLF to LF in autorelists)</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.16 <span class="changelog-date">2026-07-19 00H</span></h3>
     <ul>
-      <li>Undo/redo system: 60-deep snapshot stack covering all 18
-        mutating actions, surfaced as a fixed bottom pill.</li>
-      <li>Rollover and auto-return push boundary entries onto the
-        undo stack; crossing one requires a double-tap confirm.</li>
-      <li>Removed lastExportedConfirmed and its confirm/revert
-        buttons — redundant now that real undo covers export.</li>
+      <li>Undo/redo system: 60-deep snapshot stack covering all 18 mutating actions, surfaced as a fixed bottom pill.</li>
+      <li>Rollover and auto-return push boundary entries onto the undo stack; crossing one requires a double-tap confirm.</li>
+      <li>Removed lastExportedConfirmed and its confirm/revert buttons — redundant now that real undo covers export.</li>
       <li>Refresh button in header (page reload).</li>
     </ul>
   </div>
@@ -75,34 +78,26 @@
   <div class="changelog-entry">
     <h3>v0.15 <span class="changelog-date">2026-07-18 15H</span></h3>
     <ul>
-      <li>Checkpoint H: "Edit recurrence" modal now has a GUI tab alongside 
-        the JSON one.</li>
-      <li>Removed the "daysOfWeek" recurrence kind - it's fully covered by
-        everyNWeeksOnDays.</li>
-      <li>Recurrence types are grouped in the type dropdown by granularity:
-        day, week, month, year.</li>
+      <li>Checkpoint H: "Edit recurrence" modal now has a GUI tab alongside the JSON one.</li>
+      <li>Removed the "daysOfWeek" recurrence kind - it's fully covered by everyNWeeksOnDays.</li>
+      <li>Recurrence types are grouped in the type dropdown by granularity: day, week, month, year.</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.14 <span class="changelog-date">2026-07-17 06H</span></h3>
     <ul>
-      <li>Checkpoint G: permanent delete (explicit and TTL purge) now removes
-        the itemsById record.</li>
-      <li>Dangling ogItemId references in past day snapshots normalized to null
-        on purge.</li>
-      <li>Completed and Recurring views automatically stop showing permanently
-        deleted items.</li>
+      <li>Checkpoint G: permanent delete (explicit and TTL purge) now removes the itemsById record.</li>
+      <li>Dangling ogItemId references in past day snapshots normalized to null on purge.</li>
+      <li>Completed and Recurring views automatically stop showing permanently deleted items.</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.13 <span class="changelog-date">2026-07-17 06H</span></h3>
     <ul>
-      <li>Checkpoint F: past day cards show real snapshot data from rollover
-        instead of empty placeholders.</li>
-      <li>Past items fully interactive: check/uncheck, inline text editing, 
-        note editing, hamburger delete.</li>
+      <li>Checkpoint F: past day cards show real snapshot data from rollover instead of empty placeholders.</li>
+      <li>Past items fully interactive: check/uncheck, inline text editing, note editing, hamburger delete.</li>
       <li>Per-card adder for manually typing past entries into zone 0.</li>
     </ul>
   </div>
@@ -110,10 +105,8 @@
   <div class="changelog-entry">
     <h3>v0.12 <span class="changelog-date">2026-07-16 20H</span></h3>
     <ul>
-      <li>Checkpoint E: daily rollover. Snapshots today's zones into
-      past-day storage, clears done items, places due recurring items.</li>
-      <li>Recurrence destination changed from -1/1/2 to -1/1/3 (List 2
-      collided with the List2-&gt;List1 auto-return feature).</li>
+      <li>Checkpoint E: daily rollover. Snapshots today's zones into past-day storage, clears done items, places due recurring items.</li>
+      <li>Recurrence destination changed from -1/1/2 to -1/1/3 (List 2 collided with the List2-&gt;List1 auto-return feature).</li>
       <li>Fixed clearing an item's recurrence orphaning it when unlinked.</li>
     </ul>
   </div>
@@ -121,8 +114,7 @@
   <div class="changelog-entry">
     <h3>v0.11.2 <span class="changelog-date">2026-07-15 06H</span></h3>
     <ul>
-      <li>Factored the two "Edit recurrence" modals into one shared
-      builder; saving now always sets lastDone.</li>
+      <li>Factored the two "Edit recurrence" modals into one shared builder; saving now always sets lastDone.</li>
     </ul>
   </div>
 
@@ -136,90 +128,54 @@
   <div class="changelog-entry">
     <h3>v0.11 <span class="changelog-date">2026-07-13 06H</span></h3>
     <ul>
-      <li>Restored the recurring-adder feature (buildRecurringAdder,
-      openNewRecurringItemEditor) and the findIn/trashItem/editItem/editNote
-      listKey-optional refactor from the crazierers branch, keeping only
-      the RECURRENCE_KINDS declaration-order fix (moved above load() so
-      validateRecurrence() no longer throws on stored recurrence data).</li>
-      <li>Fixed the Completed and Recurring views (derived filters over
-      itemsById) still showing items after they'd been deleted - they now
-      check findInTrash() too, not just isDone/recurrence.</li>
-      <li>Fixed recoverItem pushing unlinked completed/recurring items into
-      List 3 on recover instead of restoring them unlinked, the way they
-      were before being trashed.</li>
-      <li>Known bug: editing a note in List 0 is currently broken - not yet
-      investigated.</li>
+      <li>Restored the recurring-adder feature (buildRecurringAdder, openNewRecurringItemEditor) and the findIn/trashItem/editItem/editNote listKey-optional refactor from the crazierers branch, keeping only the RECURRENCE_KINDS declaration-order fix (moved above load() so validateRecurrence() no longer throws on stored recurrence data).</li>
+      <li>Fixed the Completed and Recurring views (derived filters over itemsById) still showing items after they'd been deleted - they now check findInTrash() too, not just isDone/recurrence.</li>
+      <li>Fixed recoverItem pushing unlinked completed/recurring items into List 3 on recover instead of restoring them unlinked, the way they were before being trashed.</li>
+      <li>Known bug: editing a note in List 0 is currently broken - not yet investigated.</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.10 <span class="changelog-date">2026-07-12 14H</span></h3>
     <ul>
-      <li>Checkpoint C: added the Basics zone (list -1) to the Today card,
-      above zone 0. Check/delete work on it like any other list; it
-      deliberately sits outside the swipe/hamburger move chain since it
-      isn't part of the 0-1-2-3-3.5-4 urgency progression, and it has no
-      adder yet since it'll be populated by Recurring items via rollover
-      (Checkpoint E) instead of typed in by hand.</li>
-      <li>Deleted all "Select to keep" code (state, row rendering, header
-      buttons, CSS) instead of just leaving it hidden/unhooked.</li>
+      <li>Checkpoint C: added the Basics zone (list -1) to the Today card, above zone 0. Check/delete work on it like any other list; it deliberately sits outside the swipe/hamburger move chain since it isn't part of the 0-1-2-3-3.5-4 urgency progression, and it has no adder yet since it'll be populated by Recurring items via rollover (Checkpoint E) instead of typed in by hand.</li>
+      <li>Deleted all "Select to keep" code (state, row rendering, header buttons, CSS) instead of just leaving it hidden/unhooked.</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.9 <span class="changelog-date">2026-07-12 12H</span></h3>
     <ul>
-      <li>Reworked checkpoint B of the item/list data model: completing an
-      item moves it to today's zone 0 unless it's already sitting in zone -1
-      or 0; unchecking always sends it to List 2, regardless of where it
-      currently is. Items no longer carry an origin field.</li>
-      <li>Completed is now a derived filter (isDone and not recurring)
-      instead of its own stored list, matching how the Recurring view will
-      work once that lands.</li>
-      <li>Fixed a few things this uncovered along the way: a done item
-      sitting in zone 0 now renders correctly checked instead of always
-      showing unchecked, the randomizer no longer offers already-completed
-      items as candidates, and the Completed view's menu no longer offers
-      Move up/down.</li>
+      <li>Reworked checkpoint B of the item/list data model: completing an item moves it to today's zone 0 unless it's already sitting in zone -1 or 0; unchecking always sends it to List 2, regardless of where it currently is. Items no longer carry an origin field.</li>
+      <li>Completed is now a derived filter (isDone and not recurring) instead of its own stored list, matching how the Recurring view will work once that lands.</li>
+      <li>Fixed a few things this uncovered along the way: a done item sitting in zone 0 now renders correctly checked instead of always showing unchecked, the randomizer no longer offers already-completed items as candidates, and the Completed view's menu no longer offers Move up/down.</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.8 <span class="changelog-date">2026-07-10 19H</span></h3>
     <ul>
-      <li>Checkpoint B of the item/list data model rewrite: items now carry
-      isDone, lastDone, and origin fields.</li>
-      <li>Completing an item records which list it came from (origin) and
-      when (lastDone); unchecking it from Completed now sends it back to
-      that exact list instead of always dumping it into List 2.</li>
+      <li>Checkpoint B of the item/list data model rewrite: items now carry isDone, lastDone, and origin fields.</li>
+      <li>Completing an item records which list it came from (origin) and when (lastDone); unchecking it from Completed now sends it back to that exact list instead of always dumping it into List 2.</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.7 <span class="changelog-date">2026-07-10 07H</span></h3>
     <ul>
-      <li>Checkpoint A of the item/list data model rewrite: items are now
-      stored once each in a single itemsById table, and every list (Today's
-      zones, Lists 2/3/3.5/4, Completed, Trash) just holds ids into it
-      instead of full copies of the item.</li>
-      <li>Pure refactor, no visible behaviour change yet — this is prep for
-      linking one item into multiple lists at once (recurring items,
-      Basics, retroactive past-day logging) in upcoming checkpoints.</li>
+      <li>Checkpoint A of the item/list data model rewrite: items are now stored once each in a single itemsById table, and every list (Today's zones, Lists 2/3/3.5/4, Completed, Trash) just holds ids into it instead of full copies of the item.</li>
+      <li>Pure refactor, no visible behaviour change yet — this is prep for linking one item into multiple lists at once (recurring items, Basics, retroactive past-day logging) in upcoming checkpoints.</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.6.1 <span class="changelog-date">2026-07-10 07H</span></h3>
     <ul>
-      <li>Massive code refactoring. (Also got mad and finally changed the
-      stupid storage key names)</li>
-      <li>Added comments to EVERY function like a proper neat and tidy
-      coder. totally.</li>
+      <li>Massive code refactoring. (Also got mad and finally changed the stupid storage key names)</li>
+      <li>Added comments to EVERY function like a proper neat and tidy coder. totally.</li>
       <li>Then line wrapped all the comments better.</li>
-      <li>Then got mad about the unicode that AI shoved in there and put
-      them into proper ASCII.</li>
-      <li>Also at some point changed all the disgusting and ridiculous
-      multi statement mashups into proper one statement per line.</li>
+      <li>Then got mad about the unicode that AI shoved in there and put them into proper ASCII.</li>
+      <li>Also at some point changed all the disgusting and ridiculous multi statement mashups into proper one statement per line.</li>
       <li>Then line wrapped all the code better.</li>
       <li>Then got sick of line wrapping. the end.</li>
     </ul>
@@ -228,39 +184,28 @@
   <div class="changelog-entry">
     <h3>v0.6 <span class="changelog-date">2026-07-06 21H</span></h3>
     <ul>
-      <li>Removed every ternary operator from the codebase (autorelists.js, 
-        colourcaln.js, swipe-nav.js), expanded to if/else</li>
-      <li>All "current time" reads now go through one internal getNow() 
-        function instead of calling new Date() / Date.now() directly, in prep for 
-        recurring items and day rollover</li>
-      <li>Added a temporary debug panel (bottom of the lists page) to 
-        override "now" for testing date-dependent behaviour without waiting 
-        for real days to pass</li>
+      <li>Removed every ternary operator from the codebase (autorelists.js, colourcaln.js, swipe-nav.js), expanded to if/else</li>
+      <li>All "current time" reads now go through one internal getNow() function instead of calling new Date() / Date.now() directly, in prep for recurring items and day rollover</li>
+      <li>Added a temporary debug panel (bottom of the lists page) to override "now" for testing date-dependent behaviour without waiting for real days to pass</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.5 <span class="changelog-date">2026-07-05 21H</span></h3>
     <ul>
-      <li>List 1 is now a "Today" carousel card, styled distinctly 
-        (Colourcaln-style dark/vivid theme) from the rest of the lists</li>
-      <li>Real dates in the Today card header ("Today | Jul 05 Sun") and on 
-        placeholder past-day cards reached via the prev/next carousel arrows</li>
-      <li>Prev/next arrows peek the neighbouring day's card at the edges, with 
-        a sliding animation between days</li>
+      <li>List 1 is now a "Today" carousel card, styled distinctly (Colourcaln-style dark/vivid theme) from the rest of the lists</li>
+      <li>Real dates in the Today card header ("Today | Jul 05 Sun") and on placeholder past-day cards reached via the prev/next carousel arrows</li>
+      <li>Prev/next arrows peek the neighbouring day's card at the edges, with a sliding animation between days</li>
       <li>Hid the "Select to keep" button (no longer needed)</li>
-      <li>Fixed the item hamburger menu getting clipped or triggering a stray 
-        scrollbar when opened from inside the carousel</li>
+      <li>Fixed the item hamburger menu getting clipped or triggering a stray scrollbar when opened from inside the carousel</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.4 <span class="changelog-date">2026-07-05 19H</span></h3>
     <ul>
-      <li>Fixed swipe direction: swipe up from Day colours goes to Lists, swipe 
-        down from Lists goes to Day colours (was backwards)</li>
-      <li>Fixed a bug where one long or held swipe would commit instantly 
-        instead of requiring a second, separate swipe</li>
+      <li>Fixed swipe direction: swipe up from Day colours goes to Lists, swipe down from Lists goes to Day colours (was backwards)</li>
+      <li>Fixed a bug where one long or held swipe would commit instantly instead of requiring a second, separate swipe</li>
     </ul>
   </div>
 
@@ -275,18 +220,15 @@
     <h3>v0.2 <span class="changelog-date">2026-07-05 19H</span></h3>
     <ul>
       <li>Fixed broken page references left over from the file rename</li>
-      <li>One shared manifest + service worker, so the whole thing installs as 
-        a single "Aulists" PWA</li>
-      <li>Swipe-up / swipe-down navigation between the lists and Colourcaln 
-        pages</li>
+      <li>One shared manifest + service worker, so the whole thing installs as a single "Aulists" PWA</li>
+      <li>Swipe-up / swipe-down navigation between the lists and Colourcaln pages</li>
     </ul>
   </div>
 
   <div class="changelog-entry">
     <h3>v0.1 <span class="changelog-date">2026-07-05 07H</span></h3>
     <ul>
-      <li>Repo created; Colourcaln and Autorelist copied in as the two starting 
-        pages</li>
+      <li>Repo created; Colourcaln and Autorelist copied in as the two starting pages</li>
       <li>New merged app icon: cyan/purple diagonal split</li>
     </ul>
   </div>
