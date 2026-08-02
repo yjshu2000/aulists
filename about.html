@@ -28,6 +28,17 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v2<span class="changelog-date">2026-08-02 15H</span></h3>
+    <ul>
+      <li>Removed the Today card carousel and the entire past-day system (past day cards, rollover, snapshots, list -1). It never actually helped, so out it goes.</li>
+      <li>Completing an item now unlinks it from its list immediately.</li>
+      <li>Recurring items place themselves into their destination list on a live check every render, instead of on a rollover.</li>
+      <li>Colourcaln is gone. In its place: Falsedge, a points/deadline tracker. Scaffold only for now - the real page gets built in phase 3.</li>
+      <li>Phase 3 planning docs live in the scratchpad.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v1.0.2 <span class="changelog-date">2026-07-27 00H</span></h3>
     <ul>
       <li>Fixed the List 2 randomizer: it now pools list 2 and list 2.5 together instead of only drawing from list 2, and list 2.5's rows now flash correctly during the animation too.</li>

@@ -6,13 +6,9 @@
 
   // chain order for movement
   var CHAIN = ["0", "1", "2", "2.5", "3", "4"];
-  // every real list key, chain or not (used for parsing/validation, not move)
-  var LIST_KEYS = ["-1"].concat(CHAIN);
   // stored recurrence dicts against this list
   var RECURRENCE_KINDS = ["daily", "everyNDays", "everyNWeeksOnDays",
     "dayOfMonth", "nthWeekdayOfMonth", "monthOfYear", "yearly"];
-  var PAST_LIST_KEYS = ["-1", "0", "1"];  // stored past-day snapshots
-  var DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
   var state = load();
   var undoStack = [];
@@ -95,9 +91,6 @@
   var expandedNote = null;
   var editingNote = null;
   var editingNoteMounted = false;
-  var expandedPastNote = null;
-  var editingPastNote = null;
-  var editingPastNoteMounted = false;
   var randomizer = {
     active: false,
     target: null,
@@ -106,13 +99,6 @@
     done: false
   };
   var randomizerGen = 0;
-  var todayCardOffset = 0; // 0 = today; negative = carousel test steps into
-                           // the past
-  var carouselAnimating = false;
-  var CAROUSEL_PEEK = 20; // must match .today-nav width / left/right in
-                          // style-minim.css
-  var CAROUSEL_GAP = 8;   // must match .today-carousel-track gap in
-                          // style-minim.css
 
   // TEMP debug override for "now", for testing date-dependent behaviour
   // without waiting real days. getNow() stays permanently. Comment out this
@@ -178,11 +164,9 @@
       version: 2,
       itemsById: {},
       lists: {
-        "-1": [], "0": [], "1": [], "2": [], "2.5": [], "3": [], "4": [],
+        "0": [], "1": [], "2": [], "2.5": [], "3": [], "4": [],
         trash: []
       },
-      pastDaysByDate: {},
-      todayDateKey: null,
       collapsed: {
         "3": false, "4": true, completed: true, recurring: true, trash: true
       },
@@ -297,11 +281,6 @@
         if (am >= 0 && am < 1440) s.schedule.atMinutes = am;
       }
       if (typeof obj.lastReturn === "string") s.lastReturn = obj.lastReturn;
-      s.pastDaysByDate = sanitizePastDaysByDate(obj.pastDaysByDate);
-      if (typeof obj.todayDateKey === "string" &&
-        DATE_KEY_RE.test(obj.todayDateKey)) {
-        s.todayDateKey = obj.todayDateKey;
-      }
       if (typeof obj.lastExported === "string") {
         s.lastExported = obj.lastExported;
       }
@@ -439,35 +418,14 @@
     });
     state.lists.trash = keep;
     if (keep.length !== before) {
-      normalizeDanglingOgItemIds();
       save();
     }
   }
 
+  // ------------------- recurrence date helpers (compute on open) -------------
   /**
-   * Clears `ogItemId` on any past-day snapshot entry whose referenced
-   * item no longer exists in `itemsById` (e.g. after permanent delete).
-   */
-  function normalizeDanglingOgItemIds() {
-    Object.keys(state.pastDaysByDate).forEach(
-      function (dateKey) {
-        var day = state.pastDaysByDate[dateKey];
-        PAST_LIST_KEYS.forEach(function (listKey) {
-          day[listKey].forEach(function (pi) {
-            if (pi.ogItemId
-              && !state.itemsById[pi.ogItemId]) {
-              pi.ogItemId = null;
-            }
-          });
-        });
-      }
-    );
-  }
-
-  // ----------------------- rollover (compute on open) ------------------------
-  /**
-   * Formats a Date as the local "YYYY-MM-DD" key used for both
-   * `state.pastDaysByDate` entries and `state.todayDateKey`.
+   * Formats a Date as the local "YYYY-MM-DD" key, used by `everyNWeeksOnDays`
+   * rule anchors.
    * @param {Date} date - the date to key.
    * @returns {string} the date key.
    */
@@ -496,59 +454,6 @@
   function daysBetween(a, b) {
     var ms = boundaryAt(b, 0).getTime() - boundaryAt(a, 0).getTime();
     return Math.round(ms / (24 * 60 * 60 * 1000));
-  }
-
-  /**
-   * Sanitizes an arbitrary parsed-JSON `pastDaysByDate` blob into a
-   * fully-formed one, the same defensive role `normalise` plays for the rest
-   * of state. Malformed dates, lists, or entries are dropped rather than
-   * allowed to corrupt state.
-   * @param {*} raw - parsed JSON, untrusted.
-   * @returns {Object} a complete, safe-to-use `pastDaysByDate` map.
-   */
-  function sanitizePastDaysByDate(raw) {
-    var out = {};
-    if (!raw || typeof raw !== "object") return out;
-    Object.keys(raw).forEach(function (dateKey) {
-      if (!DATE_KEY_RE.test(dateKey)) return;
-      var src = raw[dateKey];
-      if (!src || typeof src !== "object") return;
-      var day = { "-1": [], "0": [], "1": [] };
-      PAST_LIST_KEYS.forEach(function (listKey) {
-        var arr = src[listKey];
-        if (!Array.isArray(arr)) return;
-        arr.forEach(function (pi) {
-          if (!pi || typeof pi.text !== "string") return;
-          var o = { ogItemId: null, text: pi.text, isDone: !!pi.isDone };
-          if (typeof pi.ogItemId === "string") o.ogItemId = pi.ogItemId;
-          if (typeof pi.note === "string" && pi.note) o.note = pi.note;
-          day[listKey].push(o);
-        });
-      });
-      out[dateKey] = day;
-    });
-    return out;
-  }
-
-  /**
-   * Freezes a snapshot of today's three lists (-1/0/1) into
-   * `state.pastDaysByDate` under `dateKey`, as PastItems linked back to their
-   * live item only via `ogItemId`. Overwrites any existing entry for that
-   * date.
-   * @param {string} dateKey - the date key the closing day snapshots under.
-   */
-  function snapshotTodayLists(dateKey) {
-    var day = { "-1": [], "0": [], "1": [] };
-    PAST_LIST_KEYS.forEach(function (listKey) {
-      state.lists[listKey].forEach(function (id) {
-        var item = state.itemsById[id];
-        if (!item) return;
-        var pastItem = { ogItemId: id, text: item.text, isDone: item.isDone };
-        if (item.note) pastItem.note = item.note;
-        day[listKey].push(pastItem);
-      });
-    });
-    state.pastDaysByDate[dateKey] = day;
   }
 
   /**
@@ -614,68 +519,26 @@
   }
 
   /**
-   * Links every due, unpaused, currently-unlinked recurring item into its
-   * `destination` list for `newDay`. Items still linked somewhere (carried
-   * forward because they weren't done) are left alone - relinking would
-   * duplicate them.
-   * @param {Date} newDay - the day rollover is producing.
+   * Links every unpaused, currently-unlinked recurring item whose rule now
+   * fires into its `destination` list. Items still linked somewhere (not yet
+   * completed since they last fired) are left alone - relinking would
+   * duplicate them. Safe to call repeatedly (e.g. on every app-open/
+   * visibility-change); only saves if something changed.
    */
-  function placeRecurringItems(newDay) {
+  function placeRecurringItems() {
+    var now = getNow();
+    var changed = false;
     recurringIds().forEach(function (id) {
       var item = state.itemsById[id];
       var rec = item.recurrence;
       if (rec.paused) return;
       if (findItemListKey(id) !== null) return;
-      if (!ruleFires(rec.rule, item, newDay)) return;
+      if (!ruleFires(rec.rule, item, now)) return;
       item.isDone = false;
       state.lists[rec.destination].push(id);
+      changed = true;
     });
-  }
-
-  /**
-   * Rolls one calendar day over: snapshots -1/0/1 into `pastDaysByDate` for
-   * the closing day, clears list -1 entirely, drops done items from 0/1 (not-
-   * done items carry forward untouched), then places due recurring items
-   * into their destinations for the day that follows.
-   * @param {Date} closingDay - the day being closed out.
-   */
-  function rolloverOneDay(closingDay) {
-    snapshotTodayLists(dateKeyFor(closingDay));
-    state.lists["-1"] = [];
-    ["0", "1"].forEach(function (listKey) {
-      state.lists[listKey] = state.lists[listKey].filter(function (id) {
-        return !state.itemsById[id].isDone;
-      });
-    });
-    placeRecurringItems(stepDays(closingDay, 1));
-  }
-
-  /**
-   * Checks whether one or more calendar-day boundaries have been crossed
-   * since the last time this ran, and if so, rolls over each of them in
-   * order. Safe to call repeatedly (e.g. on every app-open/visibility-
-   * change) - it's a no-op if still the same day, and never rewinds if the
-   * clock (real or debug-overridden) moves backward.
-   * @returns {boolean} true if at least one day was rolled over.
-   */
-  function applyRollover() {
-    var todayKey = dateKeyFor(getNow());
-    if (!state.todayDateKey) {
-      state.todayDateKey = todayKey;
-      save();
-      return false;
-    }
-    var cursor = parseDateKey(state.todayDateKey);
-    var todayDate = parseDateKey(todayKey);
-    if (todayDate.getTime() <= cursor.getTime()) return false;
-    while (cursor.getTime() < todayDate.getTime()) {
-      pushBoundary("Rollover");
-      rolloverOneDay(cursor);
-      cursor = stepDays(cursor, 1);
-    }
-    state.todayDateKey = todayKey;
-    save();
-    return true;
+    if (changed) save();
   }
 
   // ----------------------------- item operations -----------------------------
@@ -761,9 +624,10 @@
   }
 
   /**
-   * Marks an item done. An item already sitting in list -1 or 0 stays linked
-   * where it is; anything else is unlinked from its current list and linked
-   * into list 0.
+   * Marks an item done and immediately unlinks it from its current list. It
+   * lives on in `itemsById` only, surfacing through the Completed derived
+   * view (or, for recurring items, the Recurring view) until it's placed
+   * again.
    * @param {string} fromKey - list key the item currently lives in.
    * @param {string} id - id of the item to complete.
    */
@@ -773,11 +637,8 @@
     pushUndo("Complete item");
     item.isDone = true;
     item.lastDone = getNow().toISOString();
-    if (fromKey !== "-1" && fromKey !== "0") {
-      var i = findIn(fromKey, id);
-      if (i !== -1) state.lists[fromKey].splice(i, 1);
-      state.lists["0"].push(id);
-    }
+    var i = findIn(fromKey, id);
+    if (i !== -1) state.lists[fromKey].splice(i, 1);
     save();
     render();
   }
@@ -854,7 +715,6 @@
     pushUndo("Permadelete item");
     state.lists.trash.splice(i, 1);
     delete state.itemsById[id];
-    normalizeDanglingOgItemIds();
     save();
     render();
   }
@@ -909,199 +769,23 @@
     render();
   }
 
-  /**
-   * Builds the key used to track which past-item note is expanded.
-   * @param {string} dateKey - the past day's date key.
-   * @param {string} listKey - the list within that day.
-   * @param {number} idx - index of the item within the list array.
-   * @returns {string} the composite key.
-   */
-  function pastNoteKey(dateKey, listKey, idx) {
-    return dateKey + ":" + listKey + ":" + idx;
-  }
-
-  /**
-   * Toggles the done state of a single past-day snapshot item.
-   * @param {string} dateKey - the past day's date key.
-   * @param {string} listKey - the list within that day.
-   * @param {number} idx - index of the item within the list array.
-   */
-  function togglePastItemDone(dateKey, listKey, idx) {
-    var day = state.pastDaysByDate[dateKey];
-    if (!day || !day[listKey] || !day[listKey][idx]) return;
-    pushUndo("Toggle past item done");
-    day[listKey][idx].isDone = !day[listKey][idx].isDone;
-    save();
-    render();
-  }
-
-  /**
-   * Overwrites a past-day snapshot item's text. No-op if the trimmed
-   * text is empty.
-   * @param {string} dateKey - the past day's date key.
-   * @param {string} listKey - the list within that day.
-   * @param {number} idx - index of the item within the list array.
-   * @param {string} newText - the replacement text.
-   */
-  function editPastItemText(dateKey, listKey, idx, newText) {
-    var v = newText.trim();
-    if (!v) return;
-    var day = state.pastDaysByDate[dateKey];
-    if (!day || !day[listKey] || !day[listKey][idx]) return;
-    pushUndo("Edit past item text");
-    day[listKey][idx].text = v;
-    save();
-    render();
-  }
-
-  /**
-   * Sets or clears a past-day snapshot item's note. A blank/whitespace
-   * `newNote` deletes the note field entirely.
-   * @param {string} dateKey - the past day's date key.
-   * @param {string} listKey - the list within that day.
-   * @param {number} idx - index of the item within the list array.
-   * @param {string} newNote - the replacement note text.
-   */
-  function editPastItemNote(dateKey, listKey, idx, newNote) {
-    var day = state.pastDaysByDate[dateKey];
-    if (!day || !day[listKey] || !day[listKey][idx]) return;
-    pushUndo("Edit past item note");
-    var v = newNote.trim();
-    if (v) {
-      day[listKey][idx].note = v;
-      expandedPastNote = pastNoteKey(
-        dateKey, listKey, idx
-      );
-    } else {
-      delete day[listKey][idx].note;
-      expandedPastNote = null;
-    }
-    save();
-    render();
-  }
-
-  /**
-   * Removes a single item from a past-day snapshot list.
-   * @param {string} dateKey - the past day's date key.
-   * @param {string} listKey - the list within that day.
-   * @param {number} idx - index of the item within the list array.
-   */
-  function deletePastItem(dateKey, listKey, idx) {
-    var day = state.pastDaysByDate[dateKey];
-    if (!day || !day[listKey]) return;
-    pushUndo("Delete past item");
-    day[listKey].splice(idx, 1);
-    save();
-    render();
-  }
-
-  /**
-   * Adds a new manual (non-recurring-derived) item to a past day's
-   * list "0", creating the day's snapshot record if it doesn't exist
-   * yet. No-op if the trimmed text is empty.
-   * @param {string} dateKey - the past day's date key.
-   * @param {string} text - the new item's text.
-   */
-  function addPastItem(dateKey, text) {
-    var v = text.trim();
-    if (!v) return;
-    pushUndo("Add past item");
-    if (!state.pastDaysByDate[dateKey]) {
-      state.pastDaysByDate[dateKey] = {
-        "-1": [], "0": [], "1": []
-      };
-    }
-    state.pastDaysByDate[dateKey]["0"].push({
-      ogItemId: null, text: v, isDone: false
-    });
-    save();
-    render();
-  }
-
-  /**
-   * Opens the note editor for a single past-day snapshot item.
-   * @param {string} dateKey - the past day's date key.
-   * @param {string} listKey - the list within that day.
-   * @param {number} idx - index of the item within the list array.
-   */
-  function startPastNoteEdit(dateKey, listKey, idx) {
-    editingPastNote = {
-      dateKey: dateKey, listKey: listKey, idx: idx
-    };
-    expandedPastNote = pastNoteKey(
-      dateKey, listKey, idx
-    );
-    render();
-  }
-
   // -------------------------------- rendering --------------------------------
   var appEl = document.getElementById("app");
 
   /**
    * Rebuilds the entire `#app` DOM tree from the current in-memory `state` -
-   * the Today carousel, List 2 (with its two lists, 2 and 2.5), Completed,
-   * List 3, List 4, and Trash. Called after any state mutation.
+   * List 0, List 1, List 2 (with its two lists, 2 and 2.5), Completed,
+   * List 3, List 4, Recurring, and Trash. Called after any state mutation.
    */
   function render() {
     closeAllMenus();
     editingNoteMounted = false;
-    editingPastNoteMounted = false;
     appEl.innerHTML = "";
 
-    // Today carousel: a 3-slide track (prev/current/next) always centered on
-    // the current slide, so neighbour cards peek in at the edges.
-    var todayWrap = document.createElement("div");
-    todayWrap.className = "today-carousel";
+    appEl.appendChild(renderCard("0", "List 0", { fixed: true }));
 
-    var prevBtn = document.createElement("button");
-    prevBtn.className = "today-nav today-nav-prev";
-    prevBtn.textContent = "<";
-    prevBtn.setAttribute("aria-label", "Previous day");
-    prevBtn.addEventListener("click", function () {
-      if (carouselAnimating) return;
-      animateCarousel(-1);
-    });
-    todayWrap.appendChild(prevBtn);
-
-    var viewport = document.createElement("div");
-    viewport.className = "today-carousel-viewport";
-
-    var track = document.createElement("div");
-    track.className = "today-carousel-track";
-
-    var prevSlide = buildCardForOffset(todayCardOffset - 1);
-    prevSlide.classList.add("carousel-slide");
-    track.appendChild(prevSlide);
-
-    var currentSlide = buildCardForOffset(todayCardOffset);
-    currentSlide.classList.add("carousel-slide");
-    track.appendChild(currentSlide);
-
-    var nextSlide;
-    if (todayCardOffset < 0) {
-      nextSlide = buildCardForOffset(todayCardOffset + 1);
-      nextSlide.classList.add("carousel-slide");
-    } else {
-      nextSlide = document.createElement("div");
-      nextSlide.className = "carousel-slide spacer";
-    }
-    track.appendChild(nextSlide);
-
-    viewport.appendChild(track);
-    todayWrap.appendChild(viewport);
-
-    var nextBtn = document.createElement("button");
-    nextBtn.className = "today-nav today-nav-next";
-    nextBtn.textContent = ">";
-    nextBtn.setAttribute("aria-label", "Next day");
-    nextBtn.disabled = todayCardOffset === 0;
-    nextBtn.addEventListener("click", function () {
-      if (carouselAnimating || todayCardOffset === 0) return;
-      animateCarousel(1);
-    });
-    todayWrap.appendChild(nextBtn);
-
-    appEl.appendChild(todayWrap);
+    appEl.appendChild(renderCard("1", "List 1",
+      { fixed: true, randomizerTarget: "1" }));
 
     // List 2: fixed card, two lists (2 top, 2.5 bottom) split by
     // a divider, with Randomizer on list 2.
@@ -1148,133 +832,7 @@
     appEl.appendChild(renderCard("trash", "Trash",
       { collapsible: true, kind: "trash" }));
 
-    // measured last, after every card is appended, so this doesn't force
-    // layout while #app is still artificially short
-    track.style.transform =
-      "translateX(" + (CAROUSEL_PEEK - carouselStepPx(viewport)) + "px)";
-
-    var currentHeight = currentSlide.getBoundingClientRect().height;
-    prevSlide.style.maxHeight = currentHeight + "px";
-    prevSlide.style.overflow = "hidden";
-    if (todayCardOffset < 0) {
-      nextSlide.style.maxHeight = currentHeight + "px";
-      nextSlide.style.overflow = "hidden";
-    }
-
     updateNextNote();
-  }
-
-  /**
-   * Computes the pixel distance the carousel track must translate to move one
-   * slide over. `translate()` percentages resolve against the track's own
-   * width, not the viewport, so this has to come from a real DOM measurement
-   * rather than a fixed percentage.
-   * @param {Element} viewportEl - the `.today-carousel-viewport` element.
-   * @returns {number} pixel step for one slide.
-   */
-  function carouselStepPx(viewportEl) {
-    var cw = viewportEl.getBoundingClientRect().width;
-    return (cw - 2 * CAROUSEL_PEEK) + CAROUSEL_GAP;
-  }
-
-  var CARD_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
-                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  var CARD_DOWS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-  /**
-   * Formats a carousel card's date label, e.g. "Jul 08 Wed".
-   * @param {number} offset - days from today (0 = today, -1 = yesterday).
-   * @returns {string} the formatted label.
-   */
-  function formatCardDate(offset) {
-    var d = getNow();
-    d.setDate(d.getDate() + offset);
-    var day = String(d.getDate());
-    if (day.length < 2) day = "0" + day;
-    return CARD_MONTHS[d.getMonth()] + " " + day + " " + CARD_DOWS[d.getDay()];
-  }
-
-  /**
-   * Builds the DOM for one carousel slide.
-   * @param {number} offset - days from today for this slide.
-   * @returns {Element} the real Today card (offset 0) or an empty placeholder
-   *   card (any other offset).
-   */
-  function buildCardForOffset(offset) {
-    if (offset === 0) return buildTodayRealCard();
-    return buildPastDayCard(offset);
-  }
-
-  /**
-   * Builds the live Today card: its head, list "-1" (no adder of its own —
-   * populated by rollover from Recurring, not by hand), the two lists
-   * ("0" and "1") split by a divider, and the adder row (hidden while the
-   * today-targeted randomizer is active). List "-1" sits outside the
-   * randomizer/count scope.
-   * @returns {Element} the assembled Today card section.
-   */
-  function buildTodayRealCard() {
-    var today = document.createElement("section");
-    today.className = "card today-card list fixed";
-    today.appendChild(buildHead("today", "Today | " + formatCardDate(0),
-    { fixed: true, countKeys: ["0", "1"],
-      randomizerTarget: "today" }));
-
-    var list_1 = document.createElement("ul");
-    list_1.className = "items";
-    fillList(list_1, "-1", false);
-    today.appendChild(list_1);
-
-    var divBasics = document.createElement("div");
-    divBasics.className = "divider";
-    today.appendChild(divBasics);
-
-    var list0 = document.createElement("ul");
-    list0.className = "items";
-    fillList(list0, "0", true);
-    today.appendChild(list0);
-
-    var div = document.createElement("div");
-    div.className = "divider";
-    today.appendChild(div);
-
-    var list1 = document.createElement("ul");
-    list1.className = "items";
-    fillList(list1, "1", true);
-    today.appendChild(list1);
-
-    if (!(randomizer.active && randomizer.target === "today")) {
-      today.appendChild(buildAdder("1"));
-    }
-
-    return today;
-  }
-
-  /**
-   * Animates the carousel one slide over, then swaps the underlying day and
-   * snaps the track back to its resting (centered) transform with no
-   * transition, ready for the next step.
-   * @param {number} step - +1 to advance a day, -1 to go back a day.
-   */
-  function animateCarousel(step) {
-    var track = appEl.querySelector(".today-carousel-track");
-    if (!track) return;
-    var stepPx = carouselStepPx(track.parentElement);
-    carouselAnimating = true;
-    track.classList.add("anim");
-    void track.offsetWidth;
-    var targetPx;
-    if (step < 0) {
-      targetPx = CAROUSEL_PEEK;
-    } else {
-      targetPx = CAROUSEL_PEEK - 2 * stepPx;
-    }
-    track.style.transform = "translateX(" + targetPx + "px)";
-    setTimeout(function () {
-      todayCardOffset += step;
-      carouselAnimating = false;
-      render();
-    }, 280);
   }
 
   /**
@@ -1283,7 +841,7 @@
    * @param {Element} ul - the `<ul class="items">` to fill.
    * @param {string} key - the `state.lists` key to render rows for.
    * @param {boolean} [isRandomizerList] - true for lists that support the
-   *   randomizer (lists 0/1 on the Today card, list 2.5 on List 2).
+   *   randomizer (list 2.5, sharing List 2's own randomizer target).
    */
   function fillList(ul, key, isRandomizerList) {
     var ids = state.lists[key];
@@ -1294,323 +852,15 @@
       ul.appendChild(empty);
       return;
     }
-    var listTarget = (key === "2.5") ? "2" : "today";
     ids.forEach(function (id) {
       var item = state.itemsById[id];
       if (isRandomizerList && randomizer.active
-        && randomizer.target === listTarget && !item.isDone) {
+        && randomizer.target === "2" && !item.isDone) {
         ul.appendChild(buildRandomizerRow(item));
         return;
       }
       ul.appendChild(buildMainRow(key, item));
     });
-  }
-
-  /**
-   * Builds a fixed, non-swipeable card for a past day's snapshot, with
-   * one list per `PAST_LIST_KEYS` and an adder row at the bottom.
-   * @param {number} offset - day offset from today (negative = past).
-   * @returns {Element} the card `<section>`.
-   */
-  function buildPastDayCard(offset) {
-    var d = getNow();
-    d.setDate(d.getDate() + offset);
-    var dateKey = dateKeyFor(d);
-    var day = state.pastDaysByDate[dateKey];
-
-    var card = document.createElement("section");
-    card.className = "card today-card list fixed";
-    card.appendChild(buildHead(
-      "past:" + dateKey,
-      formatCardDate(offset),
-      { fixed: true, noCount: true }
-    ));
-
-    PAST_LIST_KEYS.forEach(function (listKey, i) {
-      if (i > 0) {
-        var div = document.createElement("div");
-        div.className = "divider";
-        card.appendChild(div);
-      }
-      var ul = document.createElement("ul");
-      ul.className = "items";
-      var items = day ? day[listKey] : [];
-      if (items.length === 0) {
-        var empty = document.createElement("li");
-        empty.className = "empty";
-        empty.textContent = "(empty)";
-        ul.appendChild(empty);
-      } else {
-        items.forEach(function (pi, idx) {
-          ul.appendChild(
-            buildPastItemRow(dateKey, listKey, idx, pi)
-          );
-        });
-      }
-      card.appendChild(ul);
-    });
-
-    card.appendChild(buildPastItemAdder(dateKey));
-    return card;
-  }
-
-  /**
-   * Builds a single row for a past-day snapshot item: checkbox, label
-   * (with inline note editing/expansion), edit pencil, and hamburger menu.
-   * @param {string} dateKey - the past day's date key.
-   * @param {string} listKey - the list within that day.
-   * @param {number} idx - index of the item within the list array.
-   * @param {Object} pastItem - the snapshot item to render.
-   * @returns {Element} the `<li>` row.
-   */
-  function buildPastItemRow(
-    dateKey, listKey, idx, pastItem
-  ) {
-    var li = document.createElement("li");
-    li.className = "item";
-    if (pastItem.isDone) {
-      li.className += " done";
-    }
-    var noteKey = pastNoteKey(dateKey, listKey, idx);
-    li.dataset.pastNote = noteKey;
-
-    li.appendChild(buildCheck(
-      pastItem.isDone,
-      function () {
-        togglePastItemDone(dateKey, listKey, idx);
-      }
-    ));
-    if (isBuyItem(pastItem)) {
-      li.appendChild(buildBuyTag());
-    }
-
-    var wrap = document.createElement("div");
-    wrap.className = "label-wrap";
-
-    var label = document.createElement("span");
-    label.className = "label";
-    label.textContent = pastItem.text;
-    if (pastItem.note) {
-      var marker = document.createElement("span");
-      marker.className = "note-marker";
-      marker.textContent = "*";
-      label.appendChild(marker);
-    }
-    wrap.appendChild(label);
-
-    if (editingPastNote
-      && editingPastNote.dateKey === dateKey
-      && editingPastNote.listKey === listKey
-      && editingPastNote.idx === idx
-      && !editingPastNoteMounted) {
-      editingPastNoteMounted = true;
-      var ta = document.createElement("textarea");
-      ta.className = "item-note-edit";
-      ta.value = pastItem.note || "";
-      ta.placeholder = "Add a note...";
-      ta.rows = 1;
-      wrap.appendChild(ta);
-      var autoSize = function () {
-        ta.style.height = "auto";
-        ta.style.height = ta.scrollHeight + "px";
-      };
-      ta.addEventListener("input", autoSize);
-      setTimeout(function () {
-        autoSize();
-        ta.focus();
-        ta.setSelectionRange(
-          ta.value.length, ta.value.length
-        );
-      }, 0);
-      var committed = false;
-      var commit = function () {
-        if (committed) return;
-        committed = true;
-        editingPastNote = null;
-        editPastItemNote(
-          dateKey, listKey, idx, ta.value
-        );
-      };
-      ta.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
-          commit();
-        } else if (e.key === "Escape") {
-          committed = true;
-          editingPastNote = null;
-          render();
-        }
-      });
-      ta.addEventListener("blur", commit);
-    } else if (pastItem.note
-      && expandedPastNote === noteKey) {
-      var noteEl = document.createElement("div");
-      noteEl.className = "item-note";
-      noteEl.textContent = pastItem.note;
-      wrap.appendChild(noteEl);
-    }
-
-    wrap.addEventListener("click", function (e) {
-      if (e.target.closest("button")
-        || e.target.closest(".label-edit")
-        || e.target.closest(".item-note-edit")) {
-        return;
-      }
-      if (!pastItem.note) return;
-      if (expandedPastNote === noteKey) {
-        expandedPastNote = null;
-      } else {
-        expandedPastNote = noteKey;
-      }
-      render();
-    });
-
-    li.appendChild(wrap);
-
-    var actions = document.createElement("div");
-    actions.className = "row-actions";
-
-    var pencil = mkMini("✎", "Edit");
-    pencil.addEventListener("click", function () {
-      startPastEdit(
-        li, dateKey, listKey, idx, pastItem
-      );
-    });
-    actions.appendChild(pencil);
-
-    actions.appendChild(
-      buildPastHamburger(dateKey, listKey, idx)
-    );
-
-    li.appendChild(actions);
-    return li;
-  }
-
-  /**
-   * Swaps a past-item row's label for an editable text input in place.
-   * @param {Element} li - the row element containing the label.
-   * @param {string} dateKey - the past day's date key.
-   * @param {string} listKey - the list within that day.
-   * @param {number} idx - index of the item within the list array.
-   * @param {Object} pastItem - the snapshot item being edited.
-   */
-  function startPastEdit(
-    li, dateKey, listKey, idx, pastItem
-  ) {
-    var label = li.querySelector(".label");
-    if (!label || li.querySelector(".label-edit")) {
-      return;
-    }
-    var input = document.createElement("input");
-    input.className = "label-edit";
-    input.type = "text";
-    input.value = pastItem.text;
-    label.replaceWith(input);
-    input.focus();
-    input.setSelectionRange(
-      input.value.length, input.value.length
-    );
-    var committed = false;
-    var commit = function () {
-      if (committed) return;
-      committed = true;
-      editPastItemText(
-        dateKey, listKey, idx, input.value
-      );
-      if (!input.value.trim()) render();
-    };
-    input.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") {
-        commit();
-      } else if (e.key === "Escape") {
-        committed = true;
-        render();
-      }
-    });
-    input.addEventListener("blur", commit);
-  }
-
-  /**
-   * Builds the "more options" menu button for a past-item row, with
-   * "Edit note" and "Delete" actions.
-   * @param {string} dateKey - the past day's date key.
-   * @param {string} listKey - the list within that day.
-   * @param {number} idx - index of the item within the list array.
-   * @returns {Element} the menu-anchor wrapper.
-   */
-  function buildPastHamburger(dateKey, listKey, idx) {
-    var wrap = document.createElement("div");
-    wrap.className = "menu-anchor";
-    var btn = mkMini("☰", "More options");
-    btn.addEventListener("click", function (e) {
-      e.stopPropagation();
-      if (menuOpenBtn === btn) {
-        closeAllMenus();
-        return;
-      }
-      closeAllMenus();
-      menuOpenBtn = btn;
-      var menu = document.createElement("div");
-      menu.className = "item-menu";
-
-      var note = document.createElement("button");
-      note.textContent = "Edit note";
-      note.addEventListener("click", function () {
-        closeAllMenus();
-        startPastNoteEdit(dateKey, listKey, idx);
-      });
-      menu.appendChild(note);
-
-      var del = document.createElement("button");
-      del.className = "danger";
-      del.textContent = "Delete";
-      del.addEventListener("click", function () {
-        closeAllMenus();
-        deletePastItem(dateKey, listKey, idx);
-      });
-      menu.appendChild(del);
-
-      var rect = btn.getBoundingClientRect();
-      menu.style.top = (rect.bottom + 4) + "px";
-      menu.style.right =
-        (window.innerWidth - rect.right) + "px";
-      document.body.appendChild(menu);
-    });
-    wrap.appendChild(btn);
-    return wrap;
-  }
-
-  /**
-   * Builds the text-input + "Add" button row for adding a manual item
-   * to a past day's list "0".
-   * @param {string} dateKey - the past day's date key.
-   * @returns {Element} the adder row.
-   */
-  function buildPastItemAdder(dateKey) {
-    var adder = document.createElement("div");
-    adder.className = "adder";
-    var input = document.createElement("input");
-    input.type = "text";
-    input.placeholder = "Add...";
-    input.setAttribute(
-      "aria-label", "Add a past item"
-    );
-    var addBtn = document.createElement("button");
-    addBtn.className = "primary";
-    addBtn.textContent = "Add";
-    var commit = function () {
-      var v = input.value.trim();
-      if (!v) return;
-      addPastItem(dateKey, v);
-      input.value = "";
-    };
-    addBtn.addEventListener("click", commit);
-    input.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") commit();
-    });
-    adder.appendChild(input);
-    adder.appendChild(addBtn);
-    return adder;
   }
 
   /**
@@ -2196,14 +1446,6 @@
       expandedNote = null;
       render();
     }
-    if (expandedPastNote && !editingPastNote
-      && !e.target.closest(
-        ".item[data-past-note=\""
-        + expandedPastNote + "\"]"
-      )) {
-      expandedPastNote = null;
-      render();
-    }
   });
 
   /**
@@ -2758,7 +2000,7 @@
   // ---------------------------- recurrence editor ----------------------------
   var RECURRENCE_SCHEMA_TEXT = [
     "recurrence = null | {",
-    "  destination: \"-1\" | \"1\" | \"2.5\", paused: boolean,",
+    "  destination: \"0\" | \"1\" | \"2.5\", paused: boolean,",
     "  rule:",
     "    { type: \"daily\" }",
     "      // fires every single day unconditionally",
@@ -2795,8 +2037,8 @@
    */
   function validateRecurrence(r) {
     if (!r || typeof r !== "object") return "Recurrence must be an object.";
-    if (["-1", "1", "2.5"].indexOf(r.destination) === -1) {
-      return "destination must be \"-1\", \"1\", or \"2.5\".";
+    if (["0", "1", "2.5"].indexOf(r.destination) === -1) {
+      return "destination must be \"0\", \"1\", or \"2.5\".";
     }
     if (typeof r.paused !== "boolean") {
       return "paused must be true or false.";
@@ -2832,12 +2074,12 @@
 
   /**
    * Builds a 3-way segmented toggle for the recurrence destination
-   * list key ("-1", "1", or "2.5").
+   * list key ("0", "1", or "2.5").
    * @returns {{el: Element, getValue: function(): (string|null),
    *   setValue: function(string)}} the control.
    */
   function buildDestToggle() {
-    var vals = ["-1", "1", "2.5"];
+    var vals = ["0", "1", "2.5"];
     var wrap = document.createElement("div");
     wrap.className = "rec-dest-toggle";
     var btns = [];
@@ -4345,12 +3587,12 @@
   /**
    * Re-runs the effects that depend on "now" after the debug override changes:
    * refreshes the status line, purges stale trash, applies any auto-return
-   * that's now due, and re-renders.
+   * whose boundary has passed, and re-renders.
    */
   function applyDebugNowChange() {
     updateDebugNowStatus();
     purgeTrash();
-    applyRollover();
+    placeRecurringItems();
     applyAutoReturn();
     render();
   }
@@ -4392,7 +3634,7 @@
   initTheme();
   initDebugNowPanel();
   purgeTrash();
-  applyRollover();
+  placeRecurringItems();
   applyAutoReturn();
   syncScheduleInputs();
   updateLastExported();
@@ -4401,7 +3643,7 @@
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden) {
       purgeTrash();
-      applyRollover();
+      placeRecurringItems();
       applyAutoReturn();
       render();
       refreshUndoRedoButtons();

@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>AutoReList</title>
 <link rel="stylesheet" href="style-minim.css">
-<link rel="stylesheet" href="swipe-nav.css">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#4a6f8a">
@@ -14,6 +13,8 @@
 </script>
 </head>
 <body>
+  <a class="page-nav-top" href="falsedge.html">&uarr; Go to Falsedge &uarr;</a>
+
   <header class="app">
     <h1>Lists</h1>
     <button id="refreshBtn" class="refresh">Refresh</button>
@@ -82,7 +83,6 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="autorelists.js"></script>
-<script src="swipe-nav.js" data-direction="down" data-neighbor="colourcaln.html" data-label="swipe down again for Day colours"></script>
 <script>
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js");

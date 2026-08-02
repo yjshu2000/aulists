@@ -57,8 +57,6 @@ New files: `falsedge.html`, `falsedge.js`, `style-falsedge.css`.
 
 ### Navigation wiring
 
-- `index.html:85` swipe-nav neighbor → `falsedge.html`
-- `falsedge.html` swipe-nav neighbor → `index.html`
 - `sw.js` `SHELL` array: drop `colourcaln.html`/`colourcaln.js`, add `falsedge.html`/`falsedge.js`/`style-falsedge.css`, bump `CACHE` version.
 
 ### List 0 linking
@@ -76,7 +74,18 @@ Single scrolling page, collapsible sections.
 ### Top-to-bottom order
 
 1. **Ledger + Data export**
-   - 1a. **Ledger** — above everything else, growing upward (newest entry closest to the header, older entries above, scroll up for history). Collapsed by default. Each entry renders with the same visual layout as a just-completed active task: text + "completed at [time] for [pts] pts" with a timestamp.
+   - 1a. **Ledger** — above everything else. Its own collapse toggle sits at the bottom of the ledger region (opposite every other collapsible section, whose toggle sits at the top) — that's the "header" the rest of this line means. Growing upward: newest entry closest to that toggle, older entries above it, scroll up for history. Collapsed by default. Each entry renders with the same visual layout as a just-completed active task: 
+   
+   (task text) 
+   completed by: (datetime OR "none ()")
+   pts = 42 + 6 = 48
+   scr = 127 + 6 = 133
+
+      - cancelled tasks get "none (cancelled)". 
+      - failed (didn't finish by deadline) tasks get "none (failed)". 
+      - datetime format: YYYY-MM-DD HH:MM
+      - each entry gets its own round-box outline. 
+
    - 1b. **Data export** — nested inside the ledger, just below the newest entry. Can be uncollapsed only once the ledger itself is uncollapsed. Markdown export from day one, chunked at 2000 characters, boundaries quantized to whole ledger entries. Additional options (e.g. export + delete) and exact markdown format are TBD.
 
 2. **Current pts / Current scr** — plain text. Tapping either uncollapses a full scores view (current run + high scores) inline.
@@ -98,7 +107,11 @@ by 17:00 for 1 pts                         ← smaller/fainter (upcoming)
 completed before: [16:00] [16:10]          ← only times already passed
 ```
 
-As each tier's deadline passes, it goes smaller/fainter and the next tier becomes normal-sized (the active one). WL tiers: 0/10/30/60 min after deadline → 6/3/2/1 pts. HL tiers: 0/5/15/30 min → 6/3/2/1 pts. All tasks are worth 6 pts at the primary deadline. `completed before:` shows clickable time buttons, only for tiers whose time has already passed.
+As each tier's deadline passes, it goes smaller/fainter and the next tier becomes normal-sized (the active one). 
+WL tiers: 0/10/30/60 min after deadline → 6/3/2/1 pts. 
+HL tiers: 0/5/15/30 min → 6/3/2/1 pts. 
+All tasks are worth 6 pts at the primary deadline. 
+`completed before:` shows clickable time buttons, only for tiers whose time has already passed. The purpose is if a task was completed before a time but is being reported later than that time. 
 
 4. **SET** box:
 
@@ -110,7 +123,7 @@ by [17:00] [17:10] [17:20] [17:30] [18:00]  or select [dropdown ▾]
 ↑ not small
 ```
 
-Time-template buttons show actual computed clock times (each rounded up to the next 10-min mark), computed from: +30min, +40min, +50min, +1h, at next hour. Clicking a button updates the dropdown to that time. The dropdown is the single source of truth for the selected deadline. Dropdown shows 10-min increments starting at the next-next 10-min mark from now (e.g. 16:27 → starts at 16:40). WL/HL toggle pair: mutually exclusive, either or neither active.
+Time-template buttons show actual computed clock times (each rounded up to the next 10-min mark), computed from: +30min, +40min, +50min, +1h, at next hour. Clicking a button updates the dropdown to that time. The dropdown is the single source of truth for the selected deadline. Dropdown shows 10-min increments starting at the next-next 10-min mark from now (e.g. 16:27 → starts at 16:40). WL/HL toggle pair: mutually exclusive; can be either or neither (must be either to set the task).
 
 5. **ACTIVATE** box — Falsedge's recurring templates. Timed templates sorted by next-closest occurrence (wrapping around midnight). Untimed templates listed after — sort order TBD.
 
@@ -131,12 +144,14 @@ job search stuff                          [Link]
 
 Each item has only a `Link` button (no checkbox, menu, or pencil — those live in Aulists). Clicking Link prefills the SET box's text field with the item's text; time is left blank.
 
-## Verification
+## pts system ACTUALLY EXPLAINED
 
-Manual in-browser testing only.
+- points and score are equivalent 1:1. 
+- score gets reset sometimes. (streak feature; not in scope yet - a score resetting puts the last score in highscores list)
+- points can be spent. also not in scope yet. 
+- basically, score only goes up unless reset (never subtracted); points only go up unless subtracted (never reset)
 
-- **Lists page**: List 0 and List 1 render as two separate cards. Completing an item unlinks it from its list and it shows in Completed. Recurring items with destination `0`/`1`/`2.5` auto-place on the next render once their rule is due.
-- **Navigation**: swiping down from Lists opens Falsedge; swiping up from Falsedge returns to Lists; `about.html` still renders correctly.
-- **Falsedge core**: create a task via time-template button and via the manual dropdown; toggle WL/HL through all three states (WL, HL, neither); confirm deadline-tier text transitions as simulated time crosses each threshold; complete a task and confirm it lands in the ledger with correct pts and timestamp; undo/redo restores Falsedge state correctly.
-- **Linking**: add an item to Aulists list 0, confirm it shows in Falsedge's LINK section, link it, confirm SET box prefills with its text, edit text before completing and confirm the Aulists item updates too, complete the task and confirm further edits stop syncing.
-- **Export**: with enough ledger entries to exceed 2000 chars, Markdown export splits into multiple chunks with none cut mid-entry.
+- Leniency:
+  - WL = whole leniency. the base: up to 1h leniency from the deadline, in steps of +10, +30, and +60. there is NO MORE LENIENCY AFTER THE FINAL LENIENCY DEADLINE. 
+  - HL = half leniency. 
+  - NL = no leniency. not in scope yet. 

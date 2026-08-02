@@ -83,6 +83,21 @@ header.app h1 {
   font-size: 1.5rem; font-weight: 700; letter-spacing: 0.02em; margin: 0; color: var(--ink);
 }
 
+.page-nav-top {
+  position: fixed;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex; align-items: center;
+  min-height: var(--tap); padding: 0 16px;
+  font-size: 0.9rem; font-weight: 600; text-decoration: none;
+  color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  box-shadow: 0 2px 10px var(--shadow);
+  z-index: 60;
+}
+
 
 button {
   font: inherit; color: var(--ink); background: var(--surface);

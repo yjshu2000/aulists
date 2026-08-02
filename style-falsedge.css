@@ -1,0 +1,20 @@
+  body {
+    font-family: monospace;
+  }
+  h1, h2, h3, .card-title h2 {
+    font-family: "Space Mono", monospace;
+  }
+
+  .page-nav-top {
+    position: fixed;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    display: flex; align-items: center;
+    min-height: 44px; padding: 0 16px;
+    font-size: 14px; font-weight: 600; text-decoration: none;
+    color: var(--text); background: var(--panel); border: 1px solid var(--line);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    z-index: 60;
+  }

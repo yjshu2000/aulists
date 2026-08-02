@@ -1,16 +1,15 @@
-const CACHE = 'aulists-v2';
+const CACHE = 'aulists-v3';
 const SHELL = [
   './',
   './index.html',
-  './colourcaln.html',
+  './falsedge.html',
   './about.html',
   './style-minim.css',
   './style-colourful.css',
+  './style-falsedge.css',
   './style-about.css',
-  './swipe-nav.css',
   './autorelists.js',
-  './colourcaln.js',
-  './swipe-nav.js',
+  './falsedge.js',
   './manifest.json',
   './icon.svg'
 ];
