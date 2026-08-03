@@ -14,6 +14,8 @@ Working record of every question asked and answered while spec'ing Phase 3. This
 
 **S5. Ask style.** Over-ask, never under-ask. One question at a time. Enumerate every possible interpretation, never assume anything is obvious.
 
+**S6. Naming.** ACTIVATE is the section label — the verb. The things in it are **templates**. LINK is the section label. The things in it are **linkables**.
+
 ## Q1 — How many active tasks can exist at once?
 
 **Exactly one.**
@@ -30,14 +32,27 @@ Working record of every question asked and answered while spec'ing Phase 3. This
 - Exits: `complete now`, `completed before: [time]`, `cancel`.
 - `complete now` after the final leniency tier awards 0 pts and logs as `none (failed)`.
 
-## Q3 — What is an ACTIVATE template?
+## Q3 — What is a template?
 
 **A pure preset — `text` + required `time` (time-of-day only) + optional default WL/HL.**
 
 - Always listed, never expires, no dates, no recurrence rules.
 - Every template must have a time. The adder refuses to create one without it, and the row's time control has no empty state.
 - The row always displays the real time, e.g. `by 19:00`.
-- **Sort order is still being worked out.** The current direction is a sort key of `time - 1h`, ascending from now with midnight wraparound, so a template surfaces about an hour before its time and sits at the top whenever nothing else is closer. Not final.
+
+### Q3.1 — How are templates ordered?
+
+**Manually, by lap counter. The list never moves on its own.**
+
+- Base order is plain ascending clock time, `00:00` at the top through `23:59` at the bottom. It does not reference `now`.
+- Each template carries a `lap` counter. Sort by `(lap, time)` — everything on lap 0 sits above everything on lap 1.
+- **Swipe right** (left→right) on the **first row only** increments that template's `lap`, sending it to the bottom. Rows below the first are not swipe-right-able. The hamburger's `Skip` does the same thing and is available on every row.
+- Because `Skip` works anywhere, laps can drift more than one apart and the order stops being a strict rotation. That is fine — the daily reset is what restores plain ascending order.
+- Wrap-around is free: once every template has been bumped to the same lap, ties fall back to time and the order returns to plain ascending.
+- A newly added template gets `lap: 0`, so it slots into the un-bumped group by its time with no special handling.
+- Ties on `(lap, time)` fall to creation order. New templates are pushed onto the end of `templates`, and `Array.prototype.sort` is stable, so equal elements keep their array order with no third comparison term.
+- All laps reset to `0` when the day changes. State stores a `rotationDate` day key; on render, if it isn't today, reset every `lap` and update the key. Evaluated on render rather than at midnight, since there are no timers.
+- This is visual only. It is not a boundary and does not interact with undo.
 
 ## Q4 — How do templates get created, edited, and deleted?
 
@@ -48,32 +63,33 @@ check in after getting home
 [19:00 ▾]  [WL] [HL]  [☰]
 ```
 
-- **Swipe left** (right→left) on a template row prefills SET. No `[^]` button.
-- **Hamgur** at the end of the control row; menu is `Activate` / `Edit` / `Delete`. No pencil icon. Activate does the same thing as swipe left (for desktop testing compatibility).
+- **Swipe left** (right→left) on any template row prefills SET. Every row, unlike swipe-right. No `[^]` button.
+- **Hamgur** at the end of the control row; menu is `Activate` / `Skip` / `Edit` / `Delete`. No pencil icon. `Activate` does the same thing as swipe left, `Skip` the same thing as swipe right (both for desktop testing compatibility).
+- `Skip` is enabled on **every** row, not just the first. On a row that is already last it bumps the lap but produces no visible movement.
 - **Time** edited by tapping the inline dropdown on the row.
 - **Adder** at the bottom of the ACTIVATE box, Aulists-style.
 
-### Q4.0 — Which fields does the prefill carry into SET?
+### Q4.1 — Which fields does the prefill carry into SET?
 
 **Text, time, and WL/HL — but WL/HL only when the template has one set.**
 
 - A template with `WL` set arrives in SET with `WL` lit.
 - A template with neither set leaves SET's existing WL/HL selection alone rather than clearing it.
 
-### Q4.1 — What's the exact row format, what does the adder create, and where does the WL/HL default live?
+### Q4.2 — What's the exact row format, and what does the adder create?
 
 Two lines: text on its own line, then a control row of `[time dropdown] [WL] [HL] [hambugu]`.
 
 The adder mirrors the full row shape: text field, then time dropdown + WL/HL toggles.
 
-### Q4.2 — How does the row's WL/HL control work?
+### Q4.3 — How does the row's WL/HL control work?
 
 **Two toggles, `[WL] [HL]`, matching the SET box.**
 
 - Mutually exclusive. Tapping the selected one deselects it back to unset.
 - Unset is represented by neither being lit. There is no third button for it.
 
-### Q4.3 — How tall are the ACTIVATE and LINK sections?
+### Q4.4 — How tall are the ACTIVATE and LINK sections?
 
 **Max-height `40vh` each, scrolling internally past that.**
 
@@ -112,11 +128,11 @@ The adder mirrors the full row shape: text field, then time dropdown + WL/HL tog
 
 ## Q6 — Does Falsedge get a visible undo/redo pill?
 
-**Yes — a full copy of Aulists' pill, restyled.**
+**Yes — a copy of Aulists' pill, restyled, without the boundary mechanism.**
 
-- Pill markup into `falsedge.html`, including the two-tap boundary-confirm mechanism (`pushBoundary` / `pendingBoundary` already exist in `falsedge.js`).
-- Same shape, layout and geometry.
+- Pill markup into `falsedge.html`. Same shape, layout and geometry.
 - Restyled in `style-falsedge.css` off the `style-colourful.css` palette — colourful, glowy.
+- No boundaries. `pushBoundary`, `isBoundary`, `pendingBoundary` and the confirm UI are all removed from `falsedge.js`. See Q31.
 
 ## Q7 — What does `[Link]` actually do to the Aulists item?
 
@@ -145,6 +161,15 @@ The adder mirrors the full row shape: text field, then time dropdown + WL/HL tog
 ### Q7.3 — Which task exits write back to Aulists?
 
 Both completion paths, including the 0-pt failed one. `cancel` writes nothing.
+
+### Q7.4 — Where does a pending link live between `[Link]` and `set task`?
+
+**In the draft, and it survives text edits.**
+
+- Tapping `[Link]` prefills SET's text field and stores the item's id as `setDraft.linkedItemId`. Persisted with the rest of the draft.
+- Editing the text does not break the link. Retyping `vacuum` as `do laundry` still points at the same Aulists item, which gets renamed to match.
+- Nothing is written to `aulists.listdata` while drafting. The rename lands at `set task`, and Q7's live propagation takes over from there.
+- `linkedItemId` moves onto the task at `set task` and is cleared with the draft.
 
 ## Q8 — How far does the SET dropdown run, and can a deadline cross midnight?
 
@@ -250,9 +275,9 @@ No. `getNow()` just returns `new Date()`.
 
 ## Q14 — What persists in the SET box, and when?
 
-**All three fields — text, deadline, WL/HL.**
+**All three fields — text, deadline, WL/HL — plus any pending link.**
 
-- `state.setDraft` holds `{text, time, mode}`, written on every change, restored on render.
+- `state.setDraft` holds `{text, time, mode, linkedItemId}`, written on every change, restored on render.
 - On restore, if the saved deadline is now in the past it silently falls back to the dropdown's first available option; text and WL/HL survive intact.
 - Cleared on successful SET.
 
@@ -265,12 +290,12 @@ No. `getNow()` just returns `new Date()`.
 
 ## Q16 — What blocks a task from being set?
 
-**Both missing-field cases are hard blocks, each with its own toast.**
+**Each failure is a hard block with its own toast.**
 
 - Empty text → `Task needs text`.
 - Neither WL nor HL selected → `Pick WL or HL`.
 - Deadline less than 20 minutes from now → rejected. The dropdown never offers one, so this only fires on a stale page.
-- Nothing is set in either case. No silent defaulting.
+- Nothing is set in any case. No silent defaulting.
 - A now-past deadline is handled separately, see Q12.1.
 
 ## Q17 — What is the Falsedge header layout?
@@ -306,7 +331,7 @@ A flex row, same shape as Aulists' header: `Falsedge` title left, `Refresh` butt
 
 **Templates and the active task. Nothing else.**
 
-- Templates are displayed sorted by time-of-day from now, wrapping midnight, so a row's visual position is not its array index. Look templates up with `templates.find(t => t.id === id)`. Never index into the array to mutate one.
+- Templates are displayed sorted by `(lap, time)`, so a row's visual position is not its array index. Look templates up with `templates.find(t => t.id === id)`. Never index into the array to mutate one.
 - The active task gets an id so that allowing several simultaneous active tasks later needs no migration.
 - Ledger entries stay bare strings in an array, addressed by position. Append at one end, delete in batches from the other.
 
@@ -341,10 +366,12 @@ Undo does `state = JSON.parse(JSON.stringify(snapshot))`, replacing every object
   highScores: [],              // [{score, date}], top 10, sorted desc
   ledger: [],                  // bare strings, oldest first
   activeTask: null,            // {id, text, deadline, mode, linkedItemId}
-  templates: [],               // [{id, text, time, mode}]
-  setDraft: {text: "", time: null, mode: null},
+  templates: [],               // [{id, text, time, mode, lap}]
+  rotationDate: null,          // day key; laps reset when it isn't today
+  setDraft: {text: "", time: null, mode: null, linkedItemId: null},
   lastCopyAt: null,            // ISO string, gates [Delete exported]
-  ledgerCollapsed: true
+  ledgerCollapsed: true,
+  exportCollapsed: true
 }
 ```
 
@@ -403,6 +430,18 @@ Top-right corner of the active task area, above the task text.
 
 A small chain-link emoji [🔗] beside the task text, rendered only when `linkedItemId` is set. No unlink control.
 
+### Q28.1 — How does the SET box show the draft is linked?
+
+**🔗 to the right of the text field, plus the source row highlighted in LINK.**
+
+- The glyph sits outside the text field, right-aligned on that row.
+- The linkable row the link came from stays visually marked in the LINK section for as long as its id is in `setDraft`.
+- Both appear only while `setDraft.linkedItemId` is set.
+
+```
+[ vacuum                                        ] 🔗
+```
+
 ## Q29 — What do the five SET time buttons compute?
 
 **Buttons 1-4 are `now +30 / +40 / +50 / +60` minutes, each rounded up to the next 10-minute mark. Button 5 is the smallest whole hour strictly greater than button 4.**
@@ -416,3 +455,49 @@ A small chain-link emoji [🔗] beside the task text, rendered only when `linked
 | 16:23 | 17:00 | 17:10 | 17:20 | 17:30 | 18:00 |
 | 16:50 | 17:20 | 17:30 | 17:40 | 17:50 | 18:00 |
 | 16:55 | 17:30 | 17:40 | 17:50 | 18:00 | 19:00 |
+
+## Q30 — Does Falsedge get a theme toggle?
+
+**No. Themes are out of scope.**
+
+- Falsedge uses `style-colourful.css`'s palette as-is. No toggle, no alternate palettes, no reading of `aulists.theme`.
+- Lists keeps its own switcher, unchanged.
+- Future themes will be named variants rather than a light/dark pair. Not in scope yet.
+
+## Q31 — What does Falsedge do with boundaries, and how does undo cover Aulists writes?
+
+**No boundaries. Undo reverses the Aulists write instead.**
+
+Boundaries are dropped entirely. In Aulists, `pushBoundary` has exactly one call site — the scheduled List 2→1 transfer in `applyAutoReturn` — and it exists to flag a state change the *clock* made rather than the user. Falsedge has no clock-driven state changes at all: tier decay, template sorting and the delete gate are display-only, there is no auto-fail, and there are no timers. Every mutation comes from a tap. So `pushBoundary` would have no call site. Remove it, `isBoundary`, `pendingBoundary` and the confirm UI from `falsedge.js`.
+
+Completing a linked task writes into `aulists.listdata`, which Falsedge's own state snapshot does not cover. Undo must reverse that write too, or the Lists item stays completed with no way back.
+
+- An undo entry for a linked completion carries a side-snapshot of just the affected item: `{id, isDone, lastDone, indexInList0}`.
+- Undoing restores those fields in the Aulists blob and re-inserts the id into `lists["0"]` at its recorded index.
+- Best-effort, same drift rules as Q7.2: if the item no longer exists, skip the restore silently. If `lists["0"]` is shorter than the recorded index, append instead.
+- The same applies to the text write-back — an undo entry for a text edit on a linked task carries the previous `text` and restores it.
+
+## Q32 — What do empty sections look like?
+
+**Placeholder text everywhere. Nothing is hidden.**
+
+- Ledger with no entries → `(no entries yet)` where the newest entry would sit, and the toggle reads `ledger (0)`.
+- Data export with an empty ledger → `(nothing to export)`.
+- Scores panel with no high scores → `(no high scores yet)`.
+- LINK with an empty List 0 → `(no linkables)`.
+- Every section still renders. Buttons stay live — see Q32.2.
+
+### Q32.1 — Do the copy actions toast?
+
+**Yes, both, with counts.**
+
+- `Copy from oldest` → `Copied 13 entries`. The count matters because the 2000-char cut point isn't visible.
+- Scores panel Copy icon → `Copied 7 scores`.
+- No special case for empty. The same message renders with a count of zero: `Copied 0 entries`, `Copied 0 scores`.
+
+### Q32.2 — Is `[Copy from oldest]` greyed on an empty ledger?
+
+**No, it stays live.**
+
+- Looks and behaves normally, copies an empty string to the clipboard, and toasts `Copied 0 entries`.
+- Only `[Delete exported]` is ever greyed, and only by its 10-minute gate.
