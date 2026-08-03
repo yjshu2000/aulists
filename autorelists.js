@@ -211,75 +211,83 @@
       var validIds = {};
       if (obj.itemsById && typeof obj.itemsById === "object") {
         Object.keys(obj.itemsById).forEach(function (id) {
-          var it = obj.itemsById[id];
-          if (!it || typeof it.text !== "string") return;
-          var o = { id: id, text: it.text, isDone: false, lastDone: null };
-          if (it.note) o.note = it.note;
-          if (typeof it.isDone === "boolean") o.isDone = it.isDone;
-          if (typeof it.lastDone === "string") o.lastDone = it.lastDone;
-          if (it.recurrence && validateRecurrence(it.recurrence) === null) {
-            o.recurrence = it.recurrence;
-          }
-          s.itemsById[id] = o;
-          validIds[id] = true;
+          try {
+            var it = obj.itemsById[id];
+            if (!it || typeof it.text !== "string") return;
+            var o = { id: id, text: it.text, isDone: false, lastDone: null };
+            if (it.note) o.note = it.note;
+            if (typeof it.isDone === "boolean") o.isDone = it.isDone;
+            if (typeof it.lastDone === "string") o.lastDone = it.lastDone;
+            if (it.recurrence && validateRecurrence(it.recurrence) === null) {
+              o.recurrence = it.recurrence;
+            }
+            s.itemsById[id] = o;
+            validIds[id] = true;
+          } catch (e) {}
         });
       }
-      if (obj.lists) {
-        LIST_KEYS.forEach(function (k) {
-          var arr = obj.lists[k];
-          if (!Array.isArray(arr)) return;
-          arr.forEach(function (id) {
-            if (typeof id === "string" && validIds[id]) {
-              s.lists[k].push(id);
-            }
-          });
-        });
-        if (Array.isArray(obj.lists.trash)) {
-          obj.lists.trash.forEach(function (t) {
-            if (!t || typeof t.id !== "string" || !validIds[t.id]) return;
-            var origin = "3";
-            if (LIST_KEYS.indexOf(t.origin) !== -1) {
-              origin = t.origin;
-            }
-            var deletedAt = getNow().toISOString();
-            if (typeof t.deletedAt === "string") {
-              deletedAt = t.deletedAt;
-            }
-            s.lists.trash.push({
-              id: t.id, origin: origin, deletedAt: deletedAt
+      try {
+        if (obj.lists) {
+          LIST_KEYS.forEach(function (k) {
+            var arr = obj.lists[k];
+            if (!Array.isArray(arr)) return;
+            arr.forEach(function (id) {
+              if (typeof id === "string" && validIds[id]) {
+                s.lists[k].push(id);
+              }
             });
           });
+          if (Array.isArray(obj.lists.trash)) {
+            obj.lists.trash.forEach(function (t) {
+              if (!t || typeof t.id !== "string" || !validIds[t.id]) return;
+              var origin = "3";
+              if (LIST_KEYS.indexOf(t.origin) !== -1) {
+                origin = t.origin;
+              }
+              var deletedAt = getNow().toISOString();
+              if (typeof t.deletedAt === "string") {
+                deletedAt = t.deletedAt;
+              }
+              s.lists.trash.push({
+                id: t.id, origin: origin, deletedAt: deletedAt
+              });
+            });
+          }
         }
-      }
-      if (obj.collapsed) {
-        s.collapsed["3"] = !!obj.collapsed["3"];
-        if (obj.collapsed["4"] === undefined) {
-          s.collapsed["4"] = true;
-        } else {
-          s.collapsed["4"] = !!obj.collapsed["4"];
+      } catch (e) {}
+      try {
+        if (obj.collapsed) {
+          s.collapsed["3"] = !!obj.collapsed["3"];
+          if (obj.collapsed["4"] === undefined) {
+            s.collapsed["4"] = true;
+          } else {
+            s.collapsed["4"] = !!obj.collapsed["4"];
+          }
+          if (obj.collapsed.completed === undefined) {
+            s.collapsed.completed = true;
+          } else {
+            s.collapsed.completed = !!obj.collapsed.completed;
+          }
+          if (obj.collapsed.recurring === undefined) {
+            s.collapsed.recurring = true;
+          } else {
+            s.collapsed.recurring = !!obj.collapsed.recurring;
+          }
+          if (obj.collapsed.trash === undefined) {
+            s.collapsed.trash = true;
+          } else {
+            s.collapsed.trash = !!obj.collapsed.trash;
+          }
         }
-        if (obj.collapsed.completed === undefined) {
-          s.collapsed.completed = true;
-        } else {
-          s.collapsed.completed = !!obj.collapsed.completed;
+      } catch (e) {}
+      try {
+        if (obj.schedule) {
+          var ed = parseInt(obj.schedule.everyDays, 10);
+          var am = parseInt(obj.schedule.atMinutes, 10);
+          if (ed >= 1) s.schedule.everyDays = ed;
+          if (am >= 0 && am < 1440) s.schedule.atMinutes = am;
         }
-        if (obj.collapsed.recurring === undefined) {
-          s.collapsed.recurring = true;
-        } else {
-          s.collapsed.recurring = !!obj.collapsed.recurring;
-        }
-        if (obj.collapsed.trash === undefined) {
-          s.collapsed.trash = true;
-        } else {
-          s.collapsed.trash = !!obj.collapsed.trash;
-        }
-      }
-      if (obj.schedule) {
-        var ed = parseInt(obj.schedule.everyDays, 10);
-        var am = parseInt(obj.schedule.atMinutes, 10);
-        if (ed >= 1) s.schedule.everyDays = ed;
-        if (am >= 0 && am < 1440) s.schedule.atMinutes = am;
-      }
+      } catch (e) {}
       if (typeof obj.lastReturn === "string") s.lastReturn = obj.lastReturn;
       if (typeof obj.lastExported === "string") {
         s.lastExported = obj.lastExported;

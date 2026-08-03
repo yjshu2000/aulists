@@ -32,23 +32,56 @@ Working record of every question asked and answered while spec'ing Phase 3. This
 
 ## Q3 — What is an ACTIVATE template?
 
-**A pure preset — `text` + optional `time` (time-of-day only) + optional default WL/HL.**
+**A pure preset — `text` + required `time` (time-of-day only) + optional default WL/HL.**
 
 - Always listed, never expires, no dates, no recurrence rules.
-- Sorted by time-of-day ascending from now, wrapping past midnight.
+- Every template must have a time. The adder refuses to create one without it, and the row's time control has no empty state.
+- The row always displays the real time, e.g. `by 19:00`.
+- **Sort order is still being worked out.** The current direction is a sort key of `time - 1h`, ascending from now with midnight wraparound, so a template surfaces about an hour before its time and sits at the top whenever nothing else is closer. Not final.
 
 ## Q4 — How do templates get created, edited, and deleted?
 
+- Rows are two-line: text on its own line, controls on a row beneath it.
+
+```
+check in after getting home
+[19:00 ▾]  [WL] [HL]  [☰]
+```
+
 - **Swipe left** (right→left) on a template row prefills SET. No `[^]` button.
-- **Hamburger** on the right; menu is `Edit` / `Delete`. No pencil icon.
+- **Hamgur** at the end of the control row; menu is `Activate` / `Edit` / `Delete`. No pencil icon. Activate does the same thing as swipe left (for desktop testing compatibility).
 - **Time** edited by tapping the inline dropdown on the row.
 - **Adder** at the bottom of the ACTIVATE box, Aulists-style.
 
+### Q4.0 — Which fields does the prefill carry into SET?
+
+**Text, time, and WL/HL — but WL/HL only when the template has one set.**
+
+- A template with `WL` set arrives in SET with `WL` lit.
+- A template with neither set leaves SET's existing WL/HL selection alone rather than clearing it.
+
 ### Q4.1 — What's the exact row format, what does the adder create, and where does the WL/HL default live?
 
-**OPEN — PARKED.** Row sketch is `[text] [time dropdown] [hambugu]` with no room for a WL/HL control. Nothing about the ACTIVATE box gets written to the deliverable until this closes.
+Two lines: text on its own line, then a control row of `[time dropdown] [WL] [HL] [hambugu]`.
 
-## Q5 — Where do high scores come from, and what's in the expanded scores view?
+The adder mirrors the full row shape: text field, then time dropdown + WL/HL toggles.
+
+### Q4.2 — How does the row's WL/HL control work?
+
+**Two toggles, `[WL] [HL]`, matching the SET box.**
+
+- Mutually exclusive. Tapping the selected one deselects it back to unset.
+- Unset is represented by neither being lit. There is no third button for it.
+
+### Q4.3 — How tall are the ACTIVATE and LINK sections?
+
+**Max-height `40vh` each, scrolling internally past that.**
+
+- `40vh` is a maximum, not a fixed height. A section with three rows renders three rows tall.
+- A section only scrolls within itself once its content would exceed 40% of the viewport.
+- Neither section can grow unbounded, so vertical space is never contested and controls can take a full row.
+
+## Q5 — Where do high scores come from?
 
 **A `highScores` array in state, fed by a manual reset button.**
 
@@ -115,7 +148,10 @@ Both completion paths, including the 0-pt failed one. `cancel` writes nothing.
 
 ## Q8 — How far does the SET dropdown run, and can a deadline cross midnight?
 
-24 hours forward, starting at the next-next 10-min mark, wrapping past midnight. Bare `HH:MM` labels, no date marker.
+**24 hours forward, in 10-minute steps, wrapping past midnight. Bare `HH:MM` labels, no date marker.**
+
+- First option is `ceil10(now + 20min)` — always 20 to 29 minutes out.
+- A deadline must be at least 20 minutes from now, so the dropdown never offers one the submit check would reject.
 
 ## Q9 — What's in a ledger entry?
 
@@ -194,9 +230,10 @@ No. `getNow()` just returns `new Date()`.
 
 ## Q13 — Which regions collapse, and does collapse state persist?
 
-**Only the Ledger collapses.**
+**The Ledger, and Data export nested inside it. Nothing else.**
 
-- Its toggle sits at the *bottom* of its region, collapsed by default, Data export nested inside it.
+- The Ledger's toggle sits at the *bottom* of its region. Collapsed by default.
+- Data export sits inside the ledger region with its own toggle, collapsed by default, only reachable once the ledger is expanded.
 - Active task, SET, ACTIVATE and LINK are always fully rendered. No toggles, no persisted collapse state.
 - Scores is not a collapsible region at all — see Q13.1.
 
@@ -221,12 +258,161 @@ No. `getNow()` just returns `new Date()`.
 
 ## Q15 — What is the SET box's submit control?
 
-**OPEN.** The sketch has a text field, five time-template buttons, a dropdown, and the WL/HL pair, and nothing to press.
+**A `[set task]` button on its own line at the bottom of the SET box.**
 
-## Still unasked
+- Regular button size, not full width.
+- Right-aligned.
 
-- `sw.js` `SHELL` array + cache version bump.
-- `about.html` changelog entry.
-- SET validation rules — empty text, neither WL nor HL selected.
-- Falsedge state schema, consolidated.
-- Falsedge header layout (title + Refresh button placement).
+## Q16 — What blocks a task from being set?
+
+**Both missing-field cases are hard blocks, each with its own toast.**
+
+- Empty text → `Task needs text`.
+- Neither WL nor HL selected → `Pick WL or HL`.
+- Deadline less than 20 minutes from now → rejected. The dropdown never offers one, so this only fires on a stale page.
+- Nothing is set in either case. No silent defaulting.
+- A now-past deadline is handled separately, see Q12.1.
+
+## Q17 — What is the Falsedge header layout?
+
+A flex row, same shape as Aulists' header: `Falsedge` title left, `Refresh` button right.
+
+## Q18 — How does `Go to Lists` move to the bottom?
+
+**In-flow, centred, styled as a plain `.btn`.**
+
+- Last element in `<body>`, scrolls with the page. No `position: fixed`.
+- Reuses `.btn` from `style-colourful.css` rather than the pill shape.
+- The old `.page-nav-top` rule comes out of `style-falsedge.css`. Aulists' own top pill is styled in `style-minim.css` and is unaffected.
+
+## Q19 — Does `sw.js` need anything for Phase 3?
+
+**No. `sw.js` is network-first, so `CACHE` never gates content updates.**
+
+- The fetch handler tries the network, caches the fresh response on the way through, and falls back to the cache only when the network fails. Every successful load overwrites the stored copy.
+- `CACHE` only names the bucket that `install` precaches `SHELL` into and that `activate` keeps while deleting all others.
+- `falsedge.html`, `falsedge.js` and `style-falsedge.css` are already in `SHELL`. Phase 3 adds no files.
+- `CACHE` was bumped `aulists-v3` → `aulists-v4` once, to drop orphaned `colourcaln.*` responses left in the old bucket. No routine bumping after that.
+
+## Q20 — How does a ledger entry store its numbers?
+
+**It doesn't. An entry is one pre-rendered string.**
+
+- The whole entry, including the `pts = 42 + 3 = 45` and `scr = 127 + 3 = 130` lines, is built once at the moment the task resolves and stored as text.
+- Rendering prints it. Exporting wraps it in a fence and concatenates.
+- Nothing about a past entry is ever recomputed or reformatted. A later change to the display format leaves existing entries exactly as they were written.
+
+## Q21 — What carries a `uid()`?
+
+**Templates and the active task. Nothing else.**
+
+- Templates are displayed sorted by time-of-day from now, wrapping midnight, so a row's visual position is not its array index. Look templates up with `templates.find(t => t.id === id)`. Never index into the array to mutate one.
+- The active task gets an id so that allowing several simultaneous active tasks later needs no migration.
+- Ledger entries stay bare strings in an array, addressed by position. Append at one end, delete in batches from the other.
+
+### Handler rule
+
+Event handlers must resolve state inside the callback, never capture it when building the element.
+
+```js
+// wrong
+var task = state.activeTask;
+btn.addEventListener("click", function () { completeTask(task); });
+
+// right
+btn.addEventListener("click", function () {
+  var task = state.activeTask;
+  if (!task) return;
+  completeTask(task);
+});
+```
+
+Same for templates: capture the `id` string, then `templates.find(...)` inside the callback.
+
+Undo does `state = JSON.parse(JSON.stringify(snapshot))`, replacing every object in the tree. Anything captured before that points at an object no longer reachable from `state`, and `save()` only serialises `state`, so writes to it vanish silently with no error.
+
+## Q22 — What is the Falsedge state schema, and how does `load()` handle a bad blob?
+
+```js
+{
+  version: 1,
+  pts: 0,
+  scr: 0,
+  highScores: [],              // [{score, date}], top 10, sorted desc
+  ledger: [],                  // bare strings, oldest first
+  activeTask: null,            // {id, text, deadline, mode, linkedItemId}
+  templates: [],               // [{id, text, time, mode}]
+  setDraft: {text: "", time: null, mode: null},
+  lastCopyAt: null,            // ISO string, gates [Delete exported]
+  ledgerCollapsed: true
+}
+```
+
+**`load()` runs a field-by-field `normalise()` behind a single outer try/catch.**
+
+- `normalise()` starts from `freshState()` and copies each field across only if it is the right type, so malformed or partial data degrades per field instead of wiping everything.
+- No per-field try/catch. Falsedge's fields are flat values and arrays with no logic capable of throwing.
+- No corrupt-blob backup key.
+
+## Q23 — What does the ledger look like collapsed?
+
+**The newest entry stays visible, above a toggle carrying the entry count.**
+
+- The single newest entry renders in full above the toggle. Everything older is hidden.
+- The toggle shows the total number of entries, e.g. `ledger (48)`.
+- Expanding grows the region upward, revealing history above the newest entry.
+
+## Q24 — Does the expanded ledger scroll inside itself, or push the page?
+
+**Max-height `66vh`, scrolling internally past that.**
+
+- `66vh` is a maximum, not a fixed height. A short ledger renders only as tall as its entries.
+- The region never exceeds two thirds of the viewport, however many entries exist.
+- History scrolls within the region. The rest of the page does not move.
+
+## Q25 — Is `scr` an integer or a decimal?
+
+**Fractional, displayed to one decimal place. `pts` is a whole-number counter.**
+
+- `pts` ticks up by one for each whole number `scr` crosses. It is tracked incrementally, never derived as `floor(scr)`.
+- `[streak broke]` zeroes `scr` and discards whatever fraction it held. `pts` is untouched, and a reset never decrements it on the way down.
+- Nothing currently awards a fraction — every tier is 6/3/2/1 — so today the two move in lockstep. The rule only matters once fractional awards exist.
+- On a step where `scr` moves but crosses no boundary, the ledger shows the `pts` line as a bare value with no arithmetic:
+
+```
+do task
+by 2026-08-03 16:00 (WL)
+completed by: 16:08
+pts = 20
+scr = 10.1 + 0.8 = 10.9
+```
+
+## Q26 — Where is the cancel control?
+
+Top-right corner of the active task area, above the task text.
+
+## Q27 — How do you edit an active task's text?
+
+**Tap the text, then confirm through an `edit?` overlay.**
+
+- Tapping the task text shows an `edit?` overlay on top of it.
+- Tapping `edit?` turns the text into an inline input in the active task block.
+- Tapping anywhere else dismisses the overlay without entering edit mode.
+
+## Q28 — Is a linked task marked as linked?
+
+A small chain-link emoji [🔗] beside the task text, rendered only when `linkedItemId` is set. No unlink control.
+
+## Q29 — What do the five SET time buttons compute?
+
+**Buttons 1-4 are `now +30 / +40 / +50 / +60` minutes, each rounded up to the next 10-minute mark. Button 5 is the smallest whole hour strictly greater than button 4.**
+
+- Defining button 5 off button 4 rather than off `now` means it can never duplicate button 4.
+- Buttons 1-4 are always 10 minutes apart and rounding preserves that, so they can never collide with each other either.
+
+| now | +30 | +40 | +50 | +1h | next hour |
+|---|---|---|---|---|---|
+| 16:00 | 16:30 | 16:40 | 16:50 | 17:00 | 18:00 |
+| 16:23 | 17:00 | 17:10 | 17:20 | 17:30 | 18:00 |
+| 16:50 | 17:20 | 17:30 | 17:40 | 17:50 | 18:00 |
+| 16:55 | 17:30 | 17:40 | 17:50 | 18:00 | 19:00 |
