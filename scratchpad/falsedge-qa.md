@@ -18,10 +18,14 @@ Working record of every question asked and answered while spec'ing Phase 3. This
 
 ## Q1 — How many active tasks can exist at once?
 
-**Exactly one.**
+**Unlimited. `state.activeTasks` is an array.**
 
-- SET is locked while a task is active.
-- **Cancel** unlocks SET. Distinct from undo: undo = "I mis-set this, erase it"; cancel = "I meant it, I changed my mind" and produces a ledger entry.
+- Every task renders in full — text, tier rows, `[complete now]`, `completed before:`, `[cancel task]`. No cap, no collapsing, no separate scroll region.
+- Sorted by deadline, soonest first. An overdue task stays at the top; nothing sinks when it fails.
+- Each task is a rounded block with a flat background colour distinct from the page. Filled, not outlined — deliberately different from ledger entries, which are outlined.
+- SET never locks. Setting a task appends to the array and it re-sorts on render.
+- The one restriction: two tasks cannot share an exact deadline. `[set task]` refuses with `18:00 overlaps`, regardless of the modes involved.
+- **Cancel** is per task. Distinct from undo: undo = "I mis-set this, erase it"; cancel = "I meant it, I changed my mind" and produces a ledger entry.
 - Cancelled entries read `completed by: none (cancelled)`.
 
 ## Q2 — What triggers the `failed` state, and what happens?
@@ -46,7 +50,7 @@ Working record of every question asked and answered while spec'ing Phase 3. This
 
 - Base order is plain ascending clock time, `00:00` at the top through `23:59` at the bottom. It does not reference `now`.
 - Each template carries a `lap` counter. Sort by `(lap, time)` — everything on lap 0 sits above everything on lap 1.
-- **Swipe right** (left→right) on the **first row only** increments that template's `lap`, sending it to the bottom. Rows below the first are not swipe-right-able. The hamburger's `Skip` does the same thing and is available on every row.
+- **Swipe right** (left→right) on any row increments that template's `lap`, sending it to the bottom. The hamburger's `Skip` does the same thing.
 - Because `Skip` works anywhere, laps can drift more than one apart and the order stops being a strict rotation. That is fine — the daily reset is what restores plain ascending order.
 - Wrap-around is free: whenever every template shares a lap, ties fall back to time and the order is plain ascending again.
 - A newly added template gets `lap: 0`, so it slots into the un-bumped group by its time with no special handling.
@@ -65,7 +69,7 @@ check in after getting home
 
 - **Swipe left** (right→left) on any template row prefills SET. Every row, unlike swipe-right. No `[^]` button.
 - **Hamgur** at the end of the control row; menu is `Activate` / `Skip` / `Edit` / `Delete`. No pencil icon. `Activate` does the same thing as swipe left, `Skip` the same thing as swipe right (both for desktop testing compatibility).
-- `Skip` is enabled on **every** row, not just the first. On a row that is already last it bumps the lap but produces no visible movement.
+- On a row that is already last, both swipe-right and `Skip` bump the lap but produce no visible movement.
 - **Time** edited by tapping the inline dropdown on the row. A native `<select>` listing the full day, `00:00` through `23:50` in 10-minute steps — 144 options, identical every time, unrelated to `now`. The current value scrolls into view, so earlier times sit above it and later ones below. Not circular; a circular picker wheel is a later enhancement, not part of this phase.
 - **Adder** at the bottom of the ACTIVATE box, Aulists-style.
 
@@ -104,7 +108,7 @@ After adding, every field clears — text empties, the dropdown returns to its d
 
 **A `highScores` array in state, fed by a manual reset button.**
 
-- `[streak broke]` lives in the active task area, rendered only when no task is active:
+- `[streak broke]` lives in the active task area, rendered only when `activeTasks` is empty. Breaking a streak therefore means cancelling or completing everything first:
 
 ```
 (no active tasks)
@@ -306,6 +310,7 @@ No. `getNow()` just returns `new Date()`.
 - Empty text → `Task needs text`.
 - Neither WL nor HL selected → `Pick WL or HL`.
 - Deadline less than 20 minutes from now → rejected. The dropdown never offers one, so this only fires on a stale page.
+- Deadline already held by an active task → `18:00 overlaps`.
 - Nothing is set in any case. No silent defaulting.
 - A now-past deadline is handled separately, see Q12.1.
 
@@ -376,7 +381,7 @@ Undo does `state = JSON.parse(JSON.stringify(snapshot))`, replacing every object
   scr: 0,
   highScores: [],              // [{score, date}], top 10, sorted desc
   ledger: [],                  // bare strings, oldest first
-  activeTask: null,            // {id, text, deadline, mode, linkedItemId}
+  activeTasks: [],             // [{id, text, deadline, mode, linkedItemId}]
   templates: [],               // [{id, text, time, mode, lap}]
   rotationDate: null,          // day key; laps reset when it isn't today
   setDraft: {text: "", time: null, mode: null, linkedItemId: null},
@@ -530,12 +535,12 @@ Completing a linked task writes into `aulists.listdata`, which Falsedge's own st
 
 `set task`, `complete now`, `completed before:`, `cancel`, editing the active task's text, `[streak broke]`, template add / edit / delete, template skip and swipe-right, `[Delete exported]`, and writes to `setDraft`.
 
-## Q34 — How is SET locked while a task is active?
+## Q34 — Does SET lock while tasks are active?
 
-**Fully usable, but `set task` refuses.**
+**No. It never locks.**
 
-- Fields stay live. You can type, pick a time, toggle WL/HL, and the draft saves as normal.
-- Tapping `set task` toasts `locked` and does nothing.
+- `[set task]` always works and appends to `activeTasks`.
+- The only refusal is a duplicate deadline: if any active task already holds that exact moment, it toasts `18:00 overlaps` and sets nothing, regardless of the modes involved.
 
 ## Q35 — What shows in `completed before:` when no tier has passed?
 

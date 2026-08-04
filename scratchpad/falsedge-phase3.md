@@ -15,7 +15,7 @@ Phase 3 builds the entire page. Phase 2 left a scaffold: the three files exist, 
   scr: 0,
   highScores: [],              // [{score, date}], top 10, sorted desc
   ledger: [],                  // pre-rendered strings, oldest first
-  activeTask: null,            // {id, text, deadline, mode, linkedItemId}
+  activeTasks: [],             // [{id, text, deadline, mode, linkedItemId}]
   templates: [],               // [{id, text, time, mode, lap}]
   rotationDate: null,          // day key; laps reset when it isn't today
   setDraft: {text: "", time: null, mode: null, linkedItemId: null},
@@ -28,14 +28,14 @@ Phase 3 builds the entire page. Phase 2 left a scaffold: the three files exist, 
 
 `pts` is a whole-number counter. `scr` is fractional, displayed up to one decimal place — `130` renders as `130`, `10.9` as `10.9`. `pts` ticks up by one for each whole number `scr` crosses, tracked incrementally, never derived as `floor(scr)`. Nothing currently awards a fraction, so today the two move in lockstep.
 
-Templates and the active task carry a `uid()`. Ledger entries do not — they are bare strings addressed by array position, appended at the newest end and deleted in batches from the oldest end.
+Templates and active tasks carry a `uid()`. Ledger entries do not — they are bare strings addressed by array position, appended at the newest end and deleted in batches from the oldest end.
 
 Field formats, following Aulists' existing conventions:
 
 | field | format | example |
 |---|---|---|
-| `activeTask.deadline` | ISO string, like Aulists' `lastDone` and `deletedAt` | `"2026-08-03T16:00:00.000Z"` |
-| `activeTask.mode` | `"WL"`, `"HL"`, or `null` | `"WL"` |
+| `activeTasks[].deadline` | ISO string, like Aulists' `lastDone` and `deletedAt` | `"2026-08-03T16:00:00.000Z"` |
+| `activeTasks[].mode` | `"WL"`, `"HL"`, or `null` | `"WL"` |
 | `templates[].time` | `"HH:MM"`, 24-hour, always two digits | `"04:40"` |
 | `templates[].mode` | same as `activeTask.mode` | `null` |
 | `templates[].lap` | integer, starts at `0` | `2` |
@@ -71,18 +71,18 @@ Event handlers must resolve state inside the callback, never capture it when bui
 
 ```js
 // wrong
-var task = state.activeTask;
+var task = state.activeTasks[i];
 btn.addEventListener("click", function () { completeTask(task); });
 
 // right
 btn.addEventListener("click", function () {
-  var task = state.activeTask;
+  var task = state.activeTasks.find(function (t) { return t.id === id; });
   if (!task) return;
   completeTask(task);
 });
 ```
 
-Same for templates: capture the `id` string, then `templates.find(t => t.id === id)` inside the callback. Never index into `templates` to mutate one — the displayed order is not the array order.
+Same for templates: capture the `id` string, then `templates.find(t => t.id === id)` inside the callback. Never index into `activeTasks` or `templates` to mutate one — the displayed order is not the array order.
 
 `step()` replaces the whole state with `JSON.parse(JSON.stringify(snapshot))`, so any object captured before an undo is a detached orphan. `save()` only serialises `state`, so writes to such an object vanish with no error.
 
@@ -144,10 +144,17 @@ Falsedge                                    [Refresh]
 │ Current scr: 127 > │
 └────────────────────┘
 
-                  [cancel task]
-do task
-by 16:00 for 6 pts
-...
+┌──────────────────────────────────────┐
+│                        [cancel task] │
+│ do task                              │
+│ by 16:00 for 6 pts                   │
+│ ...                                  │
+└──────────────────────────────────────┘
+┌──────────────────────────────────────┐
+│                        [cancel task] │
+│ vacuum                               │
+│ ...                                  │
+└──────────────────────────────────────┘
 
 SET
 ┌──────────────────────────────────────┐
@@ -297,24 +304,36 @@ A Copy icon sits top-right and copies the displayed list verbatim as plain text,
 
 Sorted descending, hard cap at 10. On a reset, insert `{score, date}` in sorted position and trim to 10. A score that doesn't beat the current 10th is discarded entirely. On a tie the new entry sits above the existing equal one.
 
-## Active task
+## Active tasks
 
-Exactly one task can be active at a time.
+Unlimited. `state.activeTasks` is an array, sorted by deadline soonest-first on every render. An overdue task stays at the top; nothing sinks when it fails.
+
+Every task renders in full — no cap, no collapsing, no separate scroll region. Each is a rounded block with a flat background colour distinct from the page: filled, not outlined, deliberately different from ledger entries.
 
 ```
-                                           [cancel task]
-do task
-by 16:00 for 6 pts
-by 16:10 for 3 pts
-by 16:30 for 2 pts
-by 17:00 for 1 pts
-[complete now]
-completed before: [16:00] [16:10]
+┌──────────────────────────────────────┐
+│                        [cancel task] │
+│ do task                              │
+│ by 16:00 for 6 pts                   │
+│ by 16:10 for 3 pts                   │
+│ by 16:30 for 2 pts                   │
+│ by 17:00 for 1 pts                   │
+│ [complete now]                       │
+│ completed before: [16:00] [16:10]    │
+└──────────────────────────────────────┘
+┌──────────────────────────────────────┐
+│                        [cancel task] │
+│ vacuum                            🔗 │
+│ by 19:00 for 6 pts                   │
+│ ...                                  │
+└──────────────────────────────────────┘
 ```
 
-`[cancel task]` is a normal `.btn` on its own row in the top-right corner, above the task text.
+`[cancel task]` is a normal `.btn` on its own row in each block's top-right corner, above that task's text.
 
 A linked task shows 🔗 beside its text. There is no unlink control.
+
+Every control — cancel, complete, `completed before:`, the `edit?` overlay — is per task and affects only its own block.
 
 ### Tier rows
 
@@ -337,7 +356,7 @@ Nothing fails automatically. There is no timer, no auto-fail and no dismiss butt
 
 ### Cancelling
 
-`cancel task` unlocks SET and writes a ledger entry reading `completed by: none (cancelled)` with no points. It is distinct from undo: undo erases a mis-set task, cancel records that you meant it and changed your mind.
+`cancel task` removes that task from `activeTasks` and writes a ledger entry reading `completed by: none (cancelled)` with no points. It is distinct from undo: undo erases a mis-set task, cancel records that you meant it and changed your mind.
 
 ### Editing the text
 
@@ -345,7 +364,9 @@ Tapping the task text shows an `edit?` overlay on top of it. Tapping `edit?` tur
 
 The input commits on Enter or blur, following Aulists' `startEdit` ([autorelists.js:1560](../autorelists.js#L1560)). Keep the `committed` flag — Enter commits, then the input blurs and would otherwise commit a second time. An empty value cancels rather than saving an empty name. One commit is one undo step; the edit is never written per keystroke. There is no discard control — undo is the discard.
 
-### No active task
+### No active tasks
+
+Rendered only when `activeTasks` is empty. Breaking a streak therefore means completing or cancelling everything first.
 
 ```
 (no active tasks)
@@ -398,10 +419,11 @@ Two toggles, mutually exclusive. Tapping the selected one deselects it back to u
 - Empty text → `Task needs text`
 - Neither WL nor HL selected → `Pick WL or HL`
 - Deadline less than 20 minutes away → rejected; the dropdown never offers one, so this only fires on a stale page
+- Deadline already held by an active task → `18:00 overlaps`, regardless of the modes involved
 
 Nothing is set in any of those cases. No silent defaulting.
 
-While a task is active the box stays fully usable — you can type, pick a time, toggle WL/HL, and the draft saves as normal — but `[set task]` toasts `locked` and does nothing.
+SET never locks. A successful submit appends to `activeTasks`, which re-sorts on render.
 
 ### Draft
 
@@ -441,7 +463,7 @@ Base order is plain ascending clock time, `00:00` at the top through `23:59` at 
 
 Each template carries a `lap` counter. Sort by `(lap, time)` — everything on lap 0 sits above everything on lap 1. Ties fall to creation order for free: new templates are pushed onto the end of `templates` and `Array.prototype.sort` is stable, so no third comparison term is needed.
 
-**Swipe right** (left→right) on the **first row only** increments that template's `lap`, sending it to the bottom. Rows below the first are not swipe-right-able. The hamburger's `Skip` does the same thing and is available on every row — on a row that is already last it bumps the lap but produces no visible movement. Because `Skip` works anywhere, laps can drift more than one apart and the order stops being a strict rotation; whenever every template happens to share a lap, ties fall back to time and the order is plain ascending again.
+**Swipe right** (left→right) on any row increments that template's `lap`, sending it to the bottom. The hamburger's `Skip` does the same thing. On a row that is already last, either one bumps the lap but produces no visible movement. Because any row can be bumped, laps drift more than one apart and the order is not a strict rotation; whenever every template happens to share a lap, ties fall back to time and the order is plain ascending again.
 
 A newly added template gets `lap: 0` and slots into the un-bumped group by its time.
 
@@ -449,7 +471,7 @@ All laps reset to `0` when the day changes. `rotationDate` holds a day key; on r
 
 ### Controls
 
-**Swipe left** (right→left) on any row prefills SET — every row, unlike swipe-right.
+**Swipe left** (right→left) on any row prefills SET.
 
 The prefill carries text, time and WL/HL, but WL/HL only when the template has one set; a template with neither leaves SET's existing selection alone rather than clearing it. If the template's time is less than 20 minutes away, text and WL/HL prefill as normal and the dropdown lands on its first available option instead.
 
