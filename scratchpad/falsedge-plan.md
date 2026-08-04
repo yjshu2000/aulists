@@ -69,6 +69,8 @@ Completely separate system from Aulists' `item.recurrence`. Own storage, own fie
 
 ## Phase 3 — Falsedge layout
 
+**Superseded by [falsedge-phase3.md](falsedge-phase3.md).** Everything below is the original sketch; the finalized spec lives in that file.
+
 Single scrolling page, collapsible sections.
 
 ### Top-to-bottom order
