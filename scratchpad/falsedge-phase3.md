@@ -19,6 +19,7 @@ Phase 3 builds the entire page. Phase 2 left a scaffold: the three files exist, 
   templates: [],               // [{id, text, time, mode, lap}]
   rotationDate: null,          // day key; laps reset when it isn't today
   setDraft: {text: "", time: null, mode: null, linkedItemId: null},
+  spendDraft: {text: "", cost: null},
   lastCopyAt: null,            // ISO string, gates [Delete exported]
   ledgerCollapsed: true
 }
@@ -26,7 +27,14 @@ Phase 3 builds the entire page. Phase 2 left a scaffold: the three files exist, 
 
 `version` is written and never read. It exists bcuz claude dumdum.
 
-`pts` is a whole-number counter. `scr` is fractional, displayed up to one decimal place — `130` renders as `130`, `10.9` as `10.9`. `pts` ticks up by one for each whole number `scr` crosses, tracked incrementally, never derived as `floor(scr)`. Nothing currently awards a fraction, so today the two move in lockstep.
+`pts` is a whole-number counter. `scr` is fractional, displayed up to one decimal place — `130` renders as `130`, `10.9` as `10.9`. `pts` ticks up by one for each whole number `scr` crosses, tracked incrementally, never derived as `floor(scr)`. Nothing currently awards a fraction, so awards move the two in lockstep.
+
+Spending is the one thing that moves them apart, and it is why `pts` cannot be derived. A spend subtracts from `pts` and leaves `scr` alone. `pts` is allowed to go negative and is not floored at zero.
+
+| | goes up | goes down | resets |
+|---|---|---|---|
+| `pts` | task awards | spending, without limit | never |
+| `scr` | task awards | never | `[streak broke]` |
 
 Templates and active tasks carry a `uid()`. Ledger entries do not — they are bare strings addressed by array position, appended at the newest end and deleted in batches from the oldest end.
 
@@ -37,6 +45,7 @@ Field formats, following Aulists' existing conventions:
 | `activeTasks[].deadline` | ISO string, like Aulists' `lastDone` and `deletedAt` | `"2026-08-03T16:00:00.000Z"` |
 | `activeTasks[].mode` | `"WL"`, `"HL"`, or `null` | `"WL"` |
 | `templates[].time` | `"HH:MM"`, 24-hour, always two digits | `"04:40"` |
+| `setDraft.time` | `"HH:MM"`, same format as `templates[].time` | `"17:20"` |
 | `templates[].mode` | same as `activeTask.mode` | `null` |
 | `templates[].lap` | integer, starts at `0` | `2` |
 | `highScores[].date` | day key, `"YYYY-MM-DD"` | `"2026-07-14"` |
@@ -61,9 +70,19 @@ Field formats, following Aulists' existing conventions:
 
 Copy the generic engine already in `falsedge.js` — `pushUndo`, `step`, `snapshotState`, `UNDO_CAP = 60`. Delete `pushBoundary`, `isBoundary`, `pendingBoundary` and any boundary-confirm UI; Falsedge has no clock-driven state changes, so nothing would ever push a boundary.
 
-Every state change pushes undo: `set task`, `complete now`, `completed before:`, `cancel task`, editing the active task's text, `[streak broke]`, template add / edit / delete / skip, `[Delete exported]`, and writes to `setDraft`.
+Every state change pushes undo: `set task`, `complete now`, `completed before:`, `cancel task`, editing the active task's text, `[streak broke]`, `[spend]`, template add / edit / delete / skip, `[Copy from oldest]`, `[Delete exported]`, and writes to `setDraft` and `spendDraft`. `[Copy from oldest]` is on that list because it writes `lastCopyAt`, which is what arms `[Delete exported]`.
+
+Two writes are exempt. The ledger's collapse toggle writes `ledgerCollapsed`, and the render-time lap reset writes `rotationDate` and zeroes every `lap`. The first is view state. The second fires on a passive re-render, where pushing undo would poison the stack without the user having done anything.
+
+The spend row's open/closed state and the high-scores panel's are not in `state` at all — they live in closure variables — so they never reach undo in the first place.
 
 The undo/redo pill is a copy of Aulists' markup ([index.html:77-81](../index.html#L77-L81)) minus the boundary-confirm div — same shape, layout and geometry, restyled in `style-falsedge.css` off the `style-colourful.css` palette, colourful and glowy.
+
+Every undo and redo toasts the label it just reversed or reapplied — `Undid: set task`, `Redid: spend` — the same as Aulists. The label rides along with the snapshot onto the opposite stack in both directions, so nothing extra needs looking up.
+
+The pill also copies Aulists' 500ms tap cooldown: a tap on either button greys both out and swallows further taps for 500ms, since rapid alternating taps are the same footgun as rapid same-button taps. The toast still fires on every tap regardless of cooldown.
+
+None of the pill exists yet. Phase 2 left the engine only — `falsedge.html` has no pill markup and no `.toast` div, and `falsedge.js` looks up `undoBtn`/`redoBtn` but never attaches a click listener to either, so both currently resolve to `null` and the whole block is dead code behind its own guard. Phase 3 adds the markup, the wiring and the cooldown.
 
 ### Handler rule
 
@@ -120,8 +139,9 @@ Either way the Falsedge task resolves and its ledger entry is written normally. 
 Falsedge's state snapshot does not cover `aulists.listdata`, so undo must reverse those writes explicitly.
 
 - An undo entry for a linked completion carries a side-snapshot of the affected item: `{id, isDone, lastDone, indexInList0}`. Undoing restores those fields and re-inserts the id into `lists["0"]` at its recorded index.
-- An undo entry for a text edit on a linked task carries the previous `text` and restores it.
+- An undo entry for a text edit on a linked task carries the previous `text` and restores it. The rename that lands at `set task` counts as one of these — undoing that `set task` reverts the Aulists rename as well as removing the task.
 - Best-effort, same drift rules: if the item no longer exists, skip silently. If `lists["0"]` is shorter than the recorded index, append instead.
+- Redo is symmetric. `step()` already snapshots Falsedge state onto the opposite stack before restoring; the side-snapshot works the same way. Undoing a linked completion reads the item's current post-write values into the entry it pushes onto the redo stack, then restores the pre-write ones — so redoing re-applies `isDone`, `lastDone` and the splice out of `lists["0"]`. Same for a text edit: redo re-applies the new text. Drift rules apply in both directions.
 
 ---
 
@@ -132,29 +152,21 @@ Falsedge                                    [Refresh]
 
 ┌──────────────────────────────────────┐
 │ (newest entry)                       │
-│                                      │
-│ Export data at 2000 char limits:     │
-│ [Copy from oldest] [Delete exported] │
 |──────────────────────────────────────|
 │             ledger (48)              │
 └──────────────────────────────────────┘
 
 ┌────────────────────┐
-│ Current pts: 42    │
+│ Current pts: 42  > │
+└────────────────────┘
+┌────────────────────┐
 │ Current scr: 127 > │
 └────────────────────┘
 
-┌──────────────────────────────────────┐
-│                        [cancel task] │
-│ do task                              │
-│ by 16:00 for 6 pts                   │
-│ ...                                  │
-└──────────────────────────────────────┘
-┌──────────────────────────────────────┐
-│                        [cancel task] │
-│ vacuum                               │
-│ ...                                  │
-└──────────────────────────────────────┘
+                  [cancel task]
+do task
+by 16:00 for 6 pts
+...
 
 SET
 ┌──────────────────────────────────────┐
@@ -191,7 +203,7 @@ The ledger has no section label. Unlike SET, ACTIVATE and LINK, nothing renders 
 
 ### Collapsed
 
-The newest entry renders in full above the toggle; everything older is hidden. The toggle reads `ledger (48)`, lowercase, with the total entry count.
+The newest entry renders in full above the toggle; everything older is hidden, **and so is the data export block**. Collapsed, the region is exactly two things: the newest entry, and the toggle. The toggle reads `ledger (48)`, lowercase, with the total entry count.
 
 With no entries at all, `(no entries yet)` renders where the newest entry would sit and the toggle reads `ledger (0)`.
 
@@ -199,7 +211,9 @@ With no entries at all, `(no entries yet)` renders where the newest entry would 
 
 The region grows upward, revealing history above the newest entry. It opens scrolled to the bottom, with the newest entry visible; scroll up for history.
 
-The scrolling entry list has `max-height: 66vh` and scrolls internally past that. `66vh` is a maximum — a short ledger renders only as tall as its entries. Data export and the toggle sit outside that cap, so the region as a whole can exceed `66vh`. The rest of the page does not move.
+The scrolling entry list has `max-height: 66vh` and scrolls internally past that. `66vh` is a maximum — a short ledger renders only as tall as its entries. Data export and the toggle sit outside that cap, so the region as a whole can exceed `66vh`.
+
+"Grows upward" is literal, and it has to be paid for with scroll, because the ledger is the topmost element on the page. On expand, measure the region's height before and after and add the delta to `window.scrollY`. The toggle stays at the same screen position, the revealed history appears above it, and everything below the ledger — scores, active tasks, SET, ACTIVATE, LINK — does not visually move. Collapsing subtracts the same delta. Scrolling inside the entry list never scrolls the page.
 
 ```
 ┌────────────────────────┐
@@ -232,9 +246,18 @@ scr = 127 + 3 = 130
 - Cancelled tasks read `completed by: none (cancelled)`. Failed tasks read `completed by: none (failed)`.
 - On a step where `scr` moves but crosses no whole number, the `pts` line renders as a bare value with no arithmetic: `pts = 20`.
 
+A spend writes a two-line entry — the text and the `pts` line, and nothing else. There is no `by` line, no `completed by:` line and no `scr` line, because none of those moved. 
+
+```
+new headphones
+pts = 45 - 50 = -5
+```
+
+Spend entries are ledger entries like any other: they count toward the `ledger (48)` total, they export in their own fenced block, and `[Delete exported]` removes them from the oldest end alongside task entries. No special casing anywhere.
+
 ### Data export
 
-Pinned below the scrolling entries and above the toggle. It does not scroll with history and has no toggle of its own.
+Inside the ledger region, pinned below the scrolling entries and above the toggle. It does not scroll with history and has no toggle of its own. It is hidden whenever the ledger is collapsed and appears only when the ledger is expanded.
 
 ```
 Export data at 2000 char limits:
@@ -242,6 +265,8 @@ Export data at 2000 char limits:
 ```
 
 `Copy from oldest` fills forward from the oldest entry, adding whole entries until the next would exceed 2000 characters, and copies the result to the clipboard. Each entry is wrapped in its own fenced code block; nothing wraps the whole batch.
+
+The 2000 characters are measured on the finished clipboard string, not on the entry text alone — the fences, the newlines and the blank lines between blocks all count, because 2000 is a limit on what gets pasted somewhere else.
 
 ````
 ```
@@ -263,30 +288,68 @@ scr = 130 + 0 = 130
 
 The button is stateless — repeated taps produce the same batch. `[Delete exported]` is what advances it.
 
-`[Copy from oldest]` toasts `Copied 13 entries`. The count matters because the cut point isn't visible. There is no special case for an empty ledger: it stays live, copies an empty string, and toasts `Copied 0 entries`. With an empty ledger the export block also shows `(nothing to export)`.
+Copying is a real clipboard write — `navigator.clipboard.writeText()`, toasting `copy failed` if the promise rejects. This is deliberately not what Aulists does: its `Export - Copy` opens a readonly `<textarea>` for manual selection ([autorelists.js:3380](../autorelists.js#L3380)) and never touches the clipboard. Falsedge's two copy controls, here and in the scores panel, both write directly.
+
+`[Copy from oldest]` toasts `Copied 13 entries`. The count matters because the cut point isn't visible. There is no special case for an empty ledger: it stays live, copies an empty string, and toasts `Copied 0 entries`. With an empty ledger the export block also shows `(nothing to export)` as its own line, directly above the two buttons, which stay live and normal-looking.
 
 `[Delete exported]` removes exactly the batch `Copy from oldest` produces — the oldest entries. It is always visible and greyed out until you have copied within the last 10 minutes. Tapping it while greyed toasts `Delete available after exporting`. The copy timestamp is `lastCopyAt`, plain wall-clock, surviving reload and app close. Deleting clears `lastCopyAt`, so the button greys again immediately: the rhythm is copy, delete, copy, delete.
 
-The SET text field and template adder both carry `maxlength="1000"`, so a single entry tops out around 1100 characters and can never exceed the batch limit on its own.
+Every text input on the page carries `maxlength="1000"` — the SET text field, the template adder, the spend row's text field, and both inline editors (the active task's `edit?` editor and the template hamburger's `Edit`) — so a single entry tops out around 1100 characters and can never exceed the batch limit on its own.
 
 ## Scores
 
+Two separate boxes, stacked, each its own tap target with its own chevron immediately to the right of its value.
+
 ```
 ┌────────────────────┐
-│ Current pts: 42    │
+│ Current pts: 42  > │
+└────────────────────┘
+┌────────────────────┐
 │ Current scr: 127 > │
 └────────────────────┘
 ```
 
-A rounded box, a slightly different colour from the page background, sized to its contents and left-aligned — not stretched across the content column. The empty space to its right is where the panel opens. The whole box is one tap target, with a `>` glyph at middle-right.
+Each box is rounded, a slightly different colour from the page background, sized to the wider of the two's contents and left-aligned — not stretched across the content column. The two are NOT sized independently, so their right edges MUST line up. The empty space to their right is where the high-scores panel opens.
+
+Each chevron is pinned to its own box's right edge, and since both boxes share that edge the two chevrons line up in a column. Because the shared width comes from the wider box's contents, the shorter value is never more than a character or two off its chevron — right-pinned and "beside the value" are the same position here.
+
+- `Current scr:` opens the high-scores panel.
+- `Current pts:` toggles the spend row.
+
+### Spend row
+
+Tapping `Current pts:` opens a row directly below that box and above the `Current scr:` box, in normal flow — the scr box and everything under it shift down. Tapping `Current pts:` again closes it. While it is open the box's `>` becomes `^`; the glyph is a chevron in both states purely for symmetry with the scr box, even though the motion it describes is vertical.
+
+```
+┌────────────────────┐
+│ Current pts: 42  ^ │
+└────────────────────┘
+log spent points
+[ text field    ]  [ pts cost ]  [spend]
+┌────────────────────┐
+│ Current scr: 127 > │
+└────────────────────┘
+```
+
+`pts cost` accepts a positive integer and nothing else. `[spend]` subtracts it from `pts`, leaves `scr` untouched, and appends a spend entry to the ledger.
+
+The row spans the full content column; the two score boxes stay narrow. Because the boxes are sized to their own widest content and the row sits between them in normal flow, the row has to be kept out of that intrinsic sizing or it would drag both boxes wide and swallow the gap the high-scores panel opens into. `width: 0; min-width: 100%` on the row does it: zero contribution to the shared max-content width, full width when actually laid out.
+
+`[spend]` is greyed and inert until the row holds non-empty text and a positive integer cost, mirroring ACTIVATE's `[add]`. The greyed button is the entire refusal — no toast on either condition. Both fields clear on a successful spend and `[spend]` greys again.
+
+Open/closed is a closure variable, not a state field. It survives the `visibilitychange` re-render — that rebuilds the DOM, not the variable — and is lost only on an actual page load: reload, `Refresh`, or app restart, all of which start closed. The high-scores panel works the same way.
+
+The row's contents are draft-backed in `state.spendDraft`, on the same rules as `setDraft`: text saves on `blur` and `visibilitychange`, `cost` saves on change, both writes push undo, and closing the row does not clear them. A draft left in the row is still there after a reload, with the row itself closed.
 
 ### Panel
 
-Tapping the box opens a panel that floats on top of the page — out of document flow, `position: fixed`, high `z-index`. Nothing reflows, the scores box does not shrink, and whatever is underneath is simply covered.
+Tapping `Current scr:` opens a panel that floats on top of the page — out of document flow, `position: fixed`, high `z-index`. Nothing reflows, the scores boxes do not shrink, and whatever is underneath is simply covered.
 
-The panel is right-aligned, sized to its contents, top-aligned with the scores box, and semi-transparent over a darker fill. Where it is wider than the gap beside the box it covers the box's right side. A dimming scrim sits behind it, reusing `.overlay`'s `rgba(8,9,13,.6)` + `blur(3px)` from `style-colourful.css` — that rule is laid out for bottom sheets, so the panel needs its own positioning.
+The panel is right-aligned, sized to its contents, top-aligned with the `Current scr:` box, and semi-transparent over a darker fill. Where it is wider than the gap beside the box it covers the box's right side. A dimming scrim sits behind it, reusing `.overlay`'s `rgba(8,9,13,.6)` + `blur(3px)` from `style-colourful.css` — that rule is laid out for bottom sheets, so the panel needs its own positioning.
 
 Dismissed by tapping anywhere outside it.
+
+The panel and the spend row are independent — opening either one does not close the other, and the panel simply top-aligns to wherever the `Current scr:` box currently sits, which is one row lower while the spend row is open. In practice the panel is the transient one: its scrim swallows the first tap and dismisses it, so reaching into the spend row underneath takes a second tap, and the row is still open when you get there.
 
 Contents are the top-10 high scores and nothing else. No current run, no derived stats.
 
@@ -298,7 +361,9 @@ Contents are the top-10 high scores and nothing else. No current run, no derived
 
 With none stored, `(no high scores yet)`.
 
-A Copy icon sits top-right and copies the displayed list verbatim as plain text, toasting `Copied 7 scores`.
+A Copy icon sits top-right and copies the displayed list verbatim as plain text, toasting `Copied 7 scores`. The icon is the standard copy glyph — two overlapping rounded rectangles — drawn as inline SVG. The page loads no icon font and the emoji clipboard is not it.
+
+With no scores stored the icon stays live and copies an empty string, toasting `Copied 0 scores` — the same shape as `[Copy from oldest]` on an empty ledger. The `(no high scores yet)` placeholder is a rendering of emptiness, not a line of the list, so it is never copied.
 
 ### highScores
 
@@ -343,6 +408,8 @@ All tasks are worth 6 pts at the primary deadline.
 - **HL** — offsets 0/5/15/30 minutes → 6/3/2/1 pts.
 
 Rows read `by HH:MM for N pts`. No leniency marker, no dates — a `23:50` deadline shows `23:50 / 00:00 / 00:20 / 00:50`, and the rows being in order makes the rollover self-evident.
+
+Because `activeTasks` can span more than a day, two blocks can render the same `by 17:00` row while holding deadlines on different days. That is accepted and gets no date marker. The stored deadlines are distinct instants, so nothing downstream is ambiguous, and the soonest-first sort is the only ordering signal the page needs.
 
 Passed rows and upcoming rows render smaller and fainter. The live tier renders at normal size. Once the final tier has passed every row is faint and none is normal-sized; the absence of a normal row is the signal that all deadlines are gone.
 
@@ -418,16 +485,25 @@ Two toggles, mutually exclusive. Tapping the selected one deselects it back to u
 
 - Empty text → `Task needs text`
 - Neither WL nor HL selected → `Pick WL or HL`
-- Deadline less than 20 minutes away → rejected; the dropdown never offers one, so this only fires on a stale page
-- Deadline already held by an active task → `18:00 overlaps`, regardless of the modes involved
+- Deadline less than 20 minutes away, or already past → `refreshed`; the dropdown never offers either, so this only fires on a stale page, and the toast is naming the re-render that follows rather than reporting a mistake
+- Deadline already held by an active task → `18:00 overlaps`, regardless of the modes involved. The comparison is on the exact stored instant, not the clock time — `17:00` today and `17:00` two days out are different deadlines, and both are settable
+- Any active task more than 24 hours past its own deadline → `clean up old tasks`
 
 Nothing is set in any of those cases. No silent defaulting.
+
+Nothing auto-fails, so an unresolved task sits in `activeTasks` indefinitely; once one is more than 24 hours past its own primary deadline, SET refuses every submit until that task is completed, `completed before:`'d or cancelled. Measured against the primary deadline, not the final leniency tier, and recomputed from `getNow()` at tap time like every other check. Prefilling is unaffected — a swipe-left from ACTIVATE or a `Link` from LINK writes `setDraft`, not `activeTasks`, so only the submit is blocked.
 
 SET never locks. A successful submit appends to `activeTasks`, which re-sorts on render.
 
 ### Draft
 
-`state.setDraft` holds `{text, time, mode, linkedItemId}` and is restored on render. Text saves on `blur` and `visibilitychange`; the dropdown, WL/HL and `linkedItemId` save on change. On restore, a deadline that is no longer selectable — past, or now under 20 minutes away — silently falls back to the dropdown's first available option, leaving text and WL/HL intact. The whole draft is cleared on a successful SET, with `linkedItemId` moving onto the new task first.
+`state.setDraft` holds `{text, time, mode, linkedItemId}` and is restored on render. Text saves on `blur` and `visibilitychange`; the dropdown, WL/HL and `linkedItemId` save on change. The whole draft is cleared on a successful SET, with `linkedItemId` moving onto the new task first.
+
+`setDraft.time` is a bare `"HH:MM"` clock time, not an instant — the same format as `templates[].time`. It resolves to a real deadline at restore and again at submit: the next occurrence of that clock time at or after `getNow()`, which is today's if it hasn't passed and tomorrow's if it has. That is exactly what the dropdown's midnight wrap already means, so the draft stores what the dropdown displays and nothing more.
+
+On restore the resolved instant is re-checked against the 20-minute floor, and if it falls under it the dropdown silently lands on its first available option, leaving text and WL/HL intact. There is no separate already-past case — a clock time always has a next occurrence — so the 20-minute check is the whole check.
+
+`set task` resolves the same way and stores the result as `activeTasks[].deadline`, an absolute ISO instant. From that point the task never reconsults the clock time; the overlap check and the tier rows both work off the stored instant.
 
 A draft carrying a link shows 🔗 outside the text field, right-aligned on that row, and the source row stays visually marked in LINK for as long as its id is in `setDraft`.
 
@@ -471,9 +547,15 @@ All laps reset to `0` when the day changes. `rotationDate` holds a day key; on r
 
 ### Controls
 
-**Swipe left** (right→left) on any row prefills SET.
+**Swipe left** (right→left) on any row prefills SET — every row, unlike swipe-right.
 
 The prefill carries text, time and WL/HL, but WL/HL only when the template has one set; a template with neither leaves SET's existing selection alone rather than clearing it. If the template's time is less than 20 minutes away, text and WL/HL prefill as normal and the dropdown lands on its first available option instead.
+
+The prefill overwrites the draft's text outright, so it also clears `setDraft.linkedItemId`. The replaced text no longer came from the linked item, and the 🔗 and the green LINK row go with it.
+
+A prefill scrolls SET into view and toasts `prefilled SET`. SET sits above both ACTIVATE and LINK, so on a phone the write lands offscreen and a successful prefill would otherwise look like nothing happened. This applies for any prefill action. 
+
+Both gestures come from Aulists' `swipeCore` ([autorelists.js:1804](../autorelists.js#L1804)), copied as-is except for one thing: its drag tint references `--success`, which `style-colourful.css` does not define. Use `--c-green`.
 
 **Hamgur** at the end of the control row. Menu is `Activate` / `Skip` / `Edit` / `Delete`. No pencil icon. `Activate` duplicates swipe-left and `Skip` duplicates swipe-right, both so the app is testable on desktop.
 
@@ -483,7 +565,11 @@ The prefill carries text, time and WL/HL, but WL/HL only when the template has o
 
 ### Adder
 
-Pinned at the bottom, mirroring the full row shape: text field, then time dropdown and WL/HL toggles. It refuses to create a template without a time. After adding, every field clears — text empties, the dropdown returns to its default, both toggles go unset.
+Pinned at the bottom, mirroring the full row shape: text field, then time dropdown and WL/HL toggles. The dropdown starts on a `--:--` placeholder option, which is not a valid time.
+
+`[add]` is greyed and inert until the adder holds both a time and non-empty text. The greyed button is the entire refusal — no toast on either condition.
+
+After adding, every field clears — text empties, the dropdown returns to `--:--`, both toggles go unset, and `[add]` greys again.
 
 ## LINK
 
@@ -499,7 +585,17 @@ LINK
 
 Each row has only a `Link` button — no checkbox, menu or pencil; those live in Aulists. The list has `max-height: 40vh` and scrolls internally past that.
 
-Tapping `Link` prefills SET's text field with the item's text and stores its id as `setDraft.linkedItemId`. The time is left alone. Editing the text afterwards does not break the link — the Aulists item gets renamed to match at `set task`.
+Tapping `Link` prefills SET's text field with the item's text and stores its id as `setDraft.linkedItemId`. The time is left alone. Editing the text afterwards does not break the link — the Aulists item gets renamed to match at `set task`. Like ACTIVATE's swipe-left, it scrolls SET into view and toasts `prefilled SET`.
+
+A row has three visual states, driven purely by where its id currently is:
+
+- **plain** — the id is in neither `setDraft` nor any active task. `[Link]` is live.
+- **green** — a low-alpha `--c-green` wash across the whole row, while `setDraft.linkedItemId` holds the id. Green means *in the draft*. It clears the moment the id leaves the draft, whether by a successful `set task` or by a template prefill overwriting the text.
+- **yellow** — a low-alpha `--c-yellow` wash across the whole row, while any active task holds the id as its `linkedItemId`. Yellow means *already an active task*. `[Link]` on that row is greyed and inert.
+
+The two washes are mutually exclusive by construction, not by a check. A yellow row's `[Link]` is dead, so a yellow id can never enter the draft; and a green id only turns yellow at `set task`, which clears the draft in the same step. `set task` therefore needs no duplicate-link guard of its own — the greyed button is the entire gate, and tapping it does nothing and toasts nothing, matching ACTIVATE's `[add]` and the spend row's `[spend]`.
+
+Yellow clears when the task resolves. `cancel task` writes nothing back to Aulists, so the item stays in `lists["0"]` and its row goes back to plain and live. Both completion paths splice the id out of `lists["0"]`, so the row leaves LINK entirely.
 
 With List 0 empty, `(no linkables)`.
 
@@ -514,7 +610,7 @@ The rendered DOM is never trusted. Every handler recomputes from `getNow()` at t
 - `[Delete exported]` past its 10 minutes → toast, nothing deleted.
 - `complete now` after a tier boundary passed since render → proceeds silently with the correct present value, including the 0-pt failed case. Tier rows are deadline statements, not claims about the current award, so nothing on screen was contradicted.
 - `completed before:` missing buttons for newly-passed tiers → nothing special. Buttons can only ever be missing, never wrong.
-- `set task` with a now-past deadline → refuses, toasts, re-renders with a corrected dropdown.
+- `set task` with a now-past or under-20-minute deadline → refuses, toasts `refreshed`, re-renders with a corrected dropdown.
 
 ## Service worker
 

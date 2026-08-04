@@ -269,7 +269,7 @@ No. `getNow()` just returns `new Date()`.
 **Only the Ledger.**
 
 - The Ledger's toggle sits at the *bottom* of its region. Collapsed by default.
-- Data export sits below the scrolling entries and above the toggle, pinned. It does not scroll with history, has no toggle of its own, and is always reachable once the ledger is expanded.
+- Data export sits inside the ledger region, below the scrolling entries and above the toggle, pinned. It does not scroll with history and has no toggle of its own. It is hidden whenever the ledger is collapsed and appears only when the ledger is expanded — collapsed, the region is exactly the newest entry plus the toggle.
 - Active task, SET, ACTIVATE and LINK are always fully rendered. No toggles, no persisted collapse state.
 - Scores is not a collapsible region at all — see Q13.1.
 
@@ -401,7 +401,7 @@ Undo does `state = JSON.parse(JSON.stringify(snapshot))`, replacing every object
 
 **The newest entry stays visible, above a toggle carrying the entry count.**
 
-- The single newest entry renders in full above the toggle. Everything older is hidden.
+- The single newest entry renders in full above the toggle. Everything older is hidden, and so is the data export block.
 - The toggle shows the total number of entries, e.g. `ledger (48)`.
 - Expanding grows the region upward, revealing history above the newest entry.
 
