@@ -48,7 +48,7 @@ Working record of every question asked and answered while spec'ing Phase 3. This
 - Each template carries a `lap` counter. Sort by `(lap, time)` — everything on lap 0 sits above everything on lap 1.
 - **Swipe right** (left→right) on the **first row only** increments that template's `lap`, sending it to the bottom. Rows below the first are not swipe-right-able. The hamburger's `Skip` does the same thing and is available on every row.
 - Because `Skip` works anywhere, laps can drift more than one apart and the order stops being a strict rotation. That is fine — the daily reset is what restores plain ascending order.
-- Wrap-around is free: once every template has been bumped to the same lap, ties fall back to time and the order returns to plain ascending.
+- Wrap-around is free: whenever every template shares a lap, ties fall back to time and the order is plain ascending again.
 - A newly added template gets `lap: 0`, so it slots into the un-bumped group by its time with no special handling.
 - Ties on `(lap, time)` fall to creation order. New templates are pushed onto the end of `templates`, and `Array.prototype.sort` is stable, so equal elements keep their array order with no third comparison term.
 - All laps reset to `0` when the day changes. State stores a `rotationDate` day key; on render, if it isn't today, reset every `lap` and update the key. Evaluated on render rather than at midnight, since there are no timers.
@@ -66,7 +66,7 @@ check in after getting home
 - **Swipe left** (right→left) on any template row prefills SET. Every row, unlike swipe-right. No `[^]` button.
 - **Hamgur** at the end of the control row; menu is `Activate` / `Skip` / `Edit` / `Delete`. No pencil icon. `Activate` does the same thing as swipe left, `Skip` the same thing as swipe right (both for desktop testing compatibility).
 - `Skip` is enabled on **every** row, not just the first. On a row that is already last it bumps the lap but produces no visible movement.
-- **Time** edited by tapping the inline dropdown on the row.
+- **Time** edited by tapping the inline dropdown on the row. A native `<select>` listing the full day, `00:00` through `23:50` in 10-minute steps — 144 options, identical every time, unrelated to `now`. The current value scrolls into view, so earlier times sit above it and later ones below. Not circular; a circular picker wheel is a later enhancement, not part of this phase.
 - **Adder** at the bottom of the ACTIVATE box, Aulists-style.
 
 ### Q4.1 — Which fields does the prefill carry into SET?
@@ -82,6 +82,8 @@ Two lines: text on its own line, then a control row of `[time dropdown] [WL] [HL
 
 The adder mirrors the full row shape: text field, then time dropdown + WL/HL toggles.
 
+After adding, every field clears — text empties, the dropdown returns to its default, both WL/HL toggles go unset.
+
 ### Q4.3 — How does the row's WL/HL control work?
 
 **Two toggles, `[WL] [HL]`, matching the SET box.**
@@ -91,10 +93,11 @@ The adder mirrors the full row shape: text field, then time dropdown + WL/HL tog
 
 ### Q4.4 — How tall are the ACTIVATE and LINK sections?
 
-**Max-height `40vh` each, scrolling internally past that.**
+**Max-height `40vh` on each section's row list, scrolling internally past that.**
 
 - `40vh` is a maximum, not a fixed height. A section with three rows renders three rows tall.
-- A section only scrolls within itself once its content would exceed 40% of the viewport.
+- A row list only scrolls within itself once its content would exceed 40% of the viewport.
+- ACTIVATE's adder is pinned below its scroll region, not inside it, so it stays reachable however many templates exist. The cap applies to the template rows only.
 - Neither section can grow unbounded, so vertical space is never contested and controls can take a full row.
 
 ## Q5 — Where do high scores come from?
@@ -117,6 +120,7 @@ The adder mirrors the full row shape: text field, then time dropdown + WL/HL tog
 
 - `highScores` gets `{score, date}`.
 - No confirm sheet, no ledger entry. Undo covers misfires.
+- With `scr` already at 0 it refuses: nothing is pushed, and it toasts `nothing to break`.
 
 ### Q5.2 — What are the exact top-10 semantics for `highScores`?
 
@@ -215,6 +219,8 @@ Export data at 2000 char limits:
 
 `Copy from oldest` fills forward from the oldest entry, adding whole entries until the next would exceed 2000 chars.
 
+The SET text field and the template adder both carry `maxlength="1000"`. A single entry therefore tops out around 1100 characters including its fence, so it can never exceed the batch limit on its own and the batching rule needs no floor case.
+
 ### Q10.1.1 — Does the copy button advance on repeated taps?
 
 No — it's stateless. `[Delete exported]` is what removes the copied batch so the next tap surfaces the next one.
@@ -229,7 +235,8 @@ The oldest batch — exactly the set `Copy from oldest` produces. Availability g
 
 - Tapping it while greyed shows a toast: `Delete available after exporting`.
 - Copy timestamp persisted in Falsedge state. Plain wall-clock 10 minutes, surviving reload and app close.
-- Falsedge therefore needs the `.toast` element and `toast()` helper copied from Aulists.
+- Falsedge therefore needs the `.toast` element and `toast()` helper copied from Aulists, with its own CSS in `style-falsedge.css` — Aulists styles `.toast` in `style-minim.css`.
+- Deleting clears `lastCopyAt`, so the button greys again immediately. The rhythm is copy, delete, copy, delete.
 
 ## Q11 — Does Falsedge get a debug clock override?
 
@@ -251,14 +258,14 @@ No. `getNow()` just returns `new Date()`.
 - `[complete now]` after any tier boundary passed since render → proceeds silently with the correct present value, including the 0-pt `none (failed)` case. The tier rows are deadline statements (`by 17:00 for 1 pts`), not a claim about the current award, so nothing on screen was ever contradicted.
 - `completed before:` with newly-passed tiers missing from the button row → nothing special. Buttons can only ever be missing, never wrong. Refresh to see more.
 - `SET` with a now-past deadline → validation refuses on submit, toast, re-render with a corrected dropdown.
-- A template's prefill time can never be stale. It is a bare time-of-day with no date, and the SET dropdown spans a full 24 hours, so every time-of-day is always selectable.
+- A template prefill whose time is less than 20 minutes away → text and WL/HL prefill as normal, and the dropdown lands on its first available option instead.
 
 ## Q13 — Which regions collapse, and does collapse state persist?
 
-**The Ledger, and Data export nested inside it. Nothing else.**
+**Only the Ledger.**
 
 - The Ledger's toggle sits at the *bottom* of its region. Collapsed by default.
-- Data export sits inside the ledger region with its own toggle, collapsed by default, only reachable once the ledger is expanded.
+- Data export sits below the scrolling entries and above the toggle, pinned. It does not scroll with history, has no toggle of its own, and is always reachable once the ledger is expanded.
 - Active task, SET, ACTIVATE and LINK are always fully rendered. No toggles, no persisted collapse state.
 - Scores is not a collapsible region at all — see Q13.1.
 
@@ -267,8 +274,11 @@ No. `getNow()` just returns `new Date()`.
 **A floating panel, holding high scores only.**
 
 - `Current pts: x` / `Current scr: x` sits in its own rounded box, a slightly different colour from the page background.
+- The box is sized to its contents and left-aligned, not stretched across the content column. The empty space to its right is where the panel opens.
 - The whole box is one tap target, with a `>` glyph at middle-right.
-- Tapping opens a panel to the right that floats on top of the page, darker than the background.
+- Tapping opens a panel that floats on top of the page — out of document flow, `position: fixed`, high `z-index`. Nothing reflows and the scores box does not shrink.
+- The panel is right-aligned, sized to its contents, top-aligned with the scores box, and semi-transparent over a darker fill. Where it is wider than the gap beside the box, it simply covers the box's right side.
+- A dimming scrim sits behind it, reusing `.overlay`'s `rgba(8,9,13,.6)` + `blur(3px)` from `style-colourful.css`. That rule is laid out for bottom sheets, so the panel needs its own positioning rather than inheriting it.
 - Dismissed by tapping anywhere outside it.
 - Contents are the top-10 high scores and nothing else — no current run, no derived stats.
 - Copy icon top-right copies the displayed list verbatim, as a numbered list, in plain text.
@@ -277,8 +287,9 @@ No. `getNow()` just returns `new Date()`.
 
 **All three fields — text, deadline, WL/HL — plus any pending link.**
 
-- `state.setDraft` holds `{text, time, mode, linkedItemId}`, written on every change, restored on render.
-- On restore, if the saved deadline is now in the past it silently falls back to the dropdown's first available option; text and WL/HL survive intact.
+- `state.setDraft` holds `{text, time, mode, linkedItemId}`, restored on render.
+- Text saves on `blur` and `visibilitychange`. Dropdown, WL/HL and `linkedItemId` save on change.
+- On restore, if the saved deadline is no longer selectable — past, or now under 20 minutes away — it silently falls back to the dropdown's first available option. Text and WL/HL survive intact.
 - Cleared on successful SET.
 
 ## Q15 — What is the SET box's submit control?
@@ -370,8 +381,7 @@ Undo does `state = JSON.parse(JSON.stringify(snapshot))`, replacing every object
   rotationDate: null,          // day key; laps reset when it isn't today
   setDraft: {text: "", time: null, mode: null, linkedItemId: null},
   lastCopyAt: null,            // ISO string, gates [Delete exported]
-  ledgerCollapsed: true,
-  exportCollapsed: true
+  ledgerCollapsed: true
 }
 ```
 
@@ -380,6 +390,7 @@ Undo does `state = JSON.parse(JSON.stringify(snapshot))`, replacing every object
 - `normalise()` starts from `freshState()` and copies each field across only if it is the right type, so malformed or partial data degrades per field instead of wiping everything.
 - No per-field try/catch. Falsedge's fields are flat values and arrays with no logic capable of throwing.
 - No corrupt-blob backup key.
+- `version` is written but never read, matching Aulists. It exists only bcuz claude is silly and dumdum
 
 ## Q23 — What does the ledger look like collapsed?
 
@@ -391,15 +402,15 @@ Undo does `state = JSON.parse(JSON.stringify(snapshot))`, replacing every object
 
 ## Q24 — Does the expanded ledger scroll inside itself, or push the page?
 
-**Max-height `66vh`, scrolling internally past that.**
+**Max-height `66vh` on the scrolling entries, scrolling internally past that.**
 
 - `66vh` is a maximum, not a fixed height. A short ledger renders only as tall as its entries.
-- The region never exceeds two thirds of the viewport, however many entries exist.
-- History scrolls within the region. The rest of the page does not move.
+- The cap applies to the scrolling entry list only. Data export and the toggle sit outside it, so the region as a whole is taller than `66vh`.
+- History scrolls within that list. The rest of the page does not move.
 
 ## Q25 — Is `scr` an integer or a decimal?
 
-**Fractional, displayed to one decimal place. `pts` is a whole-number counter.**
+**Fractional, displayed up to one decimal place. `pts` is a whole-number counter.**
 
 - `pts` ticks up by one for each whole number `scr` crosses. It is tracked incrementally, never derived as `floor(scr)`.
 - `[streak broke]` zeroes `scr` and discards whatever fraction it held. `pts` is untouched, and a reset never decrements it on the way down.
@@ -416,7 +427,7 @@ scr = 10.1 + 0.8 = 10.9
 
 ## Q26 — Where is the cancel control?
 
-Top-right corner of the active task area, above the task text.
+A `[cancel task]` button styled as a normal `.btn`, in the top-right corner of the active task area, above the task text.
 
 ## Q27 — How do you edit an active task's text?
 
@@ -425,6 +436,17 @@ Top-right corner of the active task area, above the task text.
 - Tapping the task text shows an `edit?` overlay on top of it.
 - Tapping `edit?` turns the text into an inline input in the active task block.
 - Tapping anywhere else dismisses the overlay without entering edit mode.
+
+### Q27.1 — How does an inline edit commit?
+
+**Enter or blur commits. Undo is the discard.**
+
+Applies to the active task's `edit?` editor and to the template hamburger's `Edit`.
+
+- Copy Aulists' `startEdit` structure ([autorelists.js:1560](autorelists.js#L1560)).
+- Keep the `committed` flag. Pressing Enter commits, then the input blurs and would otherwise commit a second time.
+- An empty value cancels rather than saving an empty name — bail and re-render to restore the label.
+- One commit is one undo step. The edit is never written per keystroke.
 
 ## Q28 — Is a linked task marked as linked?
 
@@ -501,3 +523,45 @@ Completing a linked task writes into `aulists.listdata`, which Falsedge's own st
 
 - Looks and behaves normally, copies an empty string to the clipboard, and toasts `Copied 0 entries`.
 - Only `[Delete exported]` is ever greyed, and only by its 10-minute gate.
+
+## Q33 — Which actions push undo?
+
+**Everything that changes state.**
+
+`set task`, `complete now`, `completed before:`, `cancel`, editing the active task's text, `[streak broke]`, template add / edit / delete, template skip and swipe-right, `[Delete exported]`, and writes to `setDraft`.
+
+## Q34 — How is SET locked while a task is active?
+
+**Fully usable, but `set task` refuses.**
+
+- Fields stay live. You can type, pick a time, toggle WL/HL, and the draft saves as normal.
+- Tapping `set task` toasts `locked` and does nothing.
+
+## Q35 — What shows in `completed before:` when no tier has passed?
+
+The `completed before:` label renders with nothing after it until at least one tier's time has gone by.
+
+## Q36 — How are tier rows styled once the final tier has passed?
+
+All of them render faint. There is no normal-sized row, and the absence of one is the signal that every deadline is gone.
+
+### Q36.1 — Do tier rows show WL/HL or dates?
+
+Neither. Rows are bare `by HH:MM for N pts`.
+
+- No leniency marker. The tier spacing already distinguishes WL from HL, and the ledger entry records it.
+- No dates, even when the tiers cross midnight. A `23:50` deadline shows `23:50 / 00:00 / 00:20 / 00:50`; the rows are in order, so the rollover is self-evident.
+
+## Q37 — Where does the expanded ledger start scrolled?
+
+At the bottom, newest entry visible. Matches the collapsed state, where the newest entry is the one on screen. Scroll up for history.
+
+## Q38 — How does `complete now` resolve tier boundaries?
+
+Inclusive. `by 16:10` means at or before 16:10, so completing at exactly 16:10 awards that tier's points.
+
+## Q39 — How are the section labels rendered?
+
+`SET`, `ACTIVATE` and `LINK` render in caps, above and outside their boxes — not as card titles inside them.
+
+`.card-title h2` in `style-colourful.css` lowercases its text, so these need their own rule rather than reusing it.

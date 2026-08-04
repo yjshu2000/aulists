@@ -1553,7 +1553,7 @@
 
   /**
    * Swaps an item row's label for an inline text input, wired to commit the
-   * edit on Enter/blur or cancel on Escape.
+   * edit on Enter or blur.
    * @param {Element} li - the row's `<li>`.
    * @param {Object} item - the item being edited.
    */
@@ -1581,9 +1581,6 @@
     input.addEventListener("keydown", function (e) {
       if (e.key === "Enter") {
         commit();
-      } else if (e.key === "Escape") {
-        committed = true;
-        render();
       }
     });
     input.addEventListener("blur", commit);
