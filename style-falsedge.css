@@ -1,20 +1,614 @@
+  /* both of these override style-colourful.css rules that reference its real
+     --c-cyan, which about.html still uses and Falsedge no longer does */
   body {
     font-family: monospace;
+    background:
+      radial-gradient(1200px 600px at 70% -10%, rgba(60,195,226,.06), transparent 60%),
+      var(--bg);
+  }
+  .btn:focus-visible {
+    outline-color: var(--c-sky);
   }
   h1, h2, h3, .card-title h2 {
     font-family: "Space Mono", monospace;
   }
 
-  .page-nav-top {
+  button, input, select {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .btn {
+    font-family: inherit;
+    min-height: 40px;
+  }
+  .btn:disabled, .btn.off {
+    opacity: .38;
+  }
+  input, select {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    min-height: 44px;
+    padding: 0 12px;
+  }
+  input::placeholder {
+    color: var(--faint);
+  }
+
+  /* ----------------------------------- glow ------------------------------ */
+  /* The blue arc: hue 199deg at the top of the page down to 249deg at the
+     bottom, with --c-sky (191deg) as the accent sitting just above it. These
+     live here rather than in the shared palette file because only Falsedge
+     uses them - about.html keeps colourful's real --c-cyan.
+
+     The active-task stretch between pale-azure and deep-blue has no
+     variables: its hues are interpolated per block in falsedge.js, and a
+     second copy here would be free to drift out of sync with them. */
+  :root {
+    --c-sky:        #3cc3e2;
+    --c-pale-azure: #3dade1;
+    --c-deep-blue:  #485bdb;
+    --c-indigo:     #4d4ad9;
+  }
+
+  /* Each section owns a --glow and every glow effect below is derived from
+     it, so recolouring a section is this one line. Active task blocks are the
+     exception: theirs is set inline from JS, keyed to position in the stack,
+     and the value here is only a fallback. */
+  .ledger-region { --glow: var(--c-pale-azure); }
+  /* the midpoint falsedge.js hands a lone task, as a fallback only */
+  .task-block    { --glow: hsl(215.5, 70%, 56%); }
+  .sec-set       { --glow: var(--c-deep-blue); }
+  .sec-activate  { --glow: var(--c-indigo); }
+  .sec-link      { --glow: var(--c-purple); }
+
+  /* halo (outer bloom + hairline) plus inner sheen along the top edge */
+  .ledger-region,
+  .task-block,
+  #setCard,
+  #activateCard,
+  #linkCard {
+    border: 1px solid color-mix(in srgb, var(--glow) 34%, var(--line-soft));
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--glow) 9%, transparent),
+      0 0 22px -6px color-mix(in srgb, var(--glow) 45%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--glow) 30%, transparent),
+      inset 0 10px 22px -16px color-mix(in srgb, var(--glow) 65%, transparent);
+  }
+
+  /* section labels: caps, above and outside their boxes */
+  .fd-section {
+    margin-top: 40px;
+  }
+  .fd-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--glow) 62%, var(--muted));
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin: 0 0 6px 2px;
+    text-shadow: 0 0 12px color-mix(in srgb, var(--glow) 35%, transparent);
+  }
+  .fd-section .card {
+    margin-top: 0;
+  }
+
+  /* ---------------------------------- ledger ------------------------------ */
+  .ledger-region {
+    padding: 12px 12px 6px;
+    margin-top: 28px;
+  }
+  .ledger-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 66vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .ledger-entry {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12.5px;
+    line-height: 1.5;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 8px 10px;
+  }
+  .ledger-empty {
+    font-size: 12.5px;
+    color: var(--faint);
+    padding: 4px 2px;
+  }
+  .ledger-export {
+    border-top: 1px solid var(--line-soft);
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+  .export-title {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .export-none {
+    font-size: 12px;
+    color: var(--faint);
+    margin-top: 8px;
+  }
+  .export-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .ledger-toggle {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    margin-top: 10px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-top: 1px solid var(--line-soft);
+    color: var(--muted);
+    font-size: 13px;
+    text-transform: lowercase;
+    letter-spacing: .04em;
+  }
+
+  /* ---------------------------------- scores ------------------------------ */
+  /* column 1 is max-content, shared by both boxes so their right edges line
+     up; column 2 is the empty space the high-scores panel opens into. */
+  .scores-wrap {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 8px 0;
+    margin-top: 32px;
+  }
+  .score-box {
+    grid-column: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    min-height: 48px;
+    padding: 0 14px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    font-size: 15px;
+    text-align: left;
+  }
+  .score-chev {
+    color: var(--c-sky);
+    font-size: 15px;
+  }
+
+  /* zero contribution to the shared max-content width, full width once laid
+     out - otherwise the row would drag both score boxes wide */
+  .spend-row {
+    grid-column: 1 / -1;
+    width: 0;
+    min-width: 100%;
+    padding: 4px 0 6px;
+  }
+  .spend-label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .spend-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .spend-text {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+  .spend-cost {
+    flex: 0 0 auto;
+    width: 104px;
+  }
+
+  /* high scores panel: floats over the page, nothing underneath reflows */
+  .hs-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 9, 13, .6);
+    backdrop-filter: blur(3px);
+    z-index: 60;
+  }
+  .hs-panel {
+    position: fixed;
+    z-index: 61;
+    min-width: 200px;
+    max-width: 80vw;
+    padding: 36px 14px 12px;
+    background: rgba(26, 29, 39, .88);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+  }
+  .hs-copy {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+  }
+  .hs-row {
+    font-size: 13px;
+    white-space: pre;
+    line-height: 1.7;
+  }
+  .hs-empty {
+    font-size: 12.5px;
+    color: var(--faint);
+  }
+
+  /* ------------------------------- active tasks --------------------------- */
+  /* the extra 17px is the cancel tab's overhang - it sticks half its 34px
+     height above the first block, and would otherwise eat the whole gap */
+  .tasks {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 32px;
+    margin-top: calc(36px + 17px);
+  }
+  /* each block is only as wide as its own widest line */
+  .task-block {
+    position: relative;
+    width: max-content;
+    max-width: 100%;
+    background: var(--panel-2);
+    border-radius: var(--radius);
+    padding: 18px 16px 14px;
+  }
+  /* rides the block's top border, half in / half out, right edges flush -
+     a close button in the corner, just spelled out in words */
+  .task-top {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translateY(-50%);
+  }
+  .task-top .btn {
+    min-height: 34px;
+    padding: 0 12px;
+    font-size: 12px;
+    background: var(--panel-2);
+    border-color: color-mix(in srgb, var(--glow) 45%, var(--line));
+    box-shadow: 0 0 14px -5px color-mix(in srgb, var(--glow) 70%, transparent);
+  }
+  .task-text-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0 8px;
+  }
+  .task-text {
+    font-size: 15px;
+    font-weight: 700;
+    word-break: break-word;
+  }
+  .edit-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(18, 20, 28, .88);
+    border: 1px dashed var(--c-sky);
+    border-radius: 8px;
+    color: var(--c-sky);
+    font-size: 13px;
+  }
+  .tier {
+    line-height: 1.6;
+  }
+  .tier-faint {
+    font-size: 12px;
+    color: var(--faint);
+  }
+  .tier-live {
+    font-size: 14px;
+    color: var(--text);
+  }
+  .task-actions {
+    margin-top: 10px;
+  }
+  .before-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .before-label {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .before-btn {
+    padding: 7px 11px;
+  }
+  .empty-tasks {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .streak-btn {
+    margin-top: 8px;
+    align-self: flex-start;
+  }
+  .inline-edit {
+    width: 100%;
+  }
+
+  /* ----------------------------------- SET -------------------------------- */
+  .set-text-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .set-text {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .set-link {
+    flex: 0 0 auto;
+  }
+  .time-btns {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .time-btns-label {
+    font-size: 12px;
+    color: var(--faint);
+  }
+  .time-btn {
+    padding: 6px 9px;
+    background: transparent;
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    color: var(--faint);
+    font-size: 12px;
+  }
+  .time-btn.on {
+    background: color-mix(in srgb, var(--c-sky) 12%, transparent);
+    border-color: var(--c-sky);
+    color: var(--c-sky);
+  }
+  .set-select-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .set-select-label {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .mode-row {
+    display: flex;
+    gap: 8px;
+  }
+  #setCard .mode-row {
+    margin-top: 14px;
+  }
+  .mode-btn {
+    min-height: 40px;
+    padding: 0 16px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .mode-btn.on {
+    background: var(--c-sky);
+    border-color: var(--c-sky);
+    color: var(--bg);
+  }
+  .set-submit-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 14px;
+  }
+
+  /* -------------------------------- ACTIVATE ------------------------------ */
+  .tpl-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 40vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .tpl-row {
+    padding: 8px;
+    border-radius: 10px;
+    background: var(--panel-2);
+  }
+  .tpl-text {
+    font-size: 14px;
+    margin-bottom: 8px;
+    word-break: break-word;
+  }
+  .tpl-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .time-select {
+    min-height: 40px;
+    padding: 0 8px;
+  }
+  .tpl-adder {
+    border-top: 1px solid var(--line-soft);
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+  .tpl-adder-text {
+    width: 100%;
+  }
+  .tpl-adder .tpl-controls {
+    margin-top: 8px;
+  }
+  .tpl-adder .tpl-controls .btn {
+    margin-left: auto;
+  }
+  .mini {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font-size: 15px;
+  }
+  .menu-anchor {
+    position: relative;
+    margin-left: auto;
+  }
+  .item-menu {
+    position: fixed;
+    z-index: 70;
+    min-width: 150px;
+    padding: 4px 0;
+    overflow: hidden;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, .5);
+  }
+  .item-menu button {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    padding: 0 14px;
+    text-align: left;
+    background: transparent;
+    border: none;
+    border-top: 1px solid var(--line-soft);
+    border-radius: 0;
+    font-size: 13px;
+  }
+  .item-menu button:first-child {
+    border-top: none;
+  }
+  .item-menu button.danger {
+    color: var(--c-red);
+  }
+
+  /* ----------------------------------- LINK ------------------------------- */
+  .link-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 40vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .link-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 10px;
+  }
+  .link-text {
+    flex: 1 1 auto;
+    font-size: 14px;
+    word-break: break-word;
+  }
+  .link-green {
+    background: color-mix(in srgb, var(--c-green) 16%, transparent);
+  }
+  .link-yellow {
+    background: color-mix(in srgb, var(--c-yellow) 16%, transparent);
+  }
+  .link-empty {
+    font-size: 13px;
+    color: var(--faint);
+  }
+
+  /* ---------------------------------- footer ------------------------------ */
+  .page-nav-bottom {
+    display: flex;
+    justify-content: center;
+    margin-top: 28px;
+  }
+  .page-nav-bottom .btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    text-decoration: none;
+  }
+
+  /* ------------------------------ toast / pill ---------------------------- */
+  .toast {
     position: fixed;
     left: 50%;
-    top: 0;
+    bottom: 66px;
     transform: translateX(-50%);
-    display: flex; align-items: center;
-    min-height: 44px; padding: 0 16px;
-    font-size: 14px; font-weight: 600; text-decoration: none;
-    color: var(--text); background: var(--panel); border: 1px solid var(--line);
-    border-top: none;
-    border-radius: 0 0 10px 10px;
-    z-index: 60;
+    max-width: 90%;
+    padding: 10px 16px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font-size: 13px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+    z-index: 80;
+  }
+  .toast.show {
+    opacity: 1;
+  }
+
+  .undo-redo-pill {
+    position: fixed;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 40px;
+    padding: 6px 10px 4px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+    box-shadow: 0 -2px 20px color-mix(in srgb, var(--c-sky) 18%, transparent);
+    z-index: 70;
+  }
+  .ur-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--c-sky);
+    font-size: 19px;
+    text-shadow: 0 0 10px color-mix(in srgb, var(--c-sky) 55%, transparent);
+  }
+  .ur-btn:disabled {
+    opacity: .35;
+    text-shadow: none;
+  }
+  .ur-btn.cooldown {
+    opacity: .35;
+    pointer-events: none;
   }

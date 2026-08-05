@@ -15,13 +15,23 @@
 </head>
 <body>
 
-<a class="page-nav-top" href="index.html">&darr; Go to Lists &darr;</a>
-
 <header>
   <h1>Falsedge</h1>
+  <button id="refreshBtn" class="btn">Refresh</button>
 </header>
 
 <main id="app"></main>
+
+<div class="page-nav-bottom">
+  <a class="btn" href="index.html">&darr; Go to Lists &darr;</a>
+</div>
+
+<div class="undo-redo-pill" id="undoRedoPill">
+  <button id="undoBtn" class="ur-btn" aria-label="Undo" disabled>&#8630;</button>
+  <button id="redoBtn" class="ur-btn" aria-label="Redo" disabled>&#8631;</button>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="falsedge.js"></script>
 <script>

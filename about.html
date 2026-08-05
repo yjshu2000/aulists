@@ -28,6 +28,17 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v2.1 <span class="changelog-date">2026-08-04 22H</span></h3>
+    <ul>
+      <li>Falsedge is a real page now, not a scaffold. Ledger with 2000-char export, pts/scr with a spend row and a high-scores panel, active tasks with WL/HL leniency tiers, SET, ACTIVATE templates, and LINK into list 0.</li>
+      <li>Fixed bad evil: Aulists has been silently emptying every list on load since v2. idiot claude didn't properly rename LIST_KEYS to CHAIN smh.</li>
+      <li>Undo survives moving between Aulists and Falsedge now. Each app parks its stacks in sessionStorage on the way out and picks them up on the way in - so it lasts across navigation and reloads, but not across closing the app.</li>
+      <li>Every Falsedge section glows in its own colour, running a hue ramp down the page from sky through to purple. Active tasks get their own stretch of it, and the stack runs backwards inside it on purpose.</li>
+      <li>Note: LINK needs both pages on the same origin, so it only works served over http (like Pages). Opening them locally doesn't work. meanie</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v2.0.1 <span class="changelog-date">2026-08-03 03H</span></h3>
     <ul>
       <li>Hardened save-file loading: a single malformed field can no longer wipe the whole list. Each section is isolated now, and one bad item only costs that item.</li>

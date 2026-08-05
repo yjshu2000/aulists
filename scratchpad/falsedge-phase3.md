@@ -72,6 +72,28 @@ Copy the generic engine already in `falsedge.js` — `pushUndo`, `step`, `snapsh
 
 Every state change pushes undo: `set task`, `complete now`, `completed before:`, `cancel task`, editing the active task's text, `[streak broke]`, `[spend]`, template add / edit / delete / skip, `[Copy from oldest]`, `[Delete exported]`, and writes to `setDraft` and `spendDraft`. `[Copy from oldest]` is on that list because it writes `lastCopyAt`, which is what arms `[Delete exported]`.
 
+A draft write pushes undo only when the value actually changed. Draft text saves on `blur`, so tapping into the SET field and back out without typing would otherwise push a no-op entry, and there are only 60 slots.
+
+The labels, which the toast renders as `Undid: <label>` / `Redid: <label>`:
+
+| action | label |
+|---|---|
+| `set task` | `set task` |
+| `complete now` | `complete now` |
+| a `completed before:` button | `completed before` |
+| `cancel task` | `cancel task` |
+| active task text edit | `edit task text` |
+| `[streak broke]` | `streak broke` |
+| `[spend]` | `spend` |
+| template add | `add template` |
+| template text / time / WL / HL edit | `edit template` |
+| template delete | `delete template` |
+| template skip, by menu or swipe-right | `skip template` |
+| `[Copy from oldest]` | `copy ledger` |
+| `[Delete exported]` | `delete exported` |
+| `setDraft` write | `edit SET draft` |
+| `spendDraft` write | `edit spend draft` |
+
 Two writes are exempt. The ledger's collapse toggle writes `ledgerCollapsed`, and the render-time lap reset writes `rotationDate` and zeroes every `lap`. The first is view state. The second fires on a passive re-render, where pushing undo would poison the stack without the user having done anything.
 
 The spend row's open/closed state and the high-scores panel's are not in `state` at all — they live in closure variables — so they never reach undo in the first place.
@@ -245,6 +267,7 @@ scr = 127 + 3 = 130
 - `completed by:` is always a bare `HH:MM`, even when the completion crossed midnight — the deadline line carries the date.
 - Cancelled tasks read `completed by: none (cancelled)`. Failed tasks read `completed by: none (failed)`.
 - On a step where `scr` moves but crosses no whole number, the `pts` line renders as a bare value with no arithmetic: `pts = 20`.
+- Both numbers format exactly as the score boxes do — `pts` is a whole number, `scr` is displayed up to one decimal place — so a ledger line never disagrees with the box it came from.
 
 A spend writes a two-line entry — the text and the `pts` line, and nothing else. There is no `by` line, no `completed by:` line and no `scr` line, because none of those moved. 
 
@@ -288,11 +311,11 @@ scr = 130 + 0 = 130
 
 The button is stateless — repeated taps produce the same batch. `[Delete exported]` is what advances it.
 
-Copying is a real clipboard write — `navigator.clipboard.writeText()`, toasting `copy failed` if the promise rejects. This is deliberately not what Aulists does: its `Export - Copy` opens a readonly `<textarea>` for manual selection ([autorelists.js:3380](../autorelists.js#L3380)) and never touches the clipboard. Falsedge's two copy controls, here and in the scores panel, both write directly.
+Copying is a real clipboard write — `navigator.clipboard.writeText()`, toasting `copy failed` if the promise rejects. It being a promise is what fixes the write order: `lastCopyAt` and the undo entry land in the resolve handler, not at tap time, so a rejected copy writes nothing, arms nothing and leaves `[Delete exported]` exactly as grey as it was. This is deliberately not what Aulists does: its `Export - Copy` opens a readonly `<textarea>` for manual selection ([autorelists.js:3380](../autorelists.js#L3380)) and never touches the clipboard. Falsedge's two copy controls, here and in the scores panel, both write directly.
 
 `[Copy from oldest]` toasts `Copied 13 entries`. The count matters because the cut point isn't visible. There is no special case for an empty ledger: it stays live, copies an empty string, and toasts `Copied 0 entries`. With an empty ledger the export block also shows `(nothing to export)` as its own line, directly above the two buttons, which stay live and normal-looking.
 
-`[Delete exported]` removes exactly the batch `Copy from oldest` produces — the oldest entries. It is always visible and greyed out until you have copied within the last 10 minutes. Tapping it while greyed toasts `Delete available after exporting`. The copy timestamp is `lastCopyAt`, plain wall-clock, surviving reload and app close. Deleting clears `lastCopyAt`, so the button greys again immediately: the rhythm is copy, delete, copy, delete.
+`[Delete exported]` removes exactly the batch `Copy from oldest` produces — the oldest entries. It is always visible and greyed out until you have copied within the last 10 minutes. Tapping it while greyed toasts `Delete available after exporting`; a real delete toasts `Deleted 13 entries`, the same count the copy just reported. The copy timestamp is `lastCopyAt`, plain wall-clock, surviving reload and app close. Deleting clears `lastCopyAt`, so the button greys again immediately: the rhythm is copy, delete, copy, delete.
 
 Every text input on the page carries `maxlength="1000"` — the SET text field, the template adder, the spend row's text field, and both inline editors (the active task's `edit?` editor and the template hamburger's `Edit`) — so a single entry tops out around 1100 characters and can never exceed the batch limit on its own.
 
@@ -345,7 +368,7 @@ The row's contents are draft-backed in `state.spendDraft`, on the same rules as 
 
 Tapping `Current scr:` opens a panel that floats on top of the page — out of document flow, `position: fixed`, high `z-index`. Nothing reflows, the scores boxes do not shrink, and whatever is underneath is simply covered.
 
-The panel is right-aligned, sized to its contents, top-aligned with the `Current scr:` box, and semi-transparent over a darker fill. Where it is wider than the gap beside the box it covers the box's right side. A dimming scrim sits behind it, reusing `.overlay`'s `rgba(8,9,13,.6)` + `blur(3px)` from `style-colourful.css` — that rule is laid out for bottom sheets, so the panel needs its own positioning.
+The panel is right-aligned to the content column's right edge — `body` is `max-width: 760px` and centred, so on a wide screen the panel stops at the column, not at the viewport; on a phone the two are the same place. It is sized to its contents, top-aligned with the `Current scr:` box, and semi-transparent over a darker fill. Where it is wider than the gap beside the box it covers the box's right side. A dimming scrim sits behind it, reusing `.overlay`'s `rgba(8,9,13,.6)` + `blur(3px)` from `style-colourful.css` — that rule is laid out for bottom sheets, so the panel needs its own positioning.
 
 Dismissed by tapping anywhere outside it.
 

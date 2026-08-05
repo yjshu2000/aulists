@@ -2,6 +2,7 @@
   "use strict";
 
   var STORAGE_KEY = "aulists.listdata";
+  var UNDO_SESSION_KEY = "aulists.undo";
   var WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
   // chain order for movement
@@ -87,6 +88,43 @@
 
   function undo() { step("undo"); }
   function redo() { step("redo"); }
+
+  /**
+   * Persists both stacks so they survive navigating to Falsedge and back.
+   * sessionStorage, not localStorage: the stacks should outlive a navigation
+   * but not the app being closed. Written only on the way out, so no action
+   * pays the cost of serialising up to 120 whole-state snapshots.
+   */
+  function saveUndoStacks() {
+    try {
+      sessionStorage.setItem(UNDO_SESSION_KEY, JSON.stringify({
+        undo: undoStack,
+        redo: redoStack
+      }));
+      return;
+    } catch (e) {}
+    // over quota: keep the newest few steps rather than losing all of them
+    try {
+      sessionStorage.setItem(UNDO_SESSION_KEY, JSON.stringify({
+        undo: undoStack.slice(-10),
+        redo: redoStack.slice(-10)
+      }));
+    } catch (e) {}
+  }
+
+  /**
+   * Restores both stacks at boot, if this tab left any behind.
+   */
+  function loadUndoStacks() {
+    try {
+      var raw = sessionStorage.getItem(UNDO_SESSION_KEY);
+      if (!raw) return;
+      var obj = JSON.parse(raw);
+      if (!obj) return;
+      if (Array.isArray(obj.undo)) undoStack = obj.undo;
+      if (Array.isArray(obj.redo)) redoStack = obj.redo;
+    } catch (e) {}
+  }
 
   var expandedNote = null;
   var editingNote = null;
@@ -228,7 +266,7 @@
       }
       try {
         if (obj.lists) {
-          LIST_KEYS.forEach(function (k) {
+          CHAIN.forEach(function (k) {
             var arr = obj.lists[k];
             if (!Array.isArray(arr)) return;
             arr.forEach(function (id) {
@@ -241,7 +279,7 @@
             obj.lists.trash.forEach(function (t) {
               if (!t || typeof t.id !== "string" || !validIds[t.id]) return;
               var origin = "3";
-              if (LIST_KEYS.indexOf(t.origin) !== -1) {
+              if (CHAIN.indexOf(t.origin) !== -1) {
                 origin = t.origin;
               }
               var deletedAt = getNow().toISOString();
@@ -574,15 +612,14 @@
   }
 
   /**
-   * Finds which list currently holds an id, checking every real list key
-   * (chain lists plus Basics) - not just the chain.
+   * Finds which list currently holds an id, checking every real list key.
    * @param {string} id - id of the item to locate.
    * @returns {string|null} the list key it's in, or null if not found.
    */
   function findItemListKey(id) {
-    for (var k = 0; k < LIST_KEYS.length; k++) {
-      if (state.lists[LIST_KEYS[k]].indexOf(id) !== -1) {
-        return LIST_KEYS[k];
+    for (var k = 0; k < CHAIN.length; k++) {
+      if (state.lists[CHAIN[k]].indexOf(id) !== -1) {
+        return CHAIN[k];
       }
     }
     return null;
@@ -3646,14 +3683,19 @@
   render();
 
   document.addEventListener("visibilitychange", function () {
-    if (!document.hidden) {
-      purgeTrash();
-      placeRecurringItems();
-      applyAutoReturn();
-      render();
-      refreshUndoRedoButtons();
+    if (document.hidden) {
+      saveUndoStacks();
+      return;
     }
+    purgeTrash();
+    placeRecurringItems();
+    applyAutoReturn();
+    render();
+    refreshUndoRedoButtons();
   });
+
+  // pagehide is the one that fires on an actual navigation to Falsedge
+  window.addEventListener("pagehide", saveUndoStacks);
 
   // undo/redo pill wiring
   var undoBtn = document.getElementById("undoBtn");
@@ -3725,6 +3767,8 @@
   }
   undoBtn.addEventListener("click", withCooldown(undo));
   redoBtn.addEventListener("click", withCooldown(redo));
+
+  loadUndoStacks();
   refreshUndoRedoButtons();
 
   // refresh button
