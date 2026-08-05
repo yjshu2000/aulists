@@ -1,5 +1,7 @@
 # Falsedge — Phase 3
 
+> **STATUS: implemented — this doc is stale.** Everything below shipped 2026-08-04 (v2.1, `505a7ea`). Kept as a record of intent, not a description of the code.
+
 Falsedge is a points/deadline tracker at `falsedge.html` + `falsedge.js` + `style-falsedge.css`, sharing `style-colourful.css` with `about.html`. It has its own localStorage key and its own undo engine, and it reads and writes Aulists' storage for linked tasks.
 
 Phase 3 builds the entire page. Phase 2 left a scaffold: the three files exist, `readAulistsListZero()` reads List 0, and `freshState()` returns `{version, ledger: []}`.

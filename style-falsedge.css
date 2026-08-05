@@ -308,6 +308,17 @@
     color: var(--c-sky);
     font-size: 13px;
   }
+  /* positioning parent for the "edit time?" overlay */
+  .tier-rows {
+    position: relative;
+  }
+  .task-time-edit {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 4px 0 2px;
+  }
   .tier {
     line-height: 1.6;
   }

@@ -33,6 +33,8 @@
   // and never survives an actual page load.
   var spendOpen = false;
   var scoresOpen = false;
+  // id of the active task whose deadline/mode editor is open, if any
+  var timeEditId = null;
   // the ACTIVATE adder is not draft-backed in storage, but it does have to
   // survive a re-render triggered from elsewhere on the page.
   var adderDraft = { text: "", time: "", mode: null };
@@ -1052,6 +1054,58 @@
   }
 
   /**
+   * Moves an active task's deadline. Validated exactly as SET validates a new
+   * one - resolved from `getNow()` at tap time, held to the same 20-minute
+   * floor, and refused if another active task already holds that instant. The
+   * task's own deadline is excluded from the overlap check, since a task can
+   * hardly clash with itself.
+   * @param {string} id - the task id.
+   * @param {string} clock - the chosen clock time, "HH:MM".
+   */
+  function editTaskTime(id, clock) {
+    var task = findTask(id);
+    if (!task) return;
+    var now = getNow();
+    var deadline = resolveClockTime(clock, now);
+    if (deadline.getTime() - now.getTime() < MIN_LEAD_MS) {
+      toast("refreshed");
+      render();
+      return;
+    }
+    var clash = state.activeTasks.some(function (t) {
+      return t.id !== id &&
+        new Date(t.deadline).getTime() === deadline.getTime();
+    });
+    if (clash) {
+      toast(hhmm(deadline) + " overlaps");
+      return;
+    }
+    var iso = deadline.toISOString();
+    if (task.deadline === iso) return;
+    pushUndo("edit task time");
+    task.deadline = iso;
+    save();
+    render();
+  }
+
+  /**
+   * Switches an active task's leniency, which reshapes its tier rows. Unlike
+   * SET's toggles this one can't clear back to unset - an active task always
+   * has a mode, so tapping the lit one is a no-op.
+   * @param {string} id - the task id.
+   * @param {string} mode - "WL" or "HL".
+   */
+  function editTaskMode(id, mode) {
+    var task = findTask(id);
+    if (!task) return;
+    if (task.mode === mode) return;
+    pushUndo("edit task mode");
+    task.mode = mode;
+    save();
+    render();
+  }
+
+  /**
    * Validates and commits the SET box. Every failure is a hard block with its
    * own toast; nothing is set and nothing silently defaults.
    */
@@ -1591,6 +1645,66 @@
   }
 
   /**
+   * Wires the `edit time?` overlay onto a task's tier rows, the same shape as
+   * the `edit?` overlay on its text.
+   * @param {Element} wrap - the tier-row wrapper (the positioning parent).
+   * @param {string} id - the task id.
+   */
+  function attachTimeEdit(wrap, id) {
+    wrap.addEventListener("click", function (e) {
+      e.stopPropagation();
+      closeEditOverlays();
+      var overlay = el("button", "edit-overlay", "edit time?");
+      overlay.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        closeEditOverlays();
+        timeEditId = id;
+        render();
+      });
+      wrap.appendChild(overlay);
+    });
+  }
+
+  /**
+   * Builds the deadline/leniency editor that replaces a task's tier rows
+   * while it's open. Both controls commit on change, and the editor stays
+   * open across a commit so time and mode can be changed in one go.
+   * @param {string} id - the task id.
+   * @param {Date} now - the moment the dropdown is built against.
+   * @returns {Element} the editor row.
+   */
+  function buildTaskTimeEditor(id, now) {
+    var task = findTask(id);
+    var row = el("div", "task-time-edit");
+    var opts = dropdownOptions(now);
+    var sel = el("select", "time-select");
+    opts.forEach(function (t) {
+      var o = el("option", "", t);
+      o.value = t;
+      sel.appendChild(o);
+    });
+    // an overdue deadline isn't on offer any more, so fall to the first slot
+    var cur = hhmm(new Date(task.deadline));
+    if (opts.indexOf(cur) === -1) {
+      cur = opts[0];
+    }
+    sel.value = cur;
+    sel.addEventListener("change", function () {
+      editTaskTime(id, sel.value);
+    });
+    row.appendChild(sel);
+    row.appendChild(buildModeToggles(function () {
+      var live = findTask(id);
+      if (!live) return null;
+      return live.mode;
+    }, function (next) {
+      if (!next) return;
+      editTaskMode(id, next);
+    }));
+    return row;
+  }
+
+  /**
    * Builds one active task's block: cancel, text, the four tier rows, and the
    * two completion controls.
    * @param {string} id - the task id.
@@ -1621,14 +1735,21 @@
     var now = getNow();
     var tiers = tierList(task);
     var live = liveTierIndex(tiers, now);
-    tiers.forEach(function (tier, i) {
-      var cls = "tier tier-faint";
-      if (i === live) {
-        cls = "tier tier-live";
-      }
-      block.appendChild(el("div", cls,
-        "by " + hhmm(tier.at) + " for " + tier.pts + " pts"));
-    });
+    if (timeEditId === id) {
+      block.appendChild(buildTaskTimeEditor(id, now));
+    } else {
+      var tierWrap = el("div", "tier-rows");
+      tiers.forEach(function (tier, i) {
+        var cls = "tier tier-faint";
+        if (i === live) {
+          cls = "tier tier-live";
+        }
+        tierWrap.appendChild(el("div", cls,
+          "by " + hhmm(tier.at) + " for " + tier.pts + " pts"));
+      });
+      attachTimeEdit(tierWrap, id);
+      block.appendChild(tierWrap);
+    }
 
     var actions = el("div", "task-actions");
     var nowBtn = el("button", "btn", "complete now");
@@ -2174,8 +2295,13 @@
     if (!e.target.closest(".menu-anchor")) {
       closeAllMenus();
     }
-    if (!e.target.closest(".task-text-row")) {
+    if (!e.target.closest(".task-text-row")
+      && !e.target.closest(".tier-rows")) {
       closeEditOverlays();
+    }
+    if (timeEditId && !e.target.closest(".task-time-edit")) {
+      timeEditId = null;
+      render();
     }
   });
 
