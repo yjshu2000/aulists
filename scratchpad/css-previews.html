@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Falsedge CSS previews</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  body {
+    background:
+      radial-gradient(1200px 600px at 70% -10%, rgba(60,195,226,.06), transparent 60%),
+      #12141c;
+    color: #e9ebf2;
+    font-family: "Space Mono", monospace;
+    padding: 24px 16px 80px;
+    max-width: 700px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 8px;
+  }
+  .note {
+    color: #878da2;
+    font-size: 12px;
+    line-height: 1.7;
+    margin-bottom: 32px;
+  }
+  .entry {
+    margin-bottom: 44px;
+  }
+  .entry.task {
+    margin-bottom: 28px;
+  }
+
+  /* the label above each box, same treatment as .fd-label */
+  .fd-label {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin: 0 0 6px 2px;
+    color: color-mix(in srgb, var(--glow) 62%, #878da2);
+    text-shadow: 0 0 12px color-mix(in srgb, var(--glow) 35%, transparent);
+  }
+  .meta {
+    display: block;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: .04em;
+    color: #5a6072;
+    text-shadow: none;
+    margin-top: 2px;
+  }
+  .swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    margin-right: 7px;
+    vertical-align: middle;
+    background: var(--glow);
+  }
+
+  /* halo + inner sheen, copied verbatim from style-falsedge.css */
+  .block {
+    position: relative;
+    background: #1a1d27;
+    border-radius: 14px;
+    padding: 18px 16px 16px;
+    border: 1px solid color-mix(in srgb, var(--glow) 34%, #242938);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--glow) 9%, transparent),
+      0 0 22px -6px color-mix(in srgb, var(--glow) 45%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--glow) 30%, transparent),
+      inset 0 10px 22px -16px color-mix(in srgb, var(--glow) 65%, transparent);
+  }
+  /* the cancel tab riding the top border */
+  .tab {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translateY(-50%);
+    min-height: 34px;
+    padding: 0 12px;
+    font: inherit;
+    font-size: 12px;
+    color: #e9ebf2;
+    background: #20242f;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--glow) 45%, #2b3140);
+    box-shadow: 0 0 14px -5px color-mix(in srgb, var(--glow) 70%, transparent);
+  }
+  .task-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .tier {
+    color: #5a6072;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .tier.live {
+    color: #e9ebf2;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Falsedge glow &mdash; inverted active-task test</h1>
+<div class="note">
+  Blocks are in real page order, teals dropped. Everything descends 191&deg; &rarr; 249&deg;
+  <em>except</em> the three active tasks, which deliberately run backwards (224&deg; &rarr; 207&deg;)
+  so you can see whether the doubling-back reads as contrast or as barf.
+  Watch the two seams: <strong>pale azure &rarr; blue</strong> at the top of the stack, and
+  <strong>azure &rarr; deep blue</strong> at the bottom.
+</div>
+
+<div class="entry" style="--glow:#3cc3e2">
+  <div class="fd-label"><span class="swatch"></span>accent<span class="meta">sky &middot; #3cc3e2 &middot; 191&deg; &middot; replaces --c-cyan app-wide, not a section glow</span></div>
+  <div class="block">
+    <div class="task-title">chevrons, WL / HL lit, undo pill</div>
+    <div class="tier">this colour never wraps a box &mdash; shown for adjacency only</div>
+  </div>
+</div>
+
+<div class="entry" style="--glow:#3dade1">
+  <div class="fd-label"><span class="swatch"></span>ledger<span class="meta">pale azure &middot; #3dade1 &middot; 199&deg;</span></div>
+  <div class="block">
+    <div class="task-title">do task</div>
+    <div class="tier">by 2026-08-02 16:00 (WL)</div>
+    <div class="tier">completed by: 16:08</div>
+    <div class="tier">pts = 42 + 3 = 45</div>
+  </div>
+</div>
+
+<div class="entry task" style="--glow:#476fdc">
+  <div class="fd-label"><span class="swatch"></span>active task 1 &mdash; soonest<span class="meta">blue &middot; #476fdc &middot; 224&deg;</span></div>
+  <div class="block">
+    <button class="tab">cancel task</button>
+    <div class="task-title">do task</div>
+    <div class="tier">by 16:00 for 6 pts</div>
+    <div class="tier live">by 16:10 for 3 pts</div>
+    <div class="tier">by 16:30 for 2 pts</div>
+  </div>
+</div>
+
+<div class="entry task" style="--glow:#4582de">
+  <div class="fd-label"><span class="swatch"></span>active task 2<span class="meta">cornflower &middot; #4582de &middot; 216&deg;</span></div>
+  <div class="block">
+    <button class="tab">cancel task</button>
+    <div class="task-title">vacuum</div>
+    <div class="tier">by 19:00 for 6 pts</div>
+    <div class="tier live">by 19:05 for 3 pts</div>
+    <div class="tier">by 19:15 for 2 pts</div>
+  </div>
+</div>
+
+<div class="entry task" style="--glow:#3f97de">
+  <div class="fd-label"><span class="swatch"></span>active task 3 &mdash; latest<span class="meta">azure &middot; #3f97de &middot; 207&deg;</span></div>
+  <div class="block">
+    <button class="tab">cancel task</button>
+    <div class="task-title">job search stuff</div>
+    <div class="tier">by 22:00 for 6 pts</div>
+    <div class="tier live">by 22:10 for 3 pts</div>
+    <div class="tier">by 22:30 for 2 pts</div>
+  </div>
+</div>
+
+<div class="entry" style="--glow:#485bdb">
+  <div class="fd-label"><span class="swatch"></span>set<span class="meta">deep blue &middot; #485bdb &middot; 232&deg;</span></div>
+  <div class="block">
+    <div class="task-title">[ task text ]</div>
+    <div class="tier">by 17:00 17:10 17:20 17:30 18:00</div>
+    <div class="tier live">or select 16:50</div>
+  </div>
+</div>
+
+<div class="entry" style="--glow:#4d4ad9">
+  <div class="fd-label"><span class="swatch"></span>activate<span class="meta">indigo &middot; #4d4ad9 &middot; 241&deg;</span></div>
+  <div class="block">
+    <div class="task-title">check in after getting home</div>
+    <div class="tier">19:00 &middot; WL &middot; HL</div>
+    <div class="task-title">shower</div>
+    <div class="tier">04:40 &middot; WL &middot; HL</div>
+  </div>
+</div>
+
+<div class="entry" style="--glow:#6a4fd6">
+  <div class="fd-label"><span class="swatch"></span>link<span class="meta">purple &middot; #6a4fd6 &middot; 249&deg;</span></div>
+  <div class="block">
+    <div class="task-title">vacuum</div>
+    <div class="tier">job search stuff</div>
+  </div>
+</div>
+
+</body>
+</html>

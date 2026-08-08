@@ -105,7 +105,6 @@
     gap: 8px;
     max-height: 66vh;
     overflow-y: auto;
-    overscroll-behavior: contain;
   }
   .ledger-entry {
     white-space: pre-wrap;
@@ -253,14 +252,12 @@
   }
 
   /* ------------------------------- active tasks --------------------------- */
-  /* the extra 17px is the cancel tab's overhang - it sticks half its 34px
-     height above the first block, and would otherwise eat the whole gap */
   .tasks {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 32px;
-    margin-top: calc(36px + 17px);
+    gap: 48px;
+    margin-top: 60px;
   }
   /* each block is only as wide as its own widest line */
   .task-block {
@@ -269,7 +266,7 @@
     max-width: 100%;
     background: var(--panel-2);
     border-radius: var(--radius);
-    padding: 18px 16px 14px;
+    padding: 24px 16px 14px;
   }
   /* rides the block's top border, half in / half out, right edges flush -
      a close button in the corner, just spelled out in words */
@@ -439,9 +436,6 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    max-height: 40vh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
   }
   .tpl-row {
     padding: 8px;
