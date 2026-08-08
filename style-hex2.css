@@ -177,6 +177,45 @@
     font-weight: 800;
   }
 
+  /* --------------------------------- lockout ---------------------------- */
+  /* Covers the whole viewport, not just the board - the point is that the
+     only things left to touch are the two ways out. */
+  .lockout {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(18, 20, 26, 0.94);
+    backdrop-filter: blur(3px);
+  }
+  .lockout.show {
+    display: flex;
+  }
+  .lockout-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 26px;
+    text-align: center;
+  }
+  .lockout-big {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+  .lockout-sub {
+    color: var(--hex-ink-dim);
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+  .lockout .hexbtn {
+    min-width: 180px;
+    min-height: 46px;
+  }
+
   /* ---------------------------------- footer ---------------------------- */
   footer {
     color: var(--hex-ink-dim);

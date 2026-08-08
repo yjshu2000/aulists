@@ -19,6 +19,9 @@ window.Hex2 = (function () {
   const SQRT3 = Math.sqrt(3);
   const BEST_KEY = "hexadecimal.best.v1";
   const MODE_KEY = "hex2.mode";
+  const BREAK_KEY = "hex2.break.start";
+  const UNDO_DEPTH = 6;
+  const BREAK_MS = 90 * 1000;   // a break is ninety seconds, for now
   const SWIPE_MIN = 22;      // px of travel before a drag counts as a swipe
 
   // ------------------- storage (no-op if blocked) ---------------------
@@ -104,9 +107,40 @@ window.Hex2 = (function () {
   let idCounter = 1;
   let over = false;
   let announcedWin = false;
-  let history = [];          // undo snapshots, capped at 2
+  let history = [];          // undo snapshots, capped at UNDO_DEPTH
   let mode = null;           // the config object handed to boot()
   let saveKey = "";
+
+  // sfc32, seeded from real OS entropy. Math.random() would do the job
+  // except that its state is hidden, so undo cannot rewind it - and a
+  // spawn that rerolls on undo means "swipe, undo, swipe again until the
+  // tile lands somewhere nice". Owning the state makes a repeated move
+  // reproduce its spawn exactly.
+  let rng = [0, 0, 0, 0];
+
+  function seedRng() {
+    const words = new Uint32Array(4);
+    crypto.getRandomValues(words);
+    rng = [words[0], words[1], words[2], words[3]];
+  }
+
+  function nextRandom() {
+    let a = rng[0] >>> 0;
+    let b = rng[1] >>> 0;
+    let c = rng[2] >>> 0;
+    let d = rng[3] >>> 0;
+    let t = (a + b) | 0;
+    a = b ^ (b >>> 9);
+    b = (c + (c << 3)) | 0;
+    c = (c << 21) | (c >>> 11);
+    d = (d + 1) | 0;
+    t = (t + d) | 0;
+    c = (c + t) | 0;
+    rng = [a, b, c, d];
+    return (t >>> 0) / 4294967296;
+  }
+
+  seedRng();
 
   function newId() {
     const id = idCounter;
@@ -125,9 +159,9 @@ window.Hex2 = (function () {
     if (!empties.length) {
       return null;
     }
-    const c = empties[(Math.random() * empties.length) | 0];
+    const c = empties[(nextRandom() * empties.length) | 0];
     let value = 2;
-    if (Math.random() >= 0.9) {
+    if (nextRandom() >= 0.9) {
       value = 4;
     }
     board.set(c.key, { value: value, id: newId() });
@@ -400,8 +434,10 @@ window.Hex2 = (function () {
       tiles: tiles,
       score: score,
       announcedWin: announcedWin,
+      idCounter: idCounter,
+      rng: rng.slice(),
     });
-    if (history.length > 2) {
+    if (history.length > UNDO_DEPTH) {
       history.shift();
     }
     updateUndo();
@@ -424,6 +460,13 @@ window.Hex2 = (function () {
     }
     score = snap.score;
     announcedWin = snap.announcedWin;
+    // rewinding these is what makes a repeated move replay its spawn
+    if (snap.rng) {
+      rng = snap.rng.slice();
+    }
+    if (snap.idCounter) {
+      idCounter = snap.idCounter;
+    }
     over = false;
     hideOverlay();
     updateScores();
@@ -510,6 +553,8 @@ window.Hex2 = (function () {
       score: score,
       idCounter: idCounter,
       announcedWin: announcedWin,
+      rng: rng,
+      history: history,
     }));
   }
 
@@ -529,6 +574,13 @@ window.Hex2 = (function () {
       score = data.score || 0;
       idCounter = data.idCounter || 1;
       announcedWin = !!data.announcedWin;
+      if (Array.isArray(data.rng) && data.rng.length === 4) {
+        rng = data.rng.slice();
+      }
+      history = [];
+      if (Array.isArray(data.history)) {
+        history = data.history.slice(-UNDO_DEPTH);
+      }
       return board.size > 0;
     } catch (e) {
       return false;
@@ -541,6 +593,8 @@ window.Hex2 = (function () {
     over = false;
     announcedWin = false;
     history = [];
+    idCounter = 1;
+    seedRng();
     if (mode.onReset) {
       mode.onReset();
     }
@@ -583,6 +637,30 @@ window.Hex2 = (function () {
       dir = "dr";
     }
     mode.move(dir);
+  }
+
+  // --------------------------- break timer ----------------------------
+  // Falsedge stamps BREAK_KEY on its way here, so the break is timed only
+  // when you arrived through that link. The stamp lives in storage rather
+  // than memory because the mode switch reloads the page - otherwise
+  // flipping Normal/Jiggly would restart the clock forever.
+  const lockout = document.getElementById("lockout");
+
+  function showLockout() {
+    lockout.classList.add("show");
+  }
+
+  function startBreakTimer() {
+    const started = parseInt(store.get(BREAK_KEY) || "0", 10);
+    if (!started) {
+      return;
+    }
+    const left = started + BREAK_MS - Date.now();
+    if (left <= 0) {
+      showLockout();
+      return;
+    }
+    setTimeout(showLockout, left);
   }
 
   // --------------------------- mode switch ----------------------------
@@ -650,6 +728,15 @@ window.Hex2 = (function () {
       new ResizeObserver(relayout).observe(canvas.parentElement);
     }
 
+    // Walking out of the page on purpose ends the break; the mode switch
+    // reloads without touching the stamp, so it cannot be used to escape.
+    const exits = document.querySelectorAll(".navaway");
+    for (const link of exits) {
+      link.addEventListener("click", function () {
+        store.set(BREAK_KEY, "0");
+      });
+    }
+
     computeLayout();
     updateScores();
     updateUndo();
@@ -659,6 +746,7 @@ window.Hex2 = (function () {
       save();
     }
     drawStatic();
+    startBreakTimer();
   }
 
   return {
