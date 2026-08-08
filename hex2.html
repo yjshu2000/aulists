@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Hex 2^</title>
+<link rel="stylesheet" href="style-hex2.css">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12141a">
+</head>
+<body>
+
+<a class="hexbtn page-nav-top" href="falsedge.html">&larr;&nbsp;Go to Falsedge&nbsp;&larr;</a>
+
+<header>
+  <div class="brand">
+    <h1>Hex 2^</h1>
+    <small>shamelessly vibecoded &middot; <span id="mode-name">normal mode</span></small>
+  </div>
+  <div class="scores">
+    <div class="score"><div class="k">Score</div><div class="v" id="score">0</div></div>
+    <div class="score"><div class="k">Best</div><div class="v" id="best">0</div></div>
+  </div>
+  <div class="row-break"></div>
+  <button class="hexbtn" id="undo" disabled>&#8630;&nbsp;Undo</button>
+  <div class="row-break"></div>
+  <button class="hexbtn" id="newgame">New game</button>
+  <button class="hexbtn" id="mode">Go to Jiggly</button>
+</header>
+
+<div class="stage">
+  <canvas id="board"></canvas>
+  <div class="overlay" id="overlay">
+    <div class="card">
+      <div class="big" id="ov-big">No moves left</div>
+      <div class="sub" id="ov-sub">The board is full.</div>
+      <button id="ov-btn">Play again</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Swipe up/down, along <b>/</b>, and along <b>\</b> to slide the board.
+</footer>
+
+<script>
+(function () {
+  // Pick the mode file for this page load. Each mode is a self-booting
+  // script that grabs the DOM and binds its own listeners, so only one may
+  // ever be present - switching mode reloads the page rather than swapping
+  // scripts live. async = false is what keeps core ahead of the mode.
+  var mode = "base";
+  try {
+    if (localStorage.getItem("hex2.mode") === "jiggly") {
+      mode = "jiggly";
+    }
+  } catch (e) {
+    // storage blocked; fall back to normal mode
+  }
+  var files = ["hex2-core.js", "hex2-" + mode + ".js"];
+  for (var i = 0; i < files.length; i++) {
+    var s = document.createElement("script");
+    s.src = files[i];
+    s.async = false;
+    document.body.appendChild(s);
+  }
+})();
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
+</script>
+</body>
+</html>

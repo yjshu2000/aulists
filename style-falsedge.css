@@ -564,6 +564,12 @@
     min-height: 44px;
     text-decoration: none;
   }
+  .page-nav-bottom.nav-right {
+    justify-content: flex-end;
+  }
+  .page-nav-bottom.nav-right + .page-nav-bottom {
+    margin-top: 8px;
+  }
 
   /* ------------------------------ toast / pill ---------------------------- */
   .toast {
