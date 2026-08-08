@@ -201,16 +201,6 @@
     padding: 26px;
     text-align: center;
   }
-  .lockout-big {
-    font-size: 28px;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-  }
-  .lockout-sub {
-    color: var(--hex-ink-dim);
-    font-size: 13px;
-    margin-bottom: 8px;
-  }
   .lockout .hexbtn {
     min-width: 180px;
     min-height: 46px;
