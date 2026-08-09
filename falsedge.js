@@ -620,15 +620,17 @@
 
   /**
    * Finds the live tier at a given moment, resolved inclusively - completing
-   * at exactly a tier's time still awards that tier.
+   * at exactly a tier's time (floored to the minute) still awards that tier.
    * @param {{at: Date}[]} tiers - the task's tiers.
    * @param {Date} now - the moment to resolve against.
    * @returns {number} the tier's index, or -1 once every tier has passed.
    */
   function liveTierIndex(tiers, now) {
+    var floored = new Date(now.getTime());
+    floored.setSeconds(0, 0);
     var i;
     for (i = 0; i < tiers.length; i++) {
-      if (tiers[i].at.getTime() >= now.getTime()) return i;
+      if (tiers[i].at.getTime() >= floored.getTime()) return i;
     }
     return -1;
   }
@@ -726,7 +728,7 @@
       var block = "```\n" + state.ledger[i] + "\n```";
       var next = out;
       if (next) {
-        next = next + "\n\n";
+        next = next + "\n";
       }
       next = next + block;
       if (next.length > EXPORT_LIMIT) break;

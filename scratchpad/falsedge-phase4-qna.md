@@ -70,6 +70,8 @@ A dateless `ACTIVATE (others)` row still needs a time set before swipe-left will
 
 ## Q10 — How does a task actually get promoted to DOLI status, and which tasks are eligible? **NOT SURE YET.**
 
+Build the DOLI mechanics — state schema, scoring curve, per-day/per-week limits — now, but leave no UI control to actually trigger a promotion. Revisit once there's a concrete UI to look at.
+
 ## Q11 — What happens to items already in Aulists' List 0 or List 2.5 when Phase 4 ships?
 
 **Nothing. No migration code gets written, ever (see S5).** Current chain is `["0", "1", "2", "2.5", "3", "4"]`; removing `"0"` and `"2.5"` leaves `["1", "2", "3", "4"]`, already sequential. Whatever was sitting in List 0 or List 2.5 at upgrade time is simply no longer read or written by anything; if the user wants to keep it, they export beforehand and re-import manually.
@@ -144,7 +146,7 @@ log spent points
 - The renamed Aulists file is `aulists.html`.
 - `manifest.json`'s `name`/`short_name` stay `"Aulists"` — it remains the overall umbrella app name, unchanged by which page is the entry point.
 
-## Q19 — Swipe direction meanings on `ACTIVATE` rows (both `dailies` and `others`)
+## Q18 — Swipe direction meanings on `ACTIVATE` rows (both `dailies` and `others`)
 
 **Swipe left** (right→left) directly creates the active task, bypassing `SET` entirely, gated on all required fields being filled (see Q3/Q4 — text, WL/HL, time required; date optional for `others`). Refuses with a toast if a required field is missing.
 
@@ -152,13 +154,49 @@ log spent points
 
 There is no lap/skip mechanic. No swipe bumps a row's position, no hamburger `Skip` entry, no `lap` field. `ACTIVATE (dailies)` rows sort purely by time.
 
-## Q20 — Does the "by" label go on both the row's own time control and the adder's time control?
+## Q19 — Does the "by" label go on both the row's own time control and the adder's time control?
 
 **Yes, both.** Same placement style as `SET`'s existing "by" label — to the left of the control. Both currently route through the shared `buildDayTimeSelect()`, so both get the label.
 
-## Q21 — Scroll containment removal: `ACTIVATE`'s height cap, and a separate ledger scroll-lock bug
+## Q20 — Scroll containment removal: `ACTIVATE`'s height cap, and a separate ledger scroll-lock bug
 
 **Two distinct changes:**
 
 - `ACTIVATE (dailies)` and `ACTIVATE (others)` both lose their internal scroll region entirely — no `max-height: 40vh`, no `overflow-y`, no `overscroll-behavior`. The section just renders at full height and the page scrolls past it.
 - The ledger keeps its own internal scroll region (`max-height: 66vh` when expanded) — that part is unchanged. But `.ledger-list`'s `overscroll-behavior: contain` gets removed. That property currently blocks scroll chaining: a touch-drag starting inside the ledger list can't fall through to scroll the outer page even when the ledger has nothing left to scroll (e.g. only one entry) — the gesture just freezes instead of moving anything. Removing it restores the browser's default scroll-chaining behaviour.
+
+## Q21 — Collapsible `ACTIVATE` sections. **NOT IN SCOPE — dropped.**
+
+Neither `ACTIVATE (dailies)` nor `ACTIVATE (others)` gets a collapse control. Both sections always render fully expanded.
+
+## Q22 — Does a DOLI task keep WL/HL as a leniency-scale state, applied to DOLI's own offset schedule?
+
+**Yes.** WL/HL is a general ½-scale state, not two fixed unrelated arrays (`HL_OFFSETS` is `WL_OFFSETS` halved: `[0,10,30,60]` → `[0,5,15,30]`). DOLI defines its own whole (WL) schedule — `0/10/30/60/120/>120` minutes → `12/6/3/2/0/-6` pts — and the same halving rule applies when a DOLI task is set to HL: `0/5/15/30/60/>60` minutes, same points.
+
+## Q23 — link to Hex2^ game? 
+
+Already implemented. Ignore this.
+
+## Q24 — How are the "max 1 DOLI per day / max 4 per week" limits tracked? **NOT SURE YET — the limits themselves (1/day, 4/week) aren't finalized either.**
+
+## Q25 — DOLI's Aventurine icon
+
+**Four chibi images, one picked at random per page load (stable through re-renders until an actual reload — not re-randomized on every `render()` call):**
+
+- `aven-play-cards.png`
+- `aven-cool.png`
+- `aven-cheers.png`
+- `aven-throw-money.png`
+
+All four already sit at the project root, alongside `icon.svg`.
+
+## Q26 — Aulists: pencil → hamburger menu, replaced with a copy-text icon
+
+**Add an "Edit" entry to the hamburger's dropdown menu, calling the same `startEdit(li, item)` the pencil currently calls.** Replace every current `buildPencil()` call site (main list rows, Completed-list rows, and any other row type it appears on) with a new standalone copy button in that same visual slot, copying the item's text to the clipboard. Uses Falsedge's existing `COPY_ICON` SVG (the two-overlapping-rectangles glyph already used for the ledger and high-scores copy buttons) as the icon, and toasts success/failure the same way Falsedge's copy actions already do. `buildPencil()` gets renamed to something like `buildCopyBtn()` to match what it now builds — not left with a misleading name.
+
+`buildTrashBtn()` (defined but never called anywhere — dead code from an earlier, since-abandoned refactor) gets deleted entirely while touching this area.
+
+## Q27 — Line-wrap scope for all Falsedge text fields
+
+**All of them.** Every single-line `<input type="text">` in Falsedge becomes multiline: `SET`'s text field, the `ACTIVATE` adder's text field, the spend row's text field, and the inline-edit inputs (active task text edit, template hamburger edit).
+
