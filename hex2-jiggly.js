@@ -1,9 +1,9 @@
 // Hex 2^ - jiggly mode.
 //
-// One interruptible animation loop instead of chained callbacks. Every
-// move commits to the board synchronously, so the wobble is purely
-// cosmetic and a fresh swipe can cut it off mid-flight without the game
-// state ever being caught halfway. Nothing moves while the board is idle.
+// One interruptible animation loop instead of chained callbacks. Every move
+// commits to the board synchronously, so the wobble is purely cosmetic and a
+// fresh swipe can cut it off mid-flight without the game state ever being
+// caught halfway. Nothing moves while the board is idle.
 
 (function () {
   "use strict";
@@ -15,15 +15,37 @@
   const GROW_MS = 300;        // how long a spawned tile balloons in for
   const WOBBLE_FREQ = 15;     // oscillations across one wobble
   const WOBBLE_DECAY = 2.6;   // lower = quivers longer before it sets
+  const WOBBLE_2ND_FREQ = 0.82;
+
+  const SLIDE_OVERSHOOT = 1.5;
+  const SLIDE_SMEAR = 0.34;
+
+  const PUNCH_X = 0.52;
+  const PUNCH_Y = 0.46;
+  const PUNCH_ROT = 0.12;
+
+  const GROW_OVERSHOOT = 4.0;
+  const GROW_X = 0.42;
+  const GROW_Y = 0.38;
+  const GROW_ROT = 0.14;
+
+  const BLOCK_AMP = 0.22;
+  const BLOCK_FREQ = 1.8;
+  const BLOCK_DECAY = 4.2;
+  const BLOCK_WOBBLE_FREQ = 6;
+  const BLOCK_WOBBLE_DECAY = 3.2;
+  const BLOCK_SQUASH = 0.18;
+  const BLOCK_ROT = 0.06;
 
   // rubber-band push direction for a swipe that hit a wall
+  const COS30 = Math.sqrt(3) / 2;
   const DIR_VEC = {
     up: [0, -1],
     down: [0, 1],
-    ur: [0.866, -0.5],
-    dl: [-0.866, 0.5],
-    ul: [-0.866, -0.5],
-    dr: [0.866, 0.5],
+    ur: [COS30, -0.5],
+    dl: [-COS30, 0.5],
+    ul: [-COS30, -0.5],
+    dr: [COS30, 0.5],
   };
 
   let anim = null;           // { type, start, dur, ... } or null when idle
@@ -32,7 +54,7 @@
   function easeOutBack(t, s) {          // overshoot, then settle back
     let k = s;
     if (k === undefined) {
-      k = 1.5;
+      k = SLIDE_OVERSHOOT;
     }
     const u = t - 1;
     return u * u * ((k + 1) * u + k) + 1;
@@ -42,8 +64,8 @@
     return Math.exp(-decay * t) * Math.sin(freq * Math.PI * t);
   }
 
-  // sx/sy squash the hex about its own centre; rot adds a gooey twist.
-  // The number is drawn inside the same transform so it squishes too.
+  // sx/sy squash the hex about its own centre; rot adds a gooey twist. The
+  // number is drawn inside the same transform so it squishes too.
   function drawTile(cx, cy, size, value, sxIn, syIn, rot) {
     let sx = sxIn;
     let sy = syIn;
@@ -61,11 +83,11 @@
       ctx.rotate(rot);
     }
     ctx.scale(sx, sy);
-    Hex2.hexPath(0, 0, size * 0.9);
+    Hex2.hexPath(0, 0, size * Hex2.TILE.radiusFrac);
     ctx.fillStyle = colours.fill;
     ctx.fill();
-    ctx.lineWidth = Math.max(1, size * 0.03);
-    ctx.strokeStyle = "rgba(0,0,0,0.18)";
+    ctx.lineWidth = Math.max(1, size * Hex2.TILE.strokeFrac);
+    ctx.strokeStyle = Hex2.TILE.strokeColour;
     ctx.stroke();
 
     const fs = Hex2.tileFontSize(value, size);
@@ -73,7 +95,7 @@
     ctx.font = "800 " + fs + "px ui-sans-serif, system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(String(value), 0, fs * 0.04);
+    ctx.fillText(String(value), 0, fs * Hex2.TILE.textNudgeFrac);
     ctx.restore();
   }
 
@@ -84,8 +106,8 @@
     }
   }
 
-  // The board is already at rest, so dropping the in-flight cosmetics is
-  // always safe - there is no state to unwind.
+  // The board is already at rest, so dropping the in-flight cosmetics is always
+  // safe - there is no state to unwind.
   function settleAnim() {
     anim = null;
   }
@@ -151,7 +173,7 @@
   // ---------------------------- the frames ----------------------------
   function renderSlide(a, t) {
     const layout = Hex2.getLayout();
-    const e = easeOutBack(t, 1.5);
+    const e = easeOutBack(t, SLIDE_OVERSHOOT);
     const spd = Math.max(0, 1 - t);
     Hex2.drawBoardBase(0, 0);
     for (const m of a.movers) {
@@ -162,7 +184,7 @@
       const len = Math.hypot(dx, dy) || 1;
       const ux = dx / len;
       const uy = dy / len;
-      const st = 0.34 * spd;             // smear along the travel axis
+      const st = SLIDE_SMEAR * spd;      // smear along the travel axis
       const sx = 1 + st * (Math.abs(ux) - Math.abs(uy));
       const sy = 1 + st * (Math.abs(uy) - Math.abs(ux));
       drawTile(
@@ -180,7 +202,7 @@
   function renderPop(a, t) {
     const layout = Hex2.getLayout();
     const w = damped(t, WOBBLE_FREQ, WOBBLE_DECAY);
-    const w2 = damped(t, WOBBLE_FREQ * 0.82, WOBBLE_DECAY);
+    const w2 = damped(t, WOBBLE_FREQ * WOBBLE_2ND_FREQ, WOBBLE_DECAY);
     Hex2.drawBoardBase(0, 0);
     for (const entry of Hex2.getBoard()) {
       const key = entry[0];
@@ -189,15 +211,15 @@
       let sy = 1;
       let rot = 0;
       if (a.punch.has(key)) {
-        sx = 1 + 0.52 * w;
-        sy = 1 - 0.46 * w;
-        rot = 0.12 * w2;
+        sx = 1 + PUNCH_X * w;
+        sy = 1 - PUNCH_Y * w;
+        rot = PUNCH_ROT * w2;
       } else if (a.grow.has(key)) {
         const gt = Math.min(1, t * a.dur / GROW_MS);
-        const o = easeOutBack(gt, 4.0);
-        sx = o * (1 + 0.42 * w);
-        sy = o * (1 - 0.38 * w);
-        rot = 0.14 * w2;
+        const o = easeOutBack(gt, GROW_OVERSHOOT);
+        sx = o * (1 + GROW_X * w);
+        sy = o * (1 - GROW_Y * w);
+        rot = GROW_ROT * w2;
       }
       drawTile(
         p.x,
@@ -212,22 +234,22 @@
     Hex2.endFrame();
   }
 
-  // The whole board leans into the wall and springs back, so a dead swipe
-  // reads as "nothing moved" rather than as a dropped input.
+  // The whole board leans into the wall and springs back, so a dead swipe reads
+  // as "nothing moved" rather than as a dropped input.
   function renderBlocked(a, t) {
     const layout = Hex2.getLayout();
     let v = DIR_VEC[a.dir];
     if (!v) {
       v = [0, 0];
     }
-    const amp = layout.size * 0.22;
-    const k = damped(t, 1.8, 4.2);
+    const amp = layout.size * BLOCK_AMP;
+    const k = damped(t, BLOCK_FREQ, BLOCK_DECAY);
     const ox = v[0] * amp * k;
     const oy = v[1] * amp * k;
-    const w = damped(t, 6, 3.2);
-    const sx = 1 + 0.18 * w;
-    const sy = 1 - 0.18 * w;
-    const rot = 0.06 * w;
+    const w = damped(t, BLOCK_WOBBLE_FREQ, BLOCK_WOBBLE_DECAY);
+    const sx = 1 + BLOCK_SQUASH * w;
+    const sy = 1 - BLOCK_SQUASH * w;
+    const rot = BLOCK_ROT * w;
     Hex2.drawBoardBase(ox, oy);
     for (const entry of Hex2.getBoard()) {
       const p = Hex2.posOf(entry[0]);

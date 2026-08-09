@@ -27,10 +27,17 @@
   <div class="row-break"></div>
   <button class="hexbtn" id="newgame">New game</button>
   <button class="hexbtn" id="mode">Go to Jiggly</button>
+  <button class="hexbtn" id="padtoggle">Click pads on</button>
 </header>
 
 <div class="stage">
   <canvas id="board"></canvas>
+  <button class="pad pad-up" data-dir="up" aria-label="Slide up"></button>
+  <button class="pad pad-ul" data-dir="ul" aria-label="Slide upper left"></button>
+  <button class="pad pad-ur" data-dir="ur" aria-label="Slide upper right"></button>
+  <button class="pad pad-dl" data-dir="dl" aria-label="Slide lower left"></button>
+  <button class="pad pad-dr" data-dir="dr" aria-label="Slide lower right"></button>
+  <button class="pad pad-down" data-dir="down" aria-label="Slide down"></button>
   <div class="overlay" id="overlay">
     <div class="card">
       <div class="big" id="ov-big">No moves left</div>

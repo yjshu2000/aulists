@@ -2,12 +2,12 @@
 //
 // Owns everything the two modes agree on: the cube-coordinate board, the
 // slide/merge rules, canvas layout, storage, undo, the overlay, and swipe
-// input. A mode file (hex2-base.js / hex2-jiggly.js) supplies its own
-// drawTile and move driver, then calls Hex2.boot().
+// input. A mode file (hex2-base.js / hex2-jiggly.js) supplies its own drawTile
+// and move driver, then calls Hex2.boot().
 //
-// Only one mode is ever loaded per page load - hex2.html reads the stored
-// mode and injects the matching script - so a mode may hold its own
-// animation state freely without worrying about the other one.
+// Only one mode is ever loaded per page load - hex2.html reads the stored mode
+// and injects the matching script - so a mode may hold its own animation state
+// freely without worrying about the other one.
 
 window.Hex2 = (function () {
   "use strict";
@@ -23,6 +23,19 @@ window.Hex2 = (function () {
   const UNDO_DEPTH = 6;
   const BREAK_MS = 90 * 1000;   // a break is ninety seconds, for now
   const SWIPE_MIN = 22;      // px of travel before a drag counts as a swipe
+  const PADS_KEY = "hex2.pads";
+  const PAD_H = 60;          // slide-pad thickness, all of it grown outward
+  const PAD_GAP = 6;         // board edge to a pad's inner edge
+  const BOARD_HALF_HEIGHT = SQRT3 * (R + 0.5);
+  const PAD_LEN_UNITS = 3 * SQRT3;
+
+  // both modes draw a tile the same way; only the transform around it differs
+  const TILE = {
+    radiusFrac: 0.9,
+    strokeFrac: 0.03,
+    strokeColour: "rgba(0,0,0,0.18)",
+    textNudgeFrac: 0.04,
+  };
 
   // ------------------- storage (no-op if blocked) ---------------------
   const store = {
@@ -111,11 +124,9 @@ window.Hex2 = (function () {
   let mode = null;           // the config object handed to boot()
   let saveKey = "";
 
-  // sfc32, seeded from real OS entropy. Math.random() would do the job
-  // except that its state is hidden, so undo cannot rewind it - and a
-  // spawn that rerolls on undo means "swipe, undo, swipe again until the
-  // tile lands somewhere nice". Owning the state makes a repeated move
-  // reproduce its spawn exactly.
+  // sfc32, seeded from real OS entropy. Math.random() would do the job except
+  // that its state is hidden, so undo cannot rewind it and it would've enabled
+  // savescumming.
   let rng = [0, 0, 0, 0];
 
   function seedRng() {
@@ -169,9 +180,9 @@ window.Hex2 = (function () {
   }
 
   // ---------------------------- the rules -----------------------------
-  // Collapse every line for `dir`. The result carries enough detail for a
-  // mode to animate it: which tile travelled from where to where, and
-  // which destination cells were merges.
+  // Collapse every line for `dir`. The result carries enough detail for a mode
+  // to animate it: which tile travelled from where to where, and which
+  // destination cells were merges.
   function applyMove(dir) {
     const next = new Map();
     const movers = [];         // { id, value, fromKey, toKey }
@@ -254,9 +265,9 @@ window.Hex2 = (function () {
     return false;
   }
 
-  // Adopt an applyMove result. Spawning and saving deliberately stay with
-  // the mode: base spawns once its slide has finished, jiggly spawns
-  // immediately so an interrupting swipe cannot lose the new tile.
+  // Adopt an applyMove result. Spawning and saving deliberately stay with the
+  // mode: base spawns once its slide has finished, jiggly spawns immediately so
+  // an interrupting swipe cannot lose the new tile.
   function commit(res) {
     snapshot();
     board = res.next;
@@ -296,7 +307,7 @@ window.Hex2 = (function () {
       maxY = Math.max(maxY, p.py + SQRT3 / 2);
     }
 
-    const pad = 10;
+    const pad = PAD_GAP + PAD_H + 6;   // clearance for the pad ring
     const spanX = maxX - minX;
     const spanY = maxY - minY;
     const size = Math.min(
@@ -315,6 +326,16 @@ window.Hex2 = (function () {
       });
     }
     layout = { size: size, pos: pos, cssW: cssW, cssH: cssH };
+
+    // The pad ring rides the board's own radius so a resize moves both.
+    // --pad-inner is the ring's INNER edge, so thickening a pad only ever
+    // pushes it further out.
+    const host = canvas.parentElement;
+    const inner = Math.round(size * BOARD_HALF_HEIGHT + PAD_GAP);
+    const len = Math.round(size * PAD_LEN_UNITS);
+    host.style.setProperty("--pad-inner", inner + "px");
+    host.style.setProperty("--pad-h", PAD_H + "px");
+    host.style.setProperty("--pad-len", len + "px");
   }
 
   function posOf(key) {
@@ -353,8 +374,8 @@ window.Hex2 = (function () {
     return [channel(0), channel(8), channel(4)];
   }
 
-  // Pick the number's colour off the fill's relative luminance so the
-  // digits stay legible right across the hue sweep.
+  // Pick the number's colour off the fill's relative luminance so the digits
+  // stay legible right across the hue sweep.
   function tileColours(value) {
     const hue = tileHue(value);
     const fill = "hsl(" + hue.toFixed(1) + ", 66%, 52%)";
@@ -391,8 +412,8 @@ window.Hex2 = (function () {
     ctx.stroke();
   }
 
-  // beginFrame / endFrame bracket one paint. The canvas is sized in
-  // device pixels, so every frame re-establishes the CSS-unit transform.
+  // beginFrame / endFrame bracket one paint. The canvas is sized in device
+  // pixels, so every frame re-establishes the CSS-unit transform.
   function beginFrame() {
     ctx.save();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -403,8 +424,8 @@ window.Hex2 = (function () {
     ctx.restore();
   }
 
-  // Empty cells only, optionally shoved by (ox, oy). Opens a frame that
-  // the caller closes with endFrame() after painting its own tiles.
+  // Empty cells only, optionally shoved by (ox, oy). Opens a frame that the
+  // caller closes with endFrame() after painting its own tiles.
   function drawBoardBase(ox, oy) {
     const dx = ox || 0;
     const dy = oy || 0;
@@ -640,10 +661,10 @@ window.Hex2 = (function () {
   }
 
   // --------------------------- break timer ----------------------------
-  // Falsedge stamps BREAK_KEY on its way here, so the break is timed only
-  // when you arrived through that link. The stamp lives in storage rather
-  // than memory because the mode switch reloads the page - otherwise
-  // flipping Normal/Jiggly would restart the clock forever.
+  // Falsedge stamps BREAK_KEY on its way here, so the break is timed only when
+  // you arrived through that link. The stamp lives in storage rather than
+  // memory because the mode switch reloads the page - otherwise flipping
+  // Normal/Jiggly would restart the clock forever.
   const lockout = document.getElementById("lockout");
 
   function showLockout() {
@@ -664,9 +685,9 @@ window.Hex2 = (function () {
   }
 
   // --------------------------- mode switch ----------------------------
-  // Each mode is a whole self-booting script that grabs the DOM and binds
-  // its own listeners, so there is no way to unload one at runtime -
-  // switching reloads the page and lets the bootstrap pick the other file.
+  // Each mode is a whole self-booting script that grabs the DOM and binds its
+  // own listeners, so there is no way to unload one at runtime - switching
+  // reloads the page and lets the bootstrap pick the other file.
   function currentMode() {
     if (store.get(MODE_KEY) === "jiggly") {
       return "jiggly";
@@ -728,6 +749,40 @@ window.Hex2 = (function () {
       new ResizeObserver(relayout).observe(canvas.parentElement);
     }
 
+    const pads = document.querySelectorAll(".pad");
+    for (const p of pads) {
+      p.addEventListener("click", function () {
+        mode.move(p.dataset.dir);
+      });
+    }
+
+    const padBtn = document.getElementById("padtoggle");
+    let padsOn = store.get(PADS_KEY) === "1";
+
+    // the label states what the pads are doing, not what tapping will do
+    function applyPads() {
+      if (padsOn) {
+        canvas.parentElement.classList.remove("pads-off");
+        padBtn.classList.remove("off");
+        padBtn.textContent = "Click pads on";
+        return;
+      }
+      canvas.parentElement.classList.add("pads-off");
+      padBtn.classList.add("off");
+      padBtn.textContent = "Click pads off";
+    }
+
+    padBtn.addEventListener("click", function () {
+      padsOn = !padsOn;
+      if (padsOn) {
+        store.set(PADS_KEY, "1");
+      } else {
+        store.set(PADS_KEY, "0");
+      }
+      applyPads();
+    });
+    applyPads();
+
     // Walking out of the page on purpose ends the break; the mode switch
     // reloads without touching the stamp, so it cannot be used to escape.
     const exits = document.querySelectorAll(".navaway");
@@ -781,6 +836,7 @@ window.Hex2 = (function () {
     hexPath: hexPath,
     tileColours: tileColours,
     tileFontSize: tileFontSize,
+    TILE: TILE,
 
     boot: boot,
   };
