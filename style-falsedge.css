@@ -68,16 +68,19 @@
   .task-block    { --glow: hsl(215.5, 70%, 56%); }
   /* deliberately off the blue arc - the one section that isn't part of it */
   .sec-tasks     { --glow: var(--c-green); }
-  .sec-set       { --glow: var(--c-deep-blue); }
-  .sec-activate  { --glow: var(--c-indigo); }
-  .sec-link      { --glow: var(--c-purple); }
+  /* the arc keeps descending in page order, so these follow the sections down
+     rather than staying with the box they were first attached to: SET moved to
+     the bottom of the page and took the bottom of the arc with it */
+  .sec-dailies   { --glow: var(--c-deep-blue); }
+  .sec-others    { --glow: var(--c-indigo); }
+  .sec-set       { --glow: var(--c-purple); }
 
   /* halo (outer bloom + hairline) plus inner sheen along the top edge */
   .ledger-region,
   #tasksCard,
-  #setCard,
-  #activateCard,
-  #linkCard {
+  #dailiesCard,
+  #othersCard,
+  #setCard {
     border: 1px solid color-mix(in srgb, var(--glow) 34%, var(--line-soft));
     box-shadow:
       0 0 0 1px color-mix(in srgb, var(--glow) 9%, transparent),
@@ -191,9 +194,6 @@
     color: var(--c-sky);
     font-size: 15px;
   }
-
-  /* zero contribution to the shared max-content width, full width once laid
-     out - otherwise the row would drag both score boxes wide */
   .spend-row {
     grid-column: 1 / -1;
     width: 0;
@@ -361,6 +361,21 @@
   .before-btn {
     padding: 7px 11px;
   }
+  .task-further {
+    opacity: .72;
+    border-color: color-mix(in srgb, var(--glow) 16%, var(--line-soft));
+  }
+  .task-further .task-text {
+    color: var(--muted);
+  }
+  .task-divider {
+    align-self: stretch;
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--c-green) 45%, transparent),
+      transparent);
+  }
   .empty-tasks {
     font-size: 13px;
     color: var(--muted);
@@ -382,9 +397,6 @@
   .set-text {
     flex: 1 1 auto;
     min-width: 0;
-  }
-  .set-link {
-    flex: 0 0 auto;
   }
   .time-btns {
     display: flex;
@@ -444,8 +456,11 @@
   }
   .set-submit-row {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
     margin-top: 14px;
+  }
+  #setCard .field-pair {
+    margin-top: 10px;
   }
 
   /* -------------------------------- ACTIVATE ------------------------------ */
@@ -459,9 +474,12 @@
     border-radius: 10px;
     background: var(--panel-2);
   }
-  .tpl-text {
+  /* the gap has to clear the inline editor's border too, not just the text -
+     editing is where the two rows used to visibly collide */
+  .tpl-text,
+  .tpl-row > .inline-edit {
     font-size: 14px;
-    margin-bottom: 8px;
+    margin-bottom: 14px;
     word-break: break-word;
   }
   .tpl-controls {
@@ -470,9 +488,33 @@
     gap: 8px;
     flex-wrap: wrap;
   }
+  .field-pair {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .field-label {
+    font-size: 12px;
+    color: var(--faint);
+  }
   .time-select {
     min-height: 40px;
     padding: 0 8px;
+  }
+  .date-input {
+    min-height: 40px;
+    padding: 0 8px;
+  }
+  .row-cooling {
+    background: color-mix(in srgb, var(--c-red) 8%, var(--panel-2));
+  }
+  .row-cooling .tpl-text {
+    color: var(--muted);
+  }
+  .row-cooldown {
+    font-size: 12px;
+    color: var(--c-red);
+    margin-bottom: 10px;
   }
   .tpl-adder {
     border-top: 1px solid var(--line-soft);
@@ -529,38 +571,6 @@
   }
   .item-menu button.danger {
     color: var(--c-red);
-  }
-
-  /* ----------------------------------- LINK ------------------------------- */
-  .link-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 40vh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-  .link-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 8px;
-    border-radius: 10px;
-  }
-  .link-text {
-    flex: 1 1 auto;
-    font-size: 14px;
-    word-break: break-word;
-  }
-  .link-green {
-    background: color-mix(in srgb, var(--c-green) 16%, transparent);
-  }
-  .link-yellow {
-    background: color-mix(in srgb, var(--c-yellow) 16%, transparent);
-  }
-  .link-empty {
-    font-size: 13px;
-    color: var(--faint);
   }
 
   /* ---------------------------------- footer ------------------------------ */

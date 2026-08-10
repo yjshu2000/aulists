@@ -2,16 +2,19 @@
   "use strict";
 
   var STORAGE_KEY = "falsedge.data";
-  var AULISTS_STORAGE_KEY = "aulists.listdata";
   var UNDO_SESSION_KEY = "falsedge.undo";
   var UNDO_CAP = 60;
   var EXPORT_LIMIT = 2000;
   var COPY_WINDOW_MS = 10 * 60 * 1000;
   var MIN_LEAD_MS = 20 * 60 * 1000;
   var DAY_MS = 24 * 60 * 60 * 1000;
+  var WEEK_MS = 7 * DAY_MS;
+  // cancelling a dated `others` activation locks that row out this long
+  var COOLDOWN_MS = 36 * 60 * 60 * 1000;
   var TIER_POINTS = [6, 3, 2, 1];
   var WL_OFFSETS = [0, 10, 30, 60];
   var HL_OFFSETS = [0, 5, 15, 30];
+  var DAY_ABBR = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
 
   // the active-task stack walks the page ramp's blue stretch backwards
   var TASK_HUE_SOONEST = 224;
@@ -35,9 +38,12 @@
   var scoresOpen = false;
   // id of the active task whose deadline/mode editor is open, if any
   var timeEditId = null;
-  // the ACTIVATE adder is not draft-backed in storage, but it does have to
+  // neither ACTIVATE adder is draft-backed in storage, but both do have to
   // survive a re-render triggered from elsewhere on the page.
-  var adderDraft = { text: "", time: "", mode: null };
+  var adderDrafts = {
+    dailies: { text: "", time: "", mode: null },
+    others: { text: "", time: "", mode: null, date: "" }
+  };
 
   // ------------------------------- primitives --------------------------------
   /**
@@ -143,6 +149,78 @@
   }
 
   /**
+   * Resolves a stored time plus optional date into an absolute deadline. With
+   * no date the clock time takes its next occurrence within 24h; with a date
+   * the two pair directly and no next-occurrence rule applies.
+   * @param {string} time - a clock time, "HH:MM".
+   * @param {string} date - a day key, "YYYY-MM-DD", or "" for none.
+   * @param {Date} now - the reference moment.
+   * @returns {Date} the resolved absolute instant.
+   */
+  function resolveDeadline(time, date, now) {
+    if (!date) {
+      return resolveClockTime(time, now);
+    }
+    var d = String(date).split("-");
+    var t = String(time).split(":");
+    return new Date(
+      parseInt(d[0], 10), parseInt(d[1], 10) - 1, parseInt(d[2], 10),
+      parseInt(t[0], 10), parseInt(t[1], 10), 0, 0);
+  }
+
+  /**
+   * The date picker's bounds: today through one week out.
+   * @param {Date} now - the reference moment.
+   * @returns {{min: string, max: string}} two day keys.
+   */
+  function dateBounds(now) {
+    return {
+      min: dayKey(now),
+      max: dayKey(new Date(now.getTime() + WEEK_MS))
+    };
+  }
+
+  /**
+   * Tests whether a chosen date falls inside the picker's bounds. Checked again
+   * here at submit time because `min`/`max` only grey the native picker's days
+   * out - they don't make an out-of-range value impossible to hold.
+   * @param {string} date - a day key, "YYYY-MM-DD".
+   * @param {Date} now - the reference moment.
+   * @returns {boolean} true if the date is today through one week out.
+   */
+  function dateInRange(date, now) {
+    var b = dateBounds(now);
+    return date >= b.min && date <= b.max;
+  }
+
+  /**
+   * Tests whether a deadline is far enough out to count as a "further" task.
+   * A rolling 24h window, not a calendar-day boundary: at 17:00 today, 09:00
+   * tomorrow is 16h out and so is not further, despite being another day.
+   * @param {string} deadline - the task's deadline, ISO string.
+   * @param {Date} now - the reference moment.
+   * @returns {boolean} true if the deadline is more than 24 hours away.
+   */
+  function isFurther(deadline, now) {
+    return new Date(deadline).getTime() - now.getTime() > DAY_MS;
+  }
+
+  /**
+   * Formats a remaining duration, for a cooling-down row's inline countdown.
+   * @param {number} ms - milliseconds remaining.
+   * @returns {string} e.g. "31h 12m", or "44m" once under an hour.
+   */
+  function fmtLeft(ms) {
+    var mins = Math.max(0, Math.ceil(ms / 60000));
+    var h = Math.floor(mins / 60);
+    var m = mins % 60;
+    if (h > 0) {
+      return h + "h " + m + "m";
+    }
+    return m + "m";
+  }
+
+  /**
    * Formats a points value. `pts` is always a whole number.
    * @param {number} n - the value to format.
    * @returns {string} the formatted value, e.g. "-5".
@@ -200,6 +278,21 @@
   /**
    * Builds a brand-new, empty state object - the baseline used on first run,
    * and the starting point `normalise` fills in from parsed JSON.
+   *
+   * Three things about the shape that the fields themselves don't record:
+   *
+   * `templates` holds the ACTIVATE (dailies) rows - disposable presets, {id,
+   * text, time, mode}. It's called templates bcuz that's what it used to be 
+   * called and there's already user data.
+   *
+   * `others` holds the ACTIVATE (others) rows - persistent records where the
+   * row *is* the item, {id, text, time, mode, date, lastDone, cooldownUntil}.
+   *
+   * An active task is {id, text, deadline, mode, sourceRowId, hadDate}, and
+   * `sourceRowId` points at the `others` row it was spawned from. Deleting that
+   * row is deliberately never blocked, so the id may point at nothing; a miss
+   * is the documented case, not a bug to guard against.
+   *
    * @returns {Object} an empty-but-well-formed state object.
    */
   function freshState() {
@@ -211,8 +304,8 @@
       ledger: [],
       activeTasks: [],
       templates: [],
-      rotationDate: null,
-      setDraft: { text: "", time: null, mode: null, linkedItemId: null },
+      others: [],
+      setDraft: { text: "", time: null, mode: null, date: "" },
       spendDraft: { text: "", cost: null },
       lastCopyAt: null,
       ledgerCollapsed: true
@@ -237,9 +330,7 @@
     if (Array.isArray(raw.ledger)) s.ledger = raw.ledger;
     if (Array.isArray(raw.activeTasks)) s.activeTasks = raw.activeTasks;
     if (Array.isArray(raw.templates)) s.templates = raw.templates;
-    if (typeof raw.rotationDate === "string") {
-      s.rotationDate = raw.rotationDate;
-    }
+    if (Array.isArray(raw.others)) s.others = raw.others;
     if (raw.setDraft && typeof raw.setDraft === "object") {
       if (typeof raw.setDraft.text === "string") {
         s.setDraft.text = raw.setDraft.text;
@@ -250,8 +341,8 @@
       if (raw.setDraft.mode === "WL" || raw.setDraft.mode === "HL") {
         s.setDraft.mode = raw.setDraft.mode;
       }
-      if (typeof raw.setDraft.linkedItemId === "string") {
-        s.setDraft.linkedItemId = raw.setDraft.linkedItemId;
+      if (typeof raw.setDraft.date === "string") {
+        s.setDraft.date = raw.setDraft.date;
       }
     }
     if (raw.spendDraft && typeof raw.spendDraft === "object") {
@@ -293,145 +384,6 @@
     } catch (e) {}
   }
 
-  // ----------------------------- Aulists interop -----------------------------
-  /**
-   * Reads and validates Aulists' whole storage blob.
-   * @returns {Object|null} the parsed blob, or null if it's missing or
-   *   unusable.
-   */
-  function readAulists() {
-    try {
-      var raw = localStorage.getItem(AULISTS_STORAGE_KEY);
-      if (!raw) return null;
-      var obj = JSON.parse(raw);
-      if (!obj || typeof obj !== "object") return null;
-      if (!obj.itemsById || typeof obj.itemsById !== "object") return null;
-      if (!obj.lists || !Array.isArray(obj.lists["0"])) return null;
-      return obj;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /**
-   * Writes a mutated Aulists blob back to Aulists' own storage key.
-   * @param {Object} blob - the blob to persist.
-   */
-  function writeAulists(blob) {
-    try {
-      localStorage.setItem(AULISTS_STORAGE_KEY, JSON.stringify(blob));
-    } catch (e) {}
-  }
-
-  /**
-   * Reads Aulists' List 0 directly out of its own localStorage blob, for
-   * the LINK box to list as linkable items. Called fresh on every render, so
-   * the LINK list is never stale.
-   * @returns {{id: string, text: string}[]} List 0's items, in list order.
-   */
-  function readAulistsListZero() {
-    var blob = readAulists();
-    if (!blob) return [];
-    var out = [];
-    blob.lists["0"].forEach(function (id) {
-      var item = blob.itemsById[id];
-      if (item && typeof item.text === "string") {
-        out.push({ id: id, text: item.text });
-      }
-    });
-    return out;
-  }
-
-  /**
-   * Renames a linked Aulists item, read-mutate-write. Silently does nothing
-   * if the item has since been deleted.
-   * @param {string} id - the Aulists item id.
-   * @param {string} text - the new text.
-   */
-  function aulistsSetText(id, text) {
-    var blob = readAulists();
-    if (!blob) return;
-    var item = blob.itemsById[id];
-    if (!item) return;
-    item.text = text;
-    writeAulists(blob);
-  }
-
-  /**
-   * Completes a linked Aulists item the same way Aulists' own `completeItem`
-   * does: marks it done, stamps `lastDone`, and unlinks it from List 0. If the
-   * id has drifted out of List 0 it's left in whatever list it moved to.
-   * @param {string} id - the Aulists item id.
-   * @param {string} iso - the effective completion time, ISO string.
-   */
-  function aulistsComplete(id, iso) {
-    var blob = readAulists();
-    if (!blob) return;
-    var item = blob.itemsById[id];
-    if (!item) return;
-    item.isDone = true;
-    item.lastDone = iso;
-    var at = blob.lists["0"].indexOf(id);
-    if (at !== -1) {
-      blob.lists["0"].splice(at, 1);
-    }
-    writeAulists(blob);
-  }
-
-  /**
-   * Snapshots the Aulists-side fields an undo entry has to restore, since
-   * Falsedge's own state snapshot doesn't cover Aulists' storage.
-   * @param {string} type - "text" or "complete".
-   * @param {string} id - the Aulists item id.
-   * @returns {Object|null} the side snapshot, or null if the item is gone.
-   */
-  function captureAulistsSide(type, id) {
-    var blob = readAulists();
-    if (!blob) return null;
-    var item = blob.itemsById[id];
-    if (!item) return null;
-    if (type === "text") {
-      return { type: "text", id: id, text: item.text };
-    }
-    return {
-      type: "complete",
-      id: id,
-      isDone: !!item.isDone,
-      lastDone: item.lastDone || null,
-      indexInList0: blob.lists["0"].indexOf(id)
-    };
-  }
-
-  /**
-   * Restores a side snapshot onto Aulists' storage. Best-effort: a deleted
-   * item is skipped silently, and a recorded index past the end of List 0
-   * appends instead.
-   * @param {Object|null} side - the side snapshot to apply.
-   */
-  function applyAulistsSide(side) {
-    if (!side) return;
-    var blob = readAulists();
-    if (!blob) return;
-    var item = blob.itemsById[side.id];
-    if (!item) return;
-    if (side.type === "text") {
-      item.text = side.text;
-    } else {
-      item.isDone = side.isDone;
-      item.lastDone = side.lastDone;
-      var list = blob.lists["0"];
-      var at = list.indexOf(side.id);
-      if (side.indexInList0 === -1) {
-        if (at !== -1) {
-          list.splice(at, 1);
-        }
-      } else if (at === -1) {
-        list.splice(Math.min(side.indexInList0, list.length), 0, side.id);
-      }
-    }
-    writeAulists(blob);
-  }
-
   // ---------------------------------- undo -----------------------------------
   /**
    * Deep-clones the whole state object for the undo/redo stacks.
@@ -442,17 +394,14 @@
   }
 
   /**
-   * Records the pre-mutation state (and, for linked writes, the pre-mutation
-   * Aulists fields) on the undo stack. Must be called before the mutation.
+   * Records the pre-mutation state on the undo stack. Must be called before
+   * the mutation.
    * @param {string} label - the label the toast renders after "Undid: ".
-   * @param {Object} [side] - an Aulists side snapshot, if the action also
-   *   writes into Aulists' storage.
    */
-  function pushUndo(label, side) {
+  function pushUndo(label) {
     undoStack.push({
       snapshot: snapshotState(),
-      label: label,
-      side: side || null
+      label: label
     });
     if (undoStack.length > UNDO_CAP) {
       undoStack.shift();
@@ -463,9 +412,7 @@
 
   /**
    * Moves one step along the undo/redo stacks, swapping the current state onto
-   * the opposite stack on the way. Aulists side snapshots ride along
-   * symmetrically: the entry pushed onto the opposite stack captures Aulists'
-   * current (post-write) values before the recorded ones are restored.
+   * the opposite stack on the way.
    * @param {string} direction - "undo" or "redo".
    */
   function step(direction) {
@@ -483,16 +430,10 @@
     }
     if (!from.length) return;
     var entry = from.pop();
-    var counter = null;
-    if (entry.side) {
-      counter = captureAulistsSide(entry.side.type, entry.side.id);
-    }
     to.push({
       snapshot: snapshotState(),
-      label: entry.label,
-      side: counter
+      label: entry.label
     });
-    applyAulistsSide(entry.side);
     state = entry.snapshot;
     save();
     render();
@@ -579,27 +520,67 @@
   }
 
   /**
-   * Finds a template by id.
-   * @param {string} id - the template id.
-   * @returns {Object|undefined} the template, if it still exists.
+   * Returns the array backing one ACTIVATE section.
+   * @param {string} kind - "dailies" or "others".
+   * @returns {Object[]} the live array, not a copy.
    */
-  function findTemplate(id) {
-    return state.templates.find(function (t) {
-      return t.id === id;
+  function rowList(kind) {
+    if (kind === "others") {
+      return state.others;
+    }
+    return state.templates;
+  }
+
+  /**
+   * Finds an ACTIVATE row by id.
+   * @param {string} kind - "dailies" or "others".
+   * @param {string} id - the row id.
+   * @returns {Object|undefined} the row, if it still exists.
+   */
+  function findRow(kind, id) {
+    return rowList(kind).find(function (r) {
+      return r.id === id;
     });
   }
 
   /**
-   * Finds a template's index in `state.templates`.
-   * @param {string} id - the template id.
+   * Finds an ACTIVATE row's index in its own section's array.
+   * @param {string} kind - "dailies" or "others".
+   * @param {string} id - the row id.
    * @returns {number} the index, or -1.
    */
-  function indexOfTemplate(id) {
+  function indexOfRow(kind, id) {
+    var list = rowList(kind);
     var i;
-    for (i = 0; i < state.templates.length; i++) {
-      if (state.templates[i].id === id) return i;
+    for (i = 0; i < list.length; i++) {
+      if (list[i].id === id) return i;
     }
     return -1;
+  }
+
+  /**
+   * Resolves a task's `sourceRowId` back to its `others` row. A miss is the
+   * normal case rather than an error - deleting a row is never blocked, so a
+   * live task routinely outlives the row it was spawned from.
+   * @param {Object} task - the active task.
+   * @returns {Object|undefined} the row, if there is one and it still exists.
+   */
+  function sourceRowOf(task) {
+    if (!task.sourceRowId) return undefined;
+    return findRow("others", task.sourceRowId);
+  }
+
+  /**
+   * Milliseconds left on an `others` row's cancel cooldown.
+   * @param {Object} row - the row.
+   * @param {Date} now - the reference moment.
+   * @returns {number} the remainder, or 0 if the row isn't cooling down.
+   */
+  function cooldownLeft(row, now) {
+    if (!row.cooldownUntil) return 0;
+    var until = new Date(row.cooldownUntil).getTime();
+    if (isNaN(until)) return 0;
+    return Math.max(0, until - now.getTime());
   }
 
   /**
@@ -636,15 +617,13 @@
   }
 
   /**
-   * Returns the templates in display order: by lap, then by clock time.
-   * Creation order breaks remaining ties for free, since `sort` is stable.
-   * @returns {Object[]} a sorted shallow copy of `state.templates`.
+   * Returns the dailies rows in display order: purely by clock time, ascending
+   * from 00:00. An absolute order, so it never shifts as the day passes.
+   * Creation order breaks ties for free, since `sort` is stable.
+   * @returns {Object[]} a sorted shallow copy of the dailies array.
    */
-  function sortedTemplates() {
+  function sortedDailies() {
     return state.templates.slice().sort(function (a, b) {
-      var la = a.lap || 0;
-      var lb = b.lap || 0;
-      if (la !== lb) return la - lb;
       if (a.time < b.time) return -1;
       if (a.time > b.time) return 1;
       return 0;
@@ -652,19 +631,27 @@
   }
 
   /**
-   * Resets every template's lap counter when the day has changed since the
-   * last render. Evaluated on render rather than at midnight, since Falsedge
-   * has no timers. Deliberately pushes no undo entry - it fires on passive
-   * re-renders, where an undo entry would be poison.
+   * Returns the `others` rows in display order: by `lastDone` descending, most
+   * recently completed first. A row that has never been completed carries no
+   * `lastDone` at all and pins above everything, so anything new or untouched
+   * is the first thing in the section.
+   * @returns {Object[]} a sorted shallow copy of `state.others`.
    */
-  function applyLapReset() {
-    var key = dayKey(getNow());
-    if (state.rotationDate === key) return;
-    state.rotationDate = key;
-    state.templates.forEach(function (t) {
-      t.lap = 0;
+  function sortedOthers() {
+    return state.others.slice().sort(function (a, b) {
+      var ta = null;
+      var tb = null;
+      if (a.lastDone) {
+        ta = new Date(a.lastDone).getTime();
+      }
+      if (b.lastDone) {
+        tb = new Date(b.lastDone).getTime();
+      }
+      if (ta === null && tb === null) return 0;
+      if (ta === null) return -1;
+      if (tb === null) return 1;
+      return tb - ta;
     });
-    save();
   }
 
   // --------------------------------- ledger ----------------------------------
@@ -904,7 +891,7 @@
    * Writes one field of the SET draft, pushing undo only when the value
    * actually changed - tapping into a field and back out shouldn't burn an
    * undo slot.
-   * @param {string} field - "text", "time", "mode" or "linkedItemId".
+   * @param {string} field - "text", "time", "mode" or "date".
    * @param {*} value - the new value.
    */
   function writeSetDraft(field, value) {
@@ -945,24 +932,22 @@
   // ------------------------------ task lifecycle -----------------------------
   /**
    * Resolves an active task: awards points, writes its ledger entry, drops it
-   * from `activeTasks` and, for a linked task, propagates the completion into
-   * Aulists' storage.
+   * from `activeTasks`, and stamps whatever its source `others` row is owed -
+   * `lastDone` on any completion, on time or late, and a 36h cancel cooldown
+   * on a cancel that was activated with a date. A cancel never stamps
+   * `lastDone`, and a source row that has since been deleted takes neither
+   * stamp.
    * @param {string} id - the task id.
    * @param {Date} when - the effective completion time.
    * @param {number} award - points awarded (0 for failed and cancelled).
    * @param {string} byText - what the "completed by:" line reads.
-   * @param {boolean} writeBack - whether to write into Aulists' storage.
+   * @param {string} kind - "complete" or "cancel".
    * @param {string} label - the undo label.
    */
-  function resolveTask(id, when, award, byText, writeBack, label) {
+  function resolveTask(id, when, award, byText, kind, label) {
     var task = findTask(id);
     if (!task) return;
-    var linkId = task.linkedItemId;
-    var side = null;
-    if (writeBack && linkId) {
-      side = captureAulistsSide("complete", linkId);
-    }
-    pushUndo(label, side);
+    pushUndo(label);
     var oldPts = state.pts;
     var oldScr = state.scr;
     var newScr = oldScr + award;
@@ -971,12 +956,16 @@
       taskEntryText(task, byText, oldPts, delta, oldScr, award));
     state.scr = newScr;
     state.pts = oldPts + delta;
+    var row = sourceRowOf(task);
+    if (row && kind === "complete") {
+      row.lastDone = when.toISOString();
+    } else if (row && task.hadDate) {
+      row.cooldownUntil =
+        new Date(getNow().getTime() + COOLDOWN_MS).toISOString();
+    }
     var at = indexOfTask(id);
     if (at !== -1) {
       state.activeTasks.splice(at, 1);
-    }
-    if (writeBack && linkId) {
-      aulistsComplete(linkId, when.toISOString());
     }
     save();
     render();
@@ -999,7 +988,7 @@
       award = tiers[idx].pts;
       byText = hhmm(now);
     }
-    resolveTask(id, now, award, byText, true, "complete now");
+    resolveTask(id, now, award, byText, "complete", "complete now");
   }
 
   /**
@@ -1014,22 +1003,22 @@
     if (!task) return;
     var tier = tierList(task)[tierIndex];
     if (!tier) return;
-    resolveTask(id, tier.at, tier.pts, hhmm(tier.at), true,
+    resolveTask(id, tier.at, tier.pts, hhmm(tier.at), "complete",
       "completed before");
   }
 
   /**
-   * Cancels a task: no points, a "none (cancelled)" ledger entry, and nothing
-   * written back to Aulists - a cancelled linked item stays in List 0.
+   * Cancels a task: no points, a "none (cancelled)" ledger entry, no
+   * `lastDone`, and - only if it was activated with a date set - a 36h
+   * cooldown on the `others` row it came from.
    * @param {string} id - the task id.
    */
   function cancelTask(id) {
-    resolveTask(id, getNow(), 0, "none (cancelled)", false, "cancel task");
+    resolveTask(id, getNow(), 0, "none (cancelled)", "cancel", "cancel task");
   }
 
   /**
-   * Renames an active task, propagating the rename into Aulists' storage if
-   * the task is linked. An empty value cancels rather than saving an empty
+   * Renames an active task. An empty value cancels rather than saving an empty
    * name.
    * @param {string} id - the task id.
    * @param {string} raw - the proposed replacement text, untrimmed.
@@ -1042,15 +1031,8 @@
       render();
       return;
     }
-    var side = null;
-    if (task.linkedItemId) {
-      side = captureAulistsSide("text", task.linkedItemId);
-    }
-    pushUndo("edit task text", side);
+    pushUndo("edit task text");
     task.text = v;
-    if (task.linkedItemId) {
-      aulistsSetText(task.linkedItemId, v);
-    }
     save();
     render();
   }
@@ -1061,6 +1043,10 @@
    * floor, and refused if another active task already holds that instant. The
    * task's own deadline is excluded from the overlap check, since a task can
    * hardly clash with itself.
+   *
+   * A further task keeps its day. The editor only offers clock times, so
+   * re-resolving one against `now` would silently drag it back inside 24h and
+   * strip the very thing that made it further.
    * @param {string} id - the task id.
    * @param {string} clock - the chosen clock time, "HH:MM".
    */
@@ -1068,7 +1054,12 @@
     var task = findTask(id);
     if (!task) return;
     var now = getNow();
-    var deadline = resolveClockTime(clock, now);
+    var deadline;
+    if (isFurther(task.deadline, now)) {
+      deadline = resolveDeadline(clock, dayKey(new Date(task.deadline)), now);
+    } else {
+      deadline = resolveClockTime(clock, now);
+    }
     if (deadline.getTime() - now.getTime() < MIN_LEAD_MS) {
       toast("refreshed");
       render();
@@ -1108,6 +1099,46 @@
   }
 
   /**
+   * The two stack-level rules any new task has to clear, whichever route it
+   * arrives by: no two tasks on the same instant, and nothing new while a
+   * day-old task is still sitting unresolved. Toasts the reason on refusal.
+   * The 20-minute lead floor is deliberately not here - SET answers a stale
+   * dropdown by re-rendering, and a swipe has no dropdown to re-render.
+   * @param {Date} deadline - the proposed deadline.
+   * @param {Date} now - the reference moment.
+   * @returns {boolean} true if a task may be created on that instant.
+   */
+  function deadlineClear(deadline, now) {
+    var clash = state.activeTasks.some(function (t) {
+      return new Date(t.deadline).getTime() === deadline.getTime();
+    });
+    if (clash) {
+      toast(hhmm(deadline) + " overlaps");
+      return false;
+    }
+    var stale = state.activeTasks.some(function (t) {
+      return now.getTime() - new Date(t.deadline).getTime() > DAY_MS;
+    });
+    if (stale) {
+      toast("clean up old tasks");
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Wipes all four SET draft fields at once - text, time, WL/HL and date. No
+   * confirmation step: it pushes onto the undo stack, so a mis-tap is one undo
+   * away.
+   */
+  function clearSetDraft() {
+    pushUndo("clear draft");
+    state.setDraft = { text: "", time: null, mode: null, date: "" };
+    save();
+    render();
+  }
+
+  /**
    * Validates and commits the SET box. Every failure is a hard block with its
    * own toast; nothing is set and nothing silently defaults.
    */
@@ -1126,125 +1157,132 @@
       toast("Pick WL or HL");
       return;
     }
-    var deadline = resolveClockTime(selectEl.value, now);
+    var date = state.setDraft.date;
+    if (date && !dateInRange(date, now)) {
+      toast("date must be within 1 week");
+      return;
+    }
+    var deadline = resolveDeadline(selectEl.value, date, now);
     if (deadline.getTime() - now.getTime() < MIN_LEAD_MS) {
       toast("refreshed");
       render();
       return;
     }
-    var clash = state.activeTasks.some(function (t) {
-      return new Date(t.deadline).getTime() === deadline.getTime();
-    });
-    if (clash) {
-      toast(hhmm(deadline) + " overlaps");
-      return;
-    }
-    var stale = state.activeTasks.some(function (t) {
-      return now.getTime() - new Date(t.deadline).getTime() > DAY_MS;
-    });
-    if (stale) {
-      toast("clean up old tasks");
-      return;
-    }
-    var linkId = state.setDraft.linkedItemId;
-    var side = null;
-    if (linkId) {
-      side = captureAulistsSide("text", linkId);
-    }
-    pushUndo("set task", side);
+    if (!deadlineClear(deadline, now)) return;
+    pushUndo("set task");
     state.activeTasks.push({
       id: uid(),
       text: text,
       deadline: deadline.toISOString(),
-      mode: mode,
-      linkedItemId: linkId
+      mode: mode
     });
-    if (linkId) {
-      aulistsSetText(linkId, text);
-    }
-    state.setDraft = { text: "", time: null, mode: null, linkedItemId: null };
+    state.setDraft = { text: "", time: null, mode: null, date: "" };
     save();
     render();
   }
 
-  // ---------------------------- template lifecycle ---------------------------
+  // ------------------------------ row lifecycle ------------------------------
   /**
-   * Adds a template from the pinned adder's current contents.
+   * Adds a row from its section's adder. The dailies adder is gated on text
+   * and time together; the `others` adder only on text, since an `others` row
+   * is a real record that can sit there half-filled until it's wanted.
+   * @param {string} kind - "dailies" or "others".
    */
-  function addTemplate() {
-    var text = adderDraft.text.trim();
+  function addRow(kind) {
+    var draft = adderDrafts[kind];
+    var text = draft.text.trim();
     if (!text) return;
-    if (!adderDraft.time) return;
-    pushUndo("add template");
-    state.templates.push({
-      id: uid(),
-      text: text,
-      time: adderDraft.time,
-      mode: adderDraft.mode,
-      lap: 0
-    });
-    adderDraft = { text: "", time: "", mode: null };
+    if (kind === "dailies" && !draft.time) return;
+    pushUndo("add " + kind + " row");
+    if (kind === "others") {
+      state.others.push({
+        id: uid(),
+        text: text,
+        time: draft.time,
+        mode: draft.mode,
+        date: draft.date,
+        lastDone: null,
+        cooldownUntil: null
+      });
+      adderDrafts.others = { text: "", time: "", mode: null, date: "" };
+    } else {
+      state.templates.push({
+        id: uid(),
+        text: text,
+        time: draft.time,
+        mode: draft.mode
+      });
+      adderDrafts.dailies = { text: "", time: "", mode: null };
+    }
     save();
     render();
   }
 
   /**
-   * Writes one field of a template.
-   * @param {string} id - the template id.
-   * @param {string} field - "text", "time" or "mode".
+   * Writes one field of a row.
+   * @param {string} kind - "dailies" or "others".
+   * @param {string} id - the row id.
+   * @param {string} field - "text", "time", "mode" or "date".
    * @param {*} value - the new value.
    */
-  function editTemplate(id, field, value) {
-    var t = findTemplate(id);
-    if (!t) return;
-    if (t[field] === value) return;
-    pushUndo("edit template");
-    t[field] = value;
+  function editRow(kind, id, field, value) {
+    var row = findRow(kind, id);
+    if (!row) return;
+    if (row[field] === value) return;
+    pushUndo("edit row");
+    row[field] = value;
     save();
     render();
   }
 
   /**
-   * Deletes a template.
-   * @param {string} id - the template id.
+   * Clears an `others` row's stored date and time together. One menu entry
+   * rather than two, since a row holding a date but no time can't be activated
+   * anyway.
+   * @param {string} id - the row id.
    */
-  function deleteTemplate(id) {
-    var at = indexOfTemplate(id);
+  function clearRowDatetime(id) {
+    var row = findRow("others", id);
+    if (!row) return;
+    if (!row.time && !row.date) return;
+    pushUndo("clear datetime");
+    row.time = "";
+    row.date = "";
+    save();
+    render();
+  }
+
+  /**
+   * Deletes a row. Never blocked, even on an `others` row with a live task
+   * still out: that task keeps running with a `sourceRowId` pointing at
+   * nothing, and resolves later without stamping anything.
+   * @param {string} kind - "dailies" or "others".
+   * @param {string} id - the row id.
+   */
+  function deleteRow(kind, id) {
+    var at = indexOfRow(kind, id);
     if (at === -1) return;
-    pushUndo("delete template");
-    state.templates.splice(at, 1);
+    pushUndo("delete row");
+    rowList(kind).splice(at, 1);
     save();
     render();
   }
 
   /**
-   * Bumps a template's lap counter, sending it to the bottom of the list. On a
-   * row that's already last this changes nothing visible.
-   * @param {string} id - the template id.
+   * Prefills SET from a row, leaving the row itself untouched and creating
+   * nothing. An `others` row's date rides along with the rest.
+   * @param {string} kind - "dailies" or "others".
+   * @param {string} id - the row id.
    */
-  function skipTemplate(id) {
-    var t = findTemplate(id);
-    if (!t) return;
-    pushUndo("skip template");
-    t.lap = (t.lap || 0) + 1;
-    save();
-    render();
-  }
-
-  /**
-   * Prefills SET from a template. The prefill overwrites the draft's text
-   * outright, so it also clears any link the draft was carrying.
-   * @param {string} id - the template id.
-   */
-  function prefillFromTemplate(id) {
-    var t = findTemplate(id);
-    if (!t) return;
+  function prefillFromRow(kind, id) {
+    var row = findRow(kind, id);
+    if (!row) return;
     pushUndo("edit SET draft");
-    state.setDraft.text = t.text;
-    state.setDraft.linkedItemId = null;
-    state.setDraft.time = t.time;
-    if (t.mode === "WL" || t.mode === "HL") {
-      state.setDraft.mode = t.mode;
+    state.setDraft.text = row.text;
+    state.setDraft.time = row.time;
+    state.setDraft.date = row.date || "";
+    if (row.mode === "WL" || row.mode === "HL") {
+      state.setDraft.mode = row.mode;
     }
     save();
     render();
@@ -1253,23 +1291,85 @@
   }
 
   /**
-   * Prefills SET from an Aulists List 0 item, carrying the link. The time is
-   * left alone.
-   * @param {string} id - the Aulists item id.
-   * @param {string} text - the item's text.
+   * Creates an active task straight from a row, bypassing SET entirely. Text,
+   * WL/HL and a time are all required in both sections; the date is optional
+   * and only exists on `others` rows. An `others` row additionally has to be
+   * off cooldown and have no live task of its own already out.
+   * @param {string} kind - "dailies" or "others".
+   * @param {string} id - the row id.
    */
-  function linkItem(id, text) {
-    pushUndo("edit SET draft");
-    state.setDraft.text = text;
-    state.setDraft.linkedItemId = id;
+  function activateRow(kind, id) {
+    var row = findRow(kind, id);
+    if (!row) return;
+    var now = getNow();
+    var text = String(row.text).trim();
+    if (!text) {
+      toast("Task needs text");
+      return;
+    }
+    if (row.mode !== "WL" && row.mode !== "HL") {
+      toast("Pick WL or HL");
+      return;
+    }
+    if (!row.time) {
+      toast("Task needs a time");
+      return;
+    }
+    var date = "";
+    if (kind === "others") {
+      var left = cooldownLeft(row, now);
+      if (left > 0) {
+        toast("on cooldown - " + fmtLeft(left) + " left");
+        return;
+      }
+      var out = state.activeTasks.some(function (t) {
+        return t.sourceRowId === id;
+      });
+      if (out) {
+        toast("already out as a task");
+        return;
+      }
+      date = row.date || "";
+      if (date && !dateInRange(date, now)) {
+        toast("date must be within 1 week");
+        return;
+      }
+    }
+    var deadline = resolveDeadline(row.time, date, now);
+    if (deadline.getTime() - now.getTime() < MIN_LEAD_MS) {
+      toast("too soon");
+      return;
+    }
+    if (!deadlineClear(deadline, now)) return;
+    var iso = deadline.toISOString();
+    pushUndo("activate row");
+    var task = {
+      id: uid(),
+      text: text,
+      deadline: iso,
+      mode: row.mode
+    };
+    if (kind === "others") {
+      task.sourceRowId = id;
+      // the cancel cooldown keys off this, not off the deadline: a dated
+      // activation may still land inside 24h and so never look "further"
+      task.hadDate = date !== "";
+      row.date = "";
+    }
+    state.activeTasks.push(task);
     save();
     render();
-    scrollToSet();
-    toast("prefilled SET");
+    // the swipe leaves the row where it is and the task appears somewhere
+    // further up the page, quite possibly offscreen - so say what happened
+    var stamp = hhmm(deadline);
+    if (isFurther(iso, now)) {
+      stamp = DAY_ABBR[deadline.getDay()] + " " + stamp;
+    }
+    toast("task set for " + stamp);
   }
 
   /**
-   * Scrolls the SET box into view. SET sits above both ACTIVATE and LINK, so
+   * Scrolls the SET box into view. SET sits below both ACTIVATE sections, so
    * on a phone a prefill would otherwise land offscreen and look like nothing
    * happened.
    */
@@ -1748,13 +1848,14 @@
 
     var textRow = el("div", "task-text-row");
     textRow.appendChild(el("span", "task-text", task.text));
-    if (task.linkedItemId) {
-      textRow.appendChild(el("span", "task-link", "🔗"));
-    }
     attachTextEdit(textRow, id);
     block.appendChild(textRow);
 
     var now = getNow();
+    var further = isFurther(task.deadline, now);
+    if (further) {
+      block.classList.add("task-further");
+    }
     var tiers = tierList(task);
     var live = liveTierIndex(tiers, now);
     if (timeEditId === id) {
@@ -1766,8 +1867,13 @@
         if (i === live) {
           cls = "tier tier-live";
         }
+        // a further task's clock time alone is ambiguous - which TU is it?
+        var stamp = hhmm(tier.at);
+        if (further) {
+          stamp = DAY_ABBR[tier.at.getDay()] + " " + stamp;
+        }
         tierWrap.appendChild(el("div", cls,
-          "by " + hhmm(tier.at) + " for " + tier.pts + " pts"));
+          "by " + stamp + " for " + tier.pts + " pts"));
       });
       attachTimeEdit(tierWrap, id);
       block.appendChild(tierWrap);
@@ -1800,6 +1906,10 @@
    * or the empty state with `[streak broke]`. The card is the only thing that
    * glows - the blocks inside keep their per-position border colour but have no
    * halo of their own.
+   *
+   * Sorting by deadline puts the further tasks at the end for free, so the
+   * divider is simply the seam where the first of them starts. A stack that is
+   * all further has no seam to draw, and neither does one with none.
    * @returns {Element} the section wrapper.
    */
   function buildTasks() {
@@ -1813,10 +1923,18 @@
       wrap.appendChild(brk);
       return section.wrap;
     }
+    var now = getNow();
     var sorted = state.activeTasks.slice().sort(function (a, b) {
       return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
     });
+    var drawn = false;
     sorted.forEach(function (task, i) {
+      if (!drawn && isFurther(task.deadline, now)) {
+        drawn = true;
+        if (i > 0) {
+          wrap.appendChild(el("div", "task-divider"));
+        }
+      }
       wrap.appendChild(buildTaskBlock(task.id, i, sorted.length));
     });
     return section.wrap;
@@ -1878,14 +1996,18 @@
   }
 
   /**
-   * Builds a full-day time `<select>`: 00:00 through 23:50 in 10-minute steps,
-   * identical every time and unrelated to `now`.
+   * Builds a full-day time control: a "by" caption, then a `<select>` of 00:00
+   * through 23:50 in 10-minute steps, identical every time and unrelated to
+   * `now`. Both ACTIVATE row types and both adders route through here, so the
+   * caption reaches all four from this one place.
    * @param {string} value - the currently selected "HH:MM", or "".
    * @param {boolean} withPlaceholder - include a leading "--:--" option.
    * @param {Function} onChange - called with the new value.
-   * @returns {Element} the `<select>`.
+   * @returns {Element} the caption and `<select>` in their wrapper.
    */
   function buildDayTimeSelect(value, withPlaceholder, onChange) {
+    var wrap = el("div", "field-pair");
+    wrap.appendChild(el("span", "field-label", "by"));
     var sel = el("select", "time-select");
     if (withPlaceholder) {
       var ph = el("option", "", "--:--");
@@ -1906,7 +2028,33 @@
     sel.addEventListener("change", function () {
       onChange(sel.value);
     });
-    return sel;
+    wrap.appendChild(sel);
+    return wrap;
+  }
+
+  /**
+   * Builds an optional date control: an "on" caption, then a native date
+   * picker bounded to today through one week out. The bounds only grey the
+   * picker's own days out, so `dateInRange` re-checks at submit time.
+   * @param {string} value - the currently held day key, or "".
+   * @param {Date} now - the reference moment, for the bounds.
+   * @param {Function} onChange - called with the new value.
+   * @returns {Element} the caption and input in their wrapper.
+   */
+  function buildDateInput(value, now, onChange) {
+    var wrap = el("div", "field-pair");
+    wrap.appendChild(el("span", "field-label", "on"));
+    var input = el("input", "date-input");
+    input.type = "date";
+    var bounds = dateBounds(now);
+    input.min = bounds.min;
+    input.max = bounds.max;
+    input.value = value || "";
+    input.addEventListener("change", function () {
+      onChange(input.value);
+    });
+    wrap.appendChild(input);
+    return wrap;
   }
 
   /**
@@ -1952,9 +2100,6 @@
       writeSetDraft("text", input.value);
     });
     textRow.appendChild(input);
-    if (state.setDraft.linkedItemId) {
-      textRow.appendChild(el("span", "set-link", "🔗"));
-    }
     card.appendChild(textRow);
 
     // Resolved before the buttons are built: the dropdown's value is what
@@ -1962,13 +2107,19 @@
     // dropdown, and nothing is lit when the dropdown holds some other time.
     var opts = dropdownOptions(now);
     // A draft time under the 20-minute floor silently lands on the first
-    // available option, leaving text and WL/HL intact.
+    // available option, leaving text and WL/HL intact. The floor is measured
+    // against today only, so a date being held exempts the draft time from it -
+    // 07:00 is long past by 14:00, but 07:00 three days out plainly isn't.
     var chosen = opts[0];
     if (state.setDraft.time && opts.indexOf(state.setDraft.time) !== -1) {
-      var lead = resolveClockTime(state.setDraft.time, now).getTime() -
-        now.getTime();
-      if (lead >= MIN_LEAD_MS) {
+      if (state.setDraft.date) {
         chosen = state.setDraft.time;
+      } else {
+        var lead = resolveClockTime(state.setDraft.time, now).getTime() -
+          now.getTime();
+        if (lead >= MIN_LEAD_MS) {
+          chosen = state.setDraft.time;
+        }
       }
     }
 
@@ -2004,6 +2155,14 @@
     selRow.appendChild(sel);
     card.appendChild(selRow);
 
+    // an independent control, not a modifier on the two above it: with no date
+    // the time resolves to its next occurrence within 24h exactly as it always
+    // has, and with one the two simply pair.
+    card.appendChild(buildDateInput(state.setDraft.date, now, function (v) {
+      writeSetDraft("date", v);
+      render();
+    }));
+
     card.appendChild(buildModeToggles(function () {
       return state.setDraft.mode;
     }, function (next) {
@@ -2012,6 +2171,9 @@
     }));
 
     var submitRow = el("div", "set-submit-row");
+    var clearBtn = el("button", "btn", "clear draft");
+    clearBtn.addEventListener("click", clearSetDraft);
+    submitRow.appendChild(clearBtn);
     var setBtn = el("button", "btn", "set task");
     setBtn.addEventListener("click", submitSet);
     submitRow.appendChild(setBtn);
@@ -2020,14 +2182,15 @@
   }
 
   /**
-   * Builds a template row's hamburger button and its dropdown menu. The menu
-   * is built lazily on tap and torn down by `closeAllMenus`. `Activate` and
-   * `Skip` duplicate the two swipes so the app is testable on desktop.
-   * @param {string} id - the template id.
-   * @param {Element} row - the template's row, for the inline text editor.
+   * Builds a row's hamburger button and its dropdown menu. The menu is built
+   * lazily on tap and torn down by `closeAllMenus`. `Activate` and `Prefill
+   * SET` duplicate the two swipes so the app is testable on desktop.
+   * @param {string} kind - "dailies" or "others".
+   * @param {string} id - the row id.
+   * @param {Element} row - the row, for the inline text editor.
    * @returns {Element} the `.menu-anchor` wrapper.
    */
-  function buildTemplateMenu(id, row) {
+  function buildRowMenu(kind, id, row) {
     var wrap = el("div", "menu-anchor");
     var btn = el("button", "mini", "☰");
     btn.setAttribute("aria-label", "More options");
@@ -2044,16 +2207,25 @@
       var act = el("button", "", "Activate");
       act.addEventListener("click", function () {
         closeAllMenus();
-        prefillFromTemplate(id);
+        activateRow(kind, id);
       });
       menu.appendChild(act);
 
-      var skip = el("button", "", "Skip");
-      skip.addEventListener("click", function () {
+      var pre = el("button", "", "Prefill SET");
+      pre.addEventListener("click", function () {
         closeAllMenus();
-        skipTemplate(id);
+        prefillFromRow(kind, id);
       });
-      menu.appendChild(skip);
+      menu.appendChild(pre);
+
+      if (kind === "others") {
+        var clr = el("button", "", "Clear datetime");
+        clr.addEventListener("click", function () {
+          closeAllMenus();
+          clearRowDatetime(id);
+        });
+        menu.appendChild(clr);
+      }
 
       var edit = el("button", "", "Edit");
       edit.addEventListener("click", function () {
@@ -2066,7 +2238,7 @@
             render();
             return;
           }
-          editTemplate(id, "text", v);
+          editRow(kind, id, "text", v);
         });
       });
       menu.appendChild(edit);
@@ -2074,7 +2246,7 @@
       var del = el("button", "danger", "Delete");
       del.addEventListener("click", function () {
         closeAllMenus();
-        deleteTemplate(id);
+        deleteRow(kind, id);
       });
       menu.appendChild(del);
 
@@ -2088,84 +2260,119 @@
   }
 
   /**
-   * Builds one template row: its text, then the control row of time dropdown,
-   * WL/HL toggles and hamburger. Swipe left prefills SET, swipe right skips.
-   * @param {string} id - the template id.
+   * Builds one ACTIVATE row: its text, then the control row of time dropdown,
+   * optional date picker, WL/HL toggles and hamburger. Swipe left activates it
+   * outright, swipe right prefills SET. A cooling-down `others` row dims and
+   * carries its remaining time inline, but stays fully editable - only
+   * activation is blocked.
+   * @param {string} kind - "dailies" or "others".
+   * @param {string} id - the row id.
    * @returns {Element} the row.
    */
-  function buildTemplateRow(id) {
-    var t = findTemplate(id);
+  function buildRow(kind, id) {
+    var r = findRow(kind, id);
+    var now = getNow();
     var row = el("div", "tpl-row");
-    row.appendChild(el("div", "tpl-text", t.text));
+    row.appendChild(el("div", "tpl-text", r.text));
+    if (kind === "others") {
+      var left = cooldownLeft(r, now);
+      if (left > 0) {
+        row.classList.add("row-cooling");
+        row.appendChild(el("div", "row-cooldown",
+          "on cooldown - " + fmtLeft(left) + " left"));
+      }
+    }
     var controls = el("div", "tpl-controls");
-    controls.appendChild(buildDayTimeSelect(t.time, false, function (v) {
-      editTemplate(id, "time", v);
+    controls.appendChild(buildDayTimeSelect(r.time || "", true, function (v) {
+      editRow(kind, id, "time", v);
     }));
+    if (kind === "others") {
+      controls.appendChild(buildDateInput(r.date || "", now, function (v) {
+        editRow(kind, id, "date", v);
+      }));
+    }
     controls.appendChild(buildModeToggles(function () {
-      var live = findTemplate(id);
+      var live = findRow(kind, id);
       if (!live) return null;
       return live.mode;
     }, function (next) {
-      editTemplate(id, "mode", next);
+      editRow(kind, id, "mode", next);
     }));
-    controls.appendChild(buildTemplateMenu(id, row));
+    controls.appendChild(buildRowMenu(kind, id, row));
     row.appendChild(controls);
     swipeCore(row, function (dir) {
       if (dir === "left") {
-        prefillFromTemplate(id);
+        activateRow(kind, id);
       } else {
-        skipTemplate(id);
+        prefillFromRow(kind, id);
       }
     });
     return row;
   }
 
   /**
-   * Builds the pinned template adder, mirroring the full row shape.
+   * Builds a section's pinned adder, mirroring that section's row shape.
+   * @param {string} kind - "dailies" or "others".
    * @returns {Element} the adder.
    */
-  function buildTemplateAdder() {
+  function buildAdder(kind) {
+    var draft = adderDrafts[kind];
+    var now = getNow();
     var wrap = el("div", "tpl-adder");
-    var input = buildTextArea("tpl-adder-text", adderDraft.text);
-    input.placeholder = "Add template...";
+    var input = buildTextArea("tpl-adder-text", draft.text);
+    input.placeholder = "Add other...";
+    if (kind === "dailies") {
+      input.placeholder = "Add daily...";
+    }
     var controls = el("div", "tpl-controls");
-    var sel = buildDayTimeSelect(adderDraft.time, true, function (v) {
-      adderDraft.time = v;
+    var sel = buildDayTimeSelect(draft.time, true, function (v) {
+      draft.time = v;
       refresh();
     });
     var modes = el("div", "mode-row");
     var addBtn = el("button", "btn", "add");
     /**
-     * Greys `[add]` unless the adder holds both a time and non-empty text.
+     * Greys `[add]` unless the adder holds what its section demands: text
+     * alone for `others`, text and a time together for dailies.
      */
     function refresh() {
-      var ok = adderDraft.text.trim() !== "" && adderDraft.time !== "";
+      var ok = draft.text.trim() !== "";
+      if (kind === "dailies" && draft.time === "") {
+        ok = false;
+      }
       addBtn.disabled = !ok;
     }
     ["WL", "HL"].forEach(function (m) {
       var b = el("button", "mode-btn", m);
-      if (adderDraft.mode === m) {
+      if (draft.mode === m) {
         b.classList.add("on");
       }
       b.addEventListener("click", function () {
         var next = m;
-        if (adderDraft.mode === m) {
+        if (draft.mode === m) {
           next = null;
         }
-        adderDraft.mode = next;
+        draft.mode = next;
         modes.querySelectorAll(".mode-btn").forEach(function (x) {
-          x.classList.toggle("on", x.textContent === adderDraft.mode);
+          x.classList.toggle("on", x.textContent === draft.mode);
         });
       });
       modes.appendChild(b);
     });
     input.addEventListener("input", function () {
-      adderDraft.text = input.value;
+      draft.text = input.value;
       refresh();
     });
-    addBtn.addEventListener("click", addTemplate);
+    addBtn.addEventListener("click", function () {
+      addRow(kind);
+    });
     refresh();
     controls.appendChild(sel);
+    if (kind === "others") {
+      controls.appendChild(buildDateInput(draft.date, now, function (v) {
+        draft.date = v;
+      }));
+    }
     controls.appendChild(modes);
     controls.appendChild(addBtn);
     wrap.appendChild(input);
@@ -2174,55 +2381,36 @@
   }
 
   /**
-   * Builds the ACTIVATE box: the scrolling template list plus the pinned
-   * adder.
-   * @returns {Element} the ACTIVATE section.
+   * Builds the ACTIVATE (dailies) box: disposable presets, ordered purely by
+   * clock time, plus the pinned adder.
+   * @returns {Element} the section.
    */
-  function buildActivate() {
-    var section = buildSection("ACTIVATE", "activateCard", "sec-activate");
+  function buildDailies() {
+    var section = buildSection("ACTIVATE (dailies)", "dailiesCard",
+      "sec-dailies");
     var list = el("div", "tpl-list");
-    sortedTemplates().forEach(function (t) {
-      list.appendChild(buildTemplateRow(t.id));
+    sortedDailies().forEach(function (r) {
+      list.appendChild(buildRow("dailies", r.id));
     });
     section.card.appendChild(list);
-    section.card.appendChild(buildTemplateAdder());
+    section.card.appendChild(buildAdder("dailies"));
     return section.wrap;
   }
 
   /**
-   * Builds the LINK box from Aulists' List 0, re-read fresh on every render.
-   * A row's wash is driven purely by where its id currently is: green while
-   * it's in the SET draft, yellow while an active task holds it.
-   * @returns {Element} the LINK section.
+   * Builds the ACTIVATE (others) box: persistent records, most recently
+   * completed first, plus the pinned adder.
+   * @returns {Element} the section.
    */
-  function buildLink() {
-    var section = buildSection("LINK", "linkCard", "sec-link");
-    var items = readAulistsListZero();
-    if (!items.length) {
-      section.card.appendChild(el("div", "link-empty", "(no linkables)"));
-      return section.wrap;
-    }
-    var list = el("div", "link-list");
-    items.forEach(function (item) {
-      var row = el("div", "link-row");
-      row.appendChild(el("div", "link-text", item.text));
-      var taken = state.activeTasks.some(function (t) {
-        return t.linkedItemId === item.id;
-      });
-      var btn = el("button", "btn", "Link");
-      if (taken) {
-        row.classList.add("link-yellow");
-        btn.disabled = true;
-      } else if (state.setDraft.linkedItemId === item.id) {
-        row.classList.add("link-green");
-      }
-      btn.addEventListener("click", function () {
-        linkItem(item.id, item.text);
-      });
-      row.appendChild(btn);
-      list.appendChild(row);
+  function buildOthers() {
+    var section = buildSection("ACTIVATE (others)", "othersCard",
+      "sec-others");
+    var list = el("div", "tpl-list");
+    sortedOthers().forEach(function (r) {
+      list.appendChild(buildRow("others", r.id));
     });
     section.card.appendChild(list);
+    section.card.appendChild(buildAdder("others"));
     return section.wrap;
   }
 
@@ -2231,10 +2419,10 @@
 
   /**
    * Rebuilds the entire #app DOM tree from the current in-memory state, in
-   * page order: ledger, scores, active tasks, SET, ACTIVATE, LINK.
+   * page order: ledger, scores, active tasks, ACTIVATE (dailies), ACTIVATE
+   * (others), SET.
    */
   function render() {
-    applyLapReset();
     closeAllMenus();
     document.querySelectorAll(".hs-scrim, .hs-panel").forEach(function (n) {
       n.remove();
@@ -2243,9 +2431,9 @@
     appEl.appendChild(buildLedger());
     appEl.appendChild(buildScores());
     appEl.appendChild(buildTasks());
+    appEl.appendChild(buildDailies());
+    appEl.appendChild(buildOthers());
     appEl.appendChild(buildSet());
-    appEl.appendChild(buildActivate());
-    appEl.appendChild(buildLink());
     var list = appEl.querySelector(".ledger-list");
     if (list) {
       list.scrollTop = list.scrollHeight;

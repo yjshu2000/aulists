@@ -28,6 +28,21 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v2.4 <span class="changelog-date">2026-08-10 01H</span></h3>
+    <ul>
+      <li>ACTIVATE is two boxes now. <b>Dailies</b> are the old templates, unchanged: disposable presets sorted by clock time. <b>Others</b> are persistent rows that remember when you last completed them and sort most-recent-first, so anything new or untouched sits at the top.</li>
+      <li>Swipe left on any row sets it as a task straight away, skipping SET. It needs text, a time and WL/HL, and refuses with a toast if any are missing.</li>
+      <li>Swipe right prefills SET instead. Swiping no longer moves rows down the list &mdash; the lap/skip mechanic is gone entirely.</li>
+      <li>Others rows can carry a date, up to a week out. A task more than 24h away is a <b>further</b> task: dimmer, shows the day beside the time (TU, WE...), and sits below a divider line in the active stack. You can finish them early, for no extra points.</li>
+      <li>Cancelling a task you set <em>with</em> a date locks that row for 36 hours. The row dims and shows the time remaining. Dateless rows and dailies are never locked.</li>
+      <li>SET moved to the bottom of the page, gained the same optional date field, and gained a <b>[clear draft]</b> button that wipes all four fields at once. It's undoable, so no confirmation.</li>
+      <li>Time dropdowns read "by [time]" on the rows and adders now, matching SET.</li>
+      <li>Fixed: template rows had almost no gap between the text and the controls under it, worst while editing.</li>
+      <li>LINK is gone, and with it every connection to Aulists. Falsedge no longer reads or writes Aulists' data in any way. Your existing dailies carry over untouched; Others starts empty.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v2.3.4 <span class="changelog-date">2026-08-09 21H</span></h3>
     <ul>
       <li>Hex 2^ link moved up into the header, where the refresh button used to be.</li>
