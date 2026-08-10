@@ -569,17 +569,13 @@
     justify-content: center;
     margin-top: 28px;
   }
-  .page-nav-bottom .btn {
+  /* scoped to the element, not the wrapper, so a link styled as a button
+     behaves the same wherever it sits */
+  a.btn {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
     text-decoration: none;
-  }
-  .page-nav-bottom.nav-right {
-    justify-content: flex-end;
-  }
-  .page-nav-bottom.nav-right + .page-nav-bottom {
-    margin-top: 8px;
   }
 
   /* ------------------------------ toast / pill ---------------------------- */
