@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DOLI arrow &mdash; outline cooldown</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#12141c;
+    --panel:#1a1d27;
+    --panel-2:#20242f;
+    --line:#2b3140;
+    --line-soft:#242938;
+    --text:#e9ebf2;
+    --muted:#878da2;
+    --faint:#5a6072;
+    --radius:14px;
+  }
+  body {
+    background:
+      radial-gradient(1200px 600px at 70% -10%, rgba(60,195,226,.06), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    /* the real page: style-falsedge.css sets body to plain monospace, and
+       Space Mono only ever reaches h1/h2/h3 */
+    font-family: monospace;
+    padding: 24px 16px 80px;
+    max-width: 700px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+  h1, h2 { font-family: "Space Mono", monospace; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+    margin: 44px 0 4px 2px;
+  }
+  .note {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.7;
+    margin-bottom: 8px;
+  }
+  .note.top { margin-bottom: 28px; }
+  .pct { font-size: 10px; color: var(--faint); letter-spacing: .06em; }
+  .row {
+    display: flex;
+    gap: 22px;
+    align-items: flex-end;
+    margin: 18px 0 0 2px;
+    flex-wrap: wrap;
+  }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 7px; }
+
+  /* ---------- task block, verbatim from style-falsedge.css ---------- */
+  .task-block {
+    position: relative;
+    width: max-content;
+    max-width: 100%;
+    background: var(--panel-2);
+    border-radius: var(--radius);
+    padding: 24px 16px 14px;
+    margin-top: 26px;
+    border: 1px solid color-mix(in srgb, var(--glow) 34%, var(--line-soft));
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--glow) 9%, transparent),
+      0 0 22px -6px color-mix(in srgb, var(--glow) 45%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--glow) 30%, transparent),
+      inset 0 10px 22px -16px color-mix(in srgb, var(--glow) 65%, transparent);
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .task-top {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translateY(-50%);
+  }
+  .task-top .btn {
+    min-height: 34px;
+    padding: 0 12px;
+    font: inherit;
+    font-size: 12px;
+    color: var(--text);
+    background: var(--panel-2);
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--glow) 45%, var(--line));
+    box-shadow: 0 0 14px -5px color-mix(in srgb, var(--glow) 70%, transparent);
+  }
+  .task-text-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0 8px;
+  }
+  .task-text { font-size: 15px; font-weight: 700; word-break: break-word; }
+  .tier { line-height: 1.6; }
+  .tier-faint { font-size: 12px; color: var(--faint); }
+  .tier-live { font-size: 14px; color: var(--text); }
+  .task-actions { margin-top: 10px; }
+  .btn {
+    font: inherit;
+    font-size: 13px;
+    min-height: 40px;
+    padding: 0 12px;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+
+  /* the DOLI slot: right of the by-lines, vertically centred against them */
+  .slot { align-self: center; }
+
+  /* ---------- the button ---------- */
+  /* No border of its own - the ring below draws it. The grey ring is the
+     resting outline; the glowing ring traces around it as the 30h elapses,
+     so a closed loop means ready and a partial arc means still cooling. */
+  .doli {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 10px;
+    background: var(--panel-2);
+    padding: 0;
+    display: grid;
+    place-items: center;
+    overflow: visible;
+  }
+  .ring {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    overflow: visible;
+  }
+  .ring rect { fill: none; stroke-width: 2; }
+  .ring-base { stroke: var(--line); }
+  .ring-fill {
+    stroke: var(--glow);
+    stroke-linecap: round;
+    stroke-dasharray: var(--p) 100;
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--glow) 85%, transparent));
+  }
+  .doli img { position: relative; z-index: 2; display: block; }
+
+  .chibi { width: 64px; height: 64px; border-radius: 18px; object-fit: cover; }
+  .big { background: var(--panel-2); border-radius: 28px; padding: 14px; border: 1px solid var(--line); }
+</style>
+</head>
+<body>
+
+<h1>DOLI arrow &mdash; outline cooldown</h1>
+<div class="note top">
+  The 30h cooldown is now the square's <strong>outline drawing itself round</strong>, not an
+  interior fill. A rounded rect with <code>pathLength="100"</code> and a
+  <code>stroke-dasharray</code> driven by progress, over a flat grey base ring. Closed loop =
+  ready, partial arc = still cooling. Stroke takes the task block's own <code>--glow</code>.
+  The trace starts top-left and runs clockwise &mdash; say if it should start somewhere else.
+</div>
+
+<h2>the glyph, huge</h2>
+<div class="note"><code>assets/arrow-promo.svg</code> &mdash; bold arrow, two uneven speed-lines crossing behind it, three sparkles.</div>
+<div class="row">
+  <div class="cell"><span class="big"><img src="../assets/arrow-promo.svg" width="128" height="128" alt=""></span><span class="pct">128</span></div>
+</div>
+
+<h2>cooldown, traced</h2>
+<div class="note">100 is the resting state &mdash; a task you can promote right now sits fully lit, permanently.</div>
+<div class="row" style="--glow:#476fdc">
+  <div class="cell"><button class="doli" style="--p:0"><svg class="ring" viewBox="0 0 32 32" width="32" height="32"><rect class="ring-base" x="1" y="1" width="30" height="30" rx="9"/><rect class="ring-fill" x="1" y="1" width="30" height="30" rx="9" pathLength="100"/></svg><img src="../assets/arrow-promo.svg" width="20" height="20" alt=""></button><span class="pct">0</span></div>
+  <div class="cell"><button class="doli" style="--p:15"><svg class="ring" viewBox="0 0 32 32" width="32" height="32"><rect class="ring-base" x="1" y="1" width="30" height="30" rx="9"/><rect class="ring-fill" x="1" y="1" width="30" height="30" rx="9" pathLength="100"/></svg><img src="../assets/arrow-promo.svg" width="20" height="20" alt=""></button><span class="pct">15</span></div>
+  <div class="cell"><button class="doli" style="--p:40"><svg class="ring" viewBox="0 0 32 32" width="32" height="32"><rect class="ring-base" x="1" y="1" width="30" height="30" rx="9"/><rect class="ring-fill" x="1" y="1" width="30" height="30" rx="9" pathLength="100"/></svg><img src="../assets/arrow-promo.svg" width="20" height="20" alt=""></button><span class="pct">40</span></div>
+  <div class="cell"><button class="doli" style="--p:65"><svg class="ring" viewBox="0 0 32 32" width="32" height="32"><rect class="ring-base" x="1" y="1" width="30" height="30" rx="9"/><rect class="ring-fill" x="1" y="1" width="30" height="30" rx="9" pathLength="100"/></svg><img src="../assets/arrow-promo.svg" width="20" height="20" alt=""></button><span class="pct">65</span></div>
+  <div class="cell"><button class="doli" style="--p:90"><svg class="ring" viewBox="0 0 32 32" width="32" height="32"><rect class="ring-base" x="1" y="1" width="30" height="30" rx="9"/><rect class="ring-fill" x="1" y="1" width="30" height="30" rx="9" pathLength="100"/></svg><img src="../assets/arrow-promo.svg" width="20" height="20" alt=""></button><span class="pct">90</span></div>
+  <div class="cell"><button class="doli" style="--p:100"><svg class="ring" viewBox="0 0 32 32" width="32" height="32"><rect class="ring-base" x="1" y="1" width="30" height="30" rx="9"/><rect class="ring-fill" x="1" y="1" width="30" height="30" rx="9" pathLength="100"/></svg><img src="../assets/arrow-promo.svg" width="20" height="20" alt=""></button><span class="pct">100</span></div>
+</div>
+
+<h2>glyph size inside the 32px square</h2>
+<div class="note">All at 100 so the ring isn't distracting.</div>
+<div class="row" style="--glow:#476fdc">
+  <div class="cell"><button class="doli" style="--p:100"><svg class="ring" viewBox="0 0 32 32" width="32" height="32"><rect class="ring-base" x="1" y="1" width="30" height="30" rx="9"/><rect class="ring-fill" x="1" y="1" width="30" height="30" rx="9" pathLength="100"/></svg><img src="../assets/arrow-promo.svg" width="16" height="16" alt=""></button><span class="pct">16</span></div>
+  <div class="cell"><button class="doli" style="--p:100"><svg class="ring" viewBox="0 0 32 32" width="32" height="32"><rect class="ring-base" x="1" y="1" width="30" height="30" rx="9"/><rect class="ring-fill" x="1" y="1" width="30" height="30" rx="9" pathLength="100"/></svg><img src="../assets/arrow-promo.svg" width="20" height="20" alt=""></button><span class="pct">20</span></div>
+  <div class="cell"><button class="doli" style="--p:100"><svg class="ring" viewBox="0 0 32 32" width="32" height="32"><rect class="ring-base" x="1" y="1" width="30" height="30" rx="9"/><rect class="ring-fill" x="1" y="1" width="30" height="30" rx="9" pathLength="100"/></svg><img src="../assets/arrow-promo.svg" width="24" height="24" alt=""></button><span class="pct">24</span></div>
+  <div class="cell"><button class="doli" style="--p:100"><svg class="ring" viewBox="0 0 32 32" width="32" height="32"><rect class="ring-base" x="1" y="1" width="30" height="30" rx="9"/><rect class="ring-fill" x="1" y="1" width="30" height="30" rx="9" pathLength="100"/></svg><img src="../assets/arrow-promo.svg" width="28" height="28" alt=""></button><span class="pct">28</span></div>
+</div>
+
+<h2>across the stack</h2>
+<div class="note">65 in the three active-task colours &mdash; blue 224&deg;, cornflower 216&deg;, azure 207&deg;.</div>
+<div class="row">
+  <div class="cell" style="--glow:#476fdc"><button class="doli" style="--p:65"><svg class="ring" viewBox="0 0 32 32" width="32" height="32"><rect class="ring-base" x="1" y="1" width="30" height="30" rx="9"/><rect class="ring-fill" x="1" y="1" width="30" height="30" rx="9" pathLength="100"/></svg><img src="../assets/arrow-promo.svg" width="20" height="20" alt=""></button><span class="pct">224&deg;</span></div>
+  <div class="cell" style="--glow:#4582de"><button class="doli" style="--p:65"><svg class="ring" viewBox="0 0 32 32" width="32" height="32"><rect class="ring-base" x="1" y="1" width="30" height="30" rx="9"/><rect class="ring-fill" x="1" y="1" width="30" height="30" rx="9" pathLength="100"/></svg><img src="../assets/arrow-promo.svg" width="20" height="20" alt=""></button><span class="pct">216&deg;</span></div>
+  <div class="cell" style="--glow:#3f97de"><button class="doli" style="--p:65"><svg class="ring" viewBox="0 0 32 32" width="32" height="32"><rect class="ring-base" x="1" y="1" width="30" height="30" rx="9"/><rect class="ring-fill" x="1" y="1" width="30" height="30" rx="9" pathLength="100"/></svg><img src="../assets/arrow-promo.svg" width="20" height="20" alt=""></button><span class="pct">207&deg;</span></div>
+</div>
+
+<h2>in context &mdash; and the repetition problem</h2>
+<div class="note">
+  The cooldown is global, so every unpromoted task shows the same ring at the same
+  progress. Two tasks here both sitting at 40, plus one promoted. This is the thing that
+  still needs deciding.
+</div>
+
+<div style="--glow:#476fdc">
+  <div class="task-block">
+    <div class="task-top"><button class="btn">cancel task</button></div>
+    <div>
+      <div class="task-text-row"><span class="task-text">test aaaaaaaaaaaaAAAAAAAAAa</span></div>
+      <div class="tier tier-faint">by 19:00 for 6 pts</div>
+      <div class="tier tier-live">by 19:10 for 3 pts</div>
+      <div class="tier tier-faint">by 19:30 for 2 pts</div>
+      <div class="tier tier-faint">by 20:00 for 1 pts</div>
+      <div class="task-actions"><button class="btn">complete now</button></div>
+    </div>
+    <div class="slot">
+      <button class="doli" style="--p:40"><svg class="ring" viewBox="0 0 32 32" width="32" height="32"><rect class="ring-base" x="1" y="1" width="30" height="30" rx="9"/><rect class="ring-fill" x="1" y="1" width="30" height="30" rx="9" pathLength="100"/></svg><img src="../assets/arrow-promo.svg" width="20" height="20" alt=""></button>
+    </div>
+  </div>
+</div>
+
+<div style="--glow:#4582de">
+  <div class="task-block">
+    <div class="task-top"><button class="btn">cancel task</button></div>
+    <div>
+      <div class="task-text-row"><span class="task-text">vacuum</span></div>
+      <div class="tier tier-faint">by 19:00 for 6 pts</div>
+      <div class="tier tier-live">by 19:05 for 3 pts</div>
+      <div class="tier tier-faint">by 19:15 for 2 pts</div>
+      <div class="task-actions"><button class="btn">complete now</button></div>
+    </div>
+    <div class="slot">
+      <button class="doli" style="--p:40"><svg class="ring" viewBox="0 0 32 32" width="32" height="32"><rect class="ring-base" x="1" y="1" width="30" height="30" rx="9"/><rect class="ring-fill" x="1" y="1" width="30" height="30" rx="9" pathLength="100"/></svg><img src="../assets/arrow-promo.svg" width="20" height="20" alt=""></button>
+    </div>
+  </div>
+</div>
+
+<div style="--glow:#3f97de">
+  <div class="task-block">
+    <div class="task-top"><button class="btn">cancel task</button></div>
+    <div>
+      <div class="task-text-row"><span class="task-text">job search stuff</span></div>
+      <div class="tier tier-faint">by 22:00 for 12 pts</div>
+      <div class="tier tier-live">by 22:10 for 6 pts</div>
+      <div class="tier tier-faint">by 22:30 for 3 pts</div>
+      <div class="tier tier-faint">by 23:00 for 2 pts</div>
+      <div class="task-actions"><button class="btn">complete now</button></div>
+    </div>
+    <div class="slot">
+      <img class="chibi" src="../assets/aven-cool.png" alt="">
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

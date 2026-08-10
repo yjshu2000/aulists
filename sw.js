@@ -1,4 +1,4 @@
-const CACHE = 'aulists-v5';
+const CACHE_DO_NOT_BUMP = 'aulists-networkfirst-DO-NOT-BUMP';
 const SHELL = [
   './',
   './index.html',
@@ -16,18 +16,23 @@ const SHELL = [
   './hex2-base.js',
   './hex2-jiggly.js',
   './manifest.json',
-  './icon.svg'
+  './assets/icon.svg',
+  './assets/icon-hex2.svg'
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
+  event.waitUntil(
+    caches.open(CACHE_DO_NOT_BUMP).then((cache) => cache.addAll(SHELL))
+  );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      Promise.all(keys
+        .filter((k) => k !== CACHE_DO_NOT_BUMP)
+        .map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
@@ -40,7 +45,9 @@ self.addEventListener('fetch', (event) => {
     fetch(event.request)
       .then((res) => {
         const copy = res.clone();
-        caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        caches
+          .open(CACHE_DO_NOT_BUMP)
+          .then((cache) => cache.put(event.request, copy));
         return res;
       })
       .catch(() => caches.match(event.request))

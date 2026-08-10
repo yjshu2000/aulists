@@ -1,156 +1,241 @@
 # Next features & fixes
 
-Distilled from sad-todos-babble.md (2026-08-07). Later entries in that doc supersede earlier ones.
+## Doc rules
 
-## Remove Set Task section entirely
+**D1. This is the living backlog.** It is the single place pending work is tracked. It gets edited in place as things change — not appended to, not superseded by a newer doc. No Q&A format, no discussion history, no rejected options.
 
-Set Task is redundant now that activate templates exist. Remove the whole section. The adder in the template sections replaces it. (This supersedes the earlier ideas about adding "clear draft" and "save template" buttons to the Set Task row — those are moot now.)
+**D2. Shipped items get deleted, not ticked off.** When something lands in the code, its entry is removed from this doc entirely. There is no "done" section. The changelog in `about.html` is the record of what shipped; this doc is only what hasn't.
+*This also applies to rejected options.*
 
-## Add "by" label beside time dropdown
+**D3. Three supersections, one per app page.** Falsedge, Aulists, Hex 2^. Each item is a `###` heading under its page's `##`. An item that spans two pages will go in the "multi-page items" section.
 
-In the activate template adder, the time dropdown needs a "by" label to its left so it reads as "by [time]" instead of just showing a bare time.
+**D4. Items are written as decisions, not questions.** If something is genuinely undecided, it says so explicitly in the item rather than being left vague. Exploratory ideas are marked exploratory.
 
-## Remove height limiting / scroll containment in activate
+**D5. Source lineage.** Distilled from `scratchpad/sad-todos-babble.md` and `scratchpad/falsedge-phase4-qna.md`. Both were fully folded in on 2026-08-09 and are obsolete from here on. `scratchpad/falsedge-phase3.md` is not a source — it describes the live Phase 3 baseline every item here builds on.
 
-No more internal scrolling in the activate area. No height cap. Just show the full content and let the user scroll past all of it to reach the next section. (This supersedes the earlier scroll-containment bug report and the scroll-jump-on-tap bug — both go away if there's no internal scroll.)
+**D6. The bracketed `iN` labels are IDs and nothing else.** Not priority, not chronological, not an ordering — nothing carries any of that, much less the ID. An ID is assigned once and never changes: items keep theirs when reordered or moved between sections, and a deleted item's ID is retired rather than reused. Gaps in the sequence are normal and expected. Sub-items are `iN.1`, `iN.2`, … numbered from `.1`, as `####` headings under their parent, and follow the same rules.
 
-## Active tasks visual redesign
+**D7. No backward compatibility for old data, ever.** No migration code, no accounting for old data shapes, in this phase or any future one. If data has to survive a breaking change, it gets exported, updated, and re-imported by hand.
 
-- Wrap the whole active tasks area in a labelled box reading "ACTIVE TASKS", styled like the other section labels.
-- Colour: green (the old green, not cornflower/cerulean).
-- Items inside get the same outlines and boxes as before, same colour-changing behaviour, but no glow.
+**D8. Every item's heading ends with a tag.** ⬜ big task, ⚪ medium task, ▫️ minor or trivial to implement. 🐞 marks a bug fix rather than new work, and sits alongside a size tag rather than replacing it. Sub-items are tagged on their own merits, independently of their parent.
 
-## Remove refresh buttons
+## Falsedge
 
-Removing the swipe-nav stuff also removed the capture of swipe-down-to-reload, which means the browser's native pull-to-refresh works again. The manual refresh buttons are now redundant — kill them.
+### [i0] SET (set task section) modifications ⚪
 
-## Edit templates styling bug
+`SET` stays fully functional. Do not disable any parts of it; it only gets some updates and changes.
+
+`SET`'s text field becomes multiline, along with every other text field in Falsedge — see [i10].
+
+#### [i0.1] Clear-draft button ▫️
+
+`SET`'s bottom row becomes `[clear draft]` left-aligned and `[set task]` right-aligned, on the same row.
+
+`[clear draft]` wipes all four draft fields at once — text, time, WL/HL, and the date from [i0.3] — with no confirmation step. It pushes onto the existing undo stack, so a mis-tap is one undo away.
+
+There is no `[save template]` button. That idea only existed as a replacement for the `ACTIVATE` adder, and the adder is being kept.
+
+#### [i0.2] Move SET to the bottom ▫️
+
+`SET` moves to the very bottom of the page, below both `ACTIVATE` sections. The full render order becomes ledger → scores → active tasks → `ACTIVATE (dailies)` → `ACTIVATE (others)` → `SET`, replacing today's ledger → scores → tasks → `SET` → `ACTIVATE` → `LINK`.
+
+#### [i0.3] Optional date field ⚪
+
+`SET` gains the same optional date field `ACTIVATE (others)` has (up to 1 week out — see [i3]), as a separate independent control alongside the existing time dropdown + quick buttons. When no date is picked, behaviour is unchanged: the deadline resolves to the next occurrence of the chosen time within 24h. When a date is picked, the chosen time pairs with that date directly, with no next-occurrence resolution.
+
+### [i1] Restructure Falsedge into two activate sections ⬜
+
+Aulists-linking is removed entirely — no connection to `aulists.listdata` in any form. No `🔗`, no `linkedItemId`, no propagation. The `LINK` section goes, along with `buildLink()`, `readAulistsListZero()`, and the `.link-*` CSS. The two sections that replace the linkables concept:
+
+**ACTIVATE (dailies)**
+- Every template that exists today becomes a `dailies` row. They all already carry a time, since the current adder requires one, so they satisfy the dailies rules unchanged. `ACTIVATE (others)` starts empty and gets populated by hand.
+- Rows stay pure disposable presets, exactly like today's templates. No `lastDone`, no cooldown, no persistent identity.
+- Time is mandatory. `--:--` stays available in the dropdown, but the add button is gated (blocked) when time isn't set.
+- Sorts purely by time, ascending from `00:00` — an absolute order that never shifts with the current time. (this is already what it currently does. unchanged)
+- Never gets a date field, and never gets the 36h cancel cooldown.
+
+**ACTIVATE (others)**
+- Rows are persistent records with their own identity, not disposable presets. The word "template" no longer fits — a row effectively *is* the item now, not a preset that spawns disposable copies.
+- Two things are tracked per row across its lifecycle: `lastDone`, and a cancel-cooldown timestamp (see [i3]).
+- `lastDone` updates on completion, on-time or late — but not on cancel. It is independent of Aulists entirely.
+- Sorts by `lastDone`, descending — most recently completed at the top. A row that has never been completed has no `lastDone` and pins above everything, so anything new or untouched is the first thing in this section.
+- Time is optional to store, and `--:--` must remain available. Time is still required to activate (see [i2]).
+- Carries an optional date, up to 1 week out (see [i3]).
+- Its adder does not exist yet and has to be built — Phase 3 only ever built a dailies-shaped `ACTIVATE` adder.
+- Its hamburger gains a `Clear datetime` entry, clearing the row's stored date and time together.
+- An active task spawned from an `others` row stores that row's id in a `sourceRowId` field, taking over the slot `linkedItemId` vacates. `dailies`-spawned tasks carry no such field and are fully detached the moment they're created. `sourceRowId` is what makes the rest of this section work: it's how completion knows which row to stamp `lastDone` on, how cancelling knows which row to put on cooldown, and how a row with a live task already out refuses a second swipe-left (with a toast).
+- Deleting an `others` row is never blocked, even while a task it spawned is still live. That task keeps running with a `sourceRowId` pointing at nothing: completing it stamps no `lastDone`, cancelling it sets no cooldown. Every `sourceRowId` lookup has to tolerate a missing row.
+
+Both sections:
+- WL/HL is optional to store, required to activate.
+- Swipe left (right→left) directly creates the active task, bypassing `SET` (see [i2]).
+- Swipe right (left→right) prefills `SET` with the row's text, time, and WL/HL — plus date, for `others` rows — without touching the row or creating an active task. This is what Phase 3's swipe-left used to do.
+- There is no lap/skip mechanic anywhere: no swipe bumps a row's position, no hamburger `Skip` entry, no `lap` field.
+
+### [i2] Full-template instant activation ⚪
+
+Swiping left on an `ACTIVATE` row, in either section, bypasses `SET` entirely and directly creates a new active task.
+
+Required in both sections: text, WL/HL, and time. Date is the only optional field, and only exists on `others` rows. If any required field is missing, the swipe refuses with the same toast `SET` showed on refusal — a dateless `ACTIVATE (others)` row still needs a time before swipe-left will do anything.
+
+For a row with no date, the time resolves the same way `SET`'s does: the next occurrence of that time within the next 24h. For an `others` row with a date, the time pairs with that date directly.
+
+### [i3] Further task deadlines (up to 1 week) ⬜
+
+A "further task" is an `ACTIVATE (others)` row with its date set. Once activated, it becomes an active task whose deadline is that specific date + time.
+
+- Optional date field, using the native calendar date picker. It lives on `ACTIVATE (others)` rows and on the `others` adder, and on `SET` ([i0]). `ACTIVATE (dailies)` rows and their adder never get one.
+- Max range is 1 week out (7×24h). Can't go further. Enforced twice: `min`/`max` attributes on the input so the native picker greys out anything past 7 days, plus a submit-time check that refuses with a toast.
+- The date clears after a task is set from it (swipe-left).
+- A task counts as **further** when its deadline is more than 24 hours away. This is a rolling window, not a calendar-day boundary: at 17:00 today, a deadline of 09:00 tomorrow is only 16h out and is therefore not further, despite falling on a different day.
+- The display treatment happens in the **active tasks stack**, separating near-term active tasks from far-off ones — not in the `ACTIVATE (others)` row list. Further tasks are dimmer (less glow, greyer text) and show the day abbreviation beside the time (TU, WE, …). A horizontal divider line separates further tasks from the rest, with no line when no further tasks exist.
+- Further tasks can be completed early, with no extra reward for doing so — they're intended to be done whenever.
+- Anti-abuse: cancelling an active task that was activated **with a date set** blocks re-setting that row for 36 hours. A dateless `ACTIVATE (others)` row that gets cancelled can be re-set immediately. This never applies to `ACTIVATE (dailies)`.
+- A row on cooldown dims and shows its remaining time inline, so the block is visible without having to swipe at it. The row stays fully interactive otherwise — editing its text and fields still works; only activation is blocked.
+
+### [i5] DOLI (Double Or Lose It) mechanism ⬜
+
+Ships complete: state schema, scoring curve, limits, and the promotion control itself.
+
+**Scoring.** WL/HL is a general ½-scale state, not two fixed unrelated arrays (`HL_OFFSETS` is `WL_OFFSETS` halved: `[0,10,30,60]` → `[0,5,15,30]`). DOLI defines its own whole (WL) schedule, and the same halving rule applies when a DOLI task is set to HL:
+
+```
+WL  minutes past deadline:  0   10   30   60   120   >120
+HL  minutes past deadline:  0    5   15   30    60    >60
+    points:                12    6    3    2     0     -6
+```
+
+(0 means completed on time / within deadline.) The key difference from a normal task: instead of just becoming 0, there's only a 1-hour window at 0 before it drops straight to -6.
+
+**Visual.** A promoted task shows a 64px Aventurine chibi in its own block, in the empty space to the right of the `by X for X pts` lines, vertically centred against that whole group of rows. Four images, one picked at random per page load and stable through re-renders until an actual reload: `assets/aven-play-cards.png`, `assets/aven-cool.png`, `assets/aven-cheers.png`, `assets/aven-throw-money.png`.
+
+**Promotion control.** A 32px rounded square, 10px radius, containing `assets/arrow-promo.svg` at 20px. It exists exactly once on the page, in the `ACTIVE TASKS` wrapper header ([i6]).
+
+The square carries no CSS border. Its outline is an SVG rounded rect drawn twice: a flat grey base ring, and a glowing ring over it carrying `pathLength="100"` with a `stroke-dasharray` driven by cooldown progress, so the outline traces itself clockwise from the top-left corner as the 30h elapses. The glowing stroke takes the wrapper's `--glow`, which [i6] sets to `var(--c-green)`. A closed loop means ready, a partial arc means still cooling, and there is no interior fill at any point.
+
+Tapping the square enters pick mode: every active task block gets a full-block overlay reading `select` — the existing `.edit-overlay` treatment reparented to `.task-block`, which is already `position: relative` and so needs no other change. Tapping a block promotes it. Tapping the square again, or anywhere that isn't a task block, leaves pick mode without promoting anything.
+
+Promotion is irreversible. Undo is the only way back, and otherwise the only exit is cancelling the task outright — the mechanic is a gamble on commitment, so there is no un-promote.
+
+**Limits.** One promotion per 30 hours — a rolling cooldown measured from the last promotion. That's the only limiter. Cancelling a DOLI task does not hand the promotion back: the 30h runs from the promotion regardless of what becomes of the task.
+
+The square is inert until its ring closes, so at rest it sits permanently fully lit — a closed ring is the normal state, not a special one.
+
+### [i6] Active tasks visual redesign ⚪
+
+A new outer `.card`-family wrapper goes around `.tasks`, labelled "ACTIVE TASKS" above it the same way `SET` and `ACTIVATE` are labelled — halo + sheen, matching their existing visual treatment. Its `--glow` is `var(--c-green)` (`#46d38a`), already defined in `style-colourful.css`, which Falsedge loads alongside its own stylesheet.
+
+Individual `.task-block`s stay nested inside and keep their border, background, and per-position colour-shifting, but lose their own `box-shadow` glow. Only the outer wrapper glows now.
+
+The wrapper always renders. When there are no active tasks, its contents are the "(no active tasks)" message and the `[streak broke]` button instead of task blocks.
+
+### [i8] Spend row: backdating, bulk buy, multiline ⬜
+
+The row becomes `[text field] [pts cost] [×N] [spend]`, with a date picker on its own line above it.
+
+**Backdating.** A spend is still *appended* to the ledger at the position corresponding to when it was logged (creation order, same as today), but the date stamped on the entry can be set into the past — recording when the money was actually spent, not when it was logged. A spend entry's stamped date and its position in the ledger array can therefore disagree: an entry near the end of the ledger can carry an earlier date than one before it.
+
+**UI.** A native date-picker input on its own new line, defaulting to today, sitting between the "log spent points" label and the row's existing controls — not merged into that controls row.
+
+```
+┌────────────────────┐
+│ Current pts: 42  ^ │
+└────────────────────┘
+log spent points
+[ 2026-08-03 📅 ]
+[ text field         ]  [cost▾]  [×N▾]  [spend]
+┌────────────────────┐
+│ Current scr: 127 > │
+└────────────────────┘
+```
+
+**Ledger text.** The date becomes a new second line, sitting between the text and the `pts` line — the same position a task entry's `by` line occupies:
+
+```
+new headphones
+on 2026-08-03
+pts = 45 - 50 = -5
+```
+
+**`pts cost`** becomes a combined dropdown + text input (`<input list>` + `<datalist>`) and shrinks in width. Its suggestions are the 10 most-frequently-used cost values, sorted by numerical value in the dropdown itself, not by frequency.
+
+**Frequency data** comes from a new `spendCostCounts` map in state, `{cost: timesUsed}`, incremented every time `[spend]` is tapped. It must be a plain object, not a `Map` — a `Map` serializes to `{}` and would be silently emptied by `save()`. It grows only with the number of *distinct* cost values ever used, not with total spend count — a repeated cost increments its existing counter. It is not derived by re-parsing ledger entry strings, consistent with how the rest of Falsedge avoids re-deriving things from pre-rendered ledger text.
+
+**`×N`** is a new field, the same combined dropdown + text input shape as `pts cost`, but with its own fixed suggestion range of 1–9, defaulting to 1. `pts cost` is per-unit; the total deducted is cost × N.
+
+A bulk buy shows the count in both the text line and the `pts` line, so the unit cost stays visible and the total stays checkable:
+
+```
+chips ×3
+on 2026-08-03
+pts = 45 - 10×3 = 15
+```
+
+The spend row's text field also becomes multiline (see [i10]).
+
+### [i9] Add "by" label beside time dropdown ▫️
+
+Both the `ACTIVATE` row's own time control and the adder's time control get a "by" label to their left, so each reads "by [time]" instead of showing a bare time. Same placement style as `SET`'s existing "by" label. Both already route through the shared `buildDayTimeSelect()`, so one change covers both.
+
+### [i10] Text fields must line-wrap when editing ⚪
+
+The goal is wrapping, so a long item is fully visible rather than scrolling sideways out of view. `<input type="text">` cannot wrap at any width, so each one becomes a `<textarea>` that auto-grows with its content — the section reflows as you type and the whole value stays on screen.
+
+Applies to `SET`'s text field, the `ACTIVATE` adder's text field, the spend row's text field, and the inline-edit inputs (active task text edit, template hamburger edit).
+
+Enter inserts a newline in all of them. Three of the four have no Enter handling today, so nothing is lost; the inline-edit field currently commits on Enter and gives that up, leaving blur as its only commit path.
+
+### [i11] Edit templates styling bug 🐞 ▫️
 
 The template rows have basically no gap between the text and the controls row beneath it. It's most visible when editing (because the borders appear and make the collision obvious), but it applies to both the regular rows and the inline edit UI. Just needs slightly more spacing between the two rows.
 
-## Deletable ledger entries with undo
+### [i12] Swipe-right on templates stops moving rows down ▫️
 
-Two parts:
-1. Need the ability to delete individual ledger entries (for when the undo history has expired/died).
-2. Deleting a ledger entry should itself go into the undo stack.
+Swipe right (left-to-right) on template rows currently moves them down. That behaviour is removed — swipe right now prefills `SET` instead (see [i1]). Nothing bumps a row's position any more.
 
-## Full-template instant activation
+### [i13] Swap homepage to Falsedge ⚪
 
-If a template has all fields filled (WL/HL, time, text), swiping left (right-to-left) on it should bypass any intermediate step and directly create a new active task. If any field is missing, toast the same refusal message that Set Task would have shown. Time is "next available in next 24h" for the bypassed case.
+Done as a file rename. The current `index.html` (Aulists) becomes `aulists.html`, and `falsedge.html` becomes `index.html`. Cross-links, `manifest.json`'s `start_url`, and `sw.js`'s `SHELL` list all get updated to match the new filenames.
 
-## Restructure Falsedge into two activate sections
+`manifest.json`'s `name` and `short_name` stay `"Aulists"` — it remains the overall umbrella app name, unchanged by which page is the entry point.
 
-Replace the current linkables concept. The two sections become:
+### [i14] Complex tasks ⬜
 
-**ACTIVATE (dailies)**
-- Time is mandatory.
-- Sorts by time.
-- --:-- available in dropdown but the add/set button is gated (blocked) if time isn't set.
+#### [i14.1] Multipliers and bonuses (exploratory) ⬜
 
-**ACTIVATE (others)**
-- Time is optional; --:-- must remain available as an option.
-- Sorts by last-done date (this needs to be tracked now — completion date updates on on-time or late completion, but not on cancel).
-- This last-done tracking is independent of Aulists entirely.
+Vague idea — support for multipliers on tasks (conditional?) and +1 bonuses attached to a task. Not fleshed out.
 
-Both sections:
-- WL/HL optional until trying to set/activate.
-- Swipe left directly creates active task (same as "full-template instant activation" above) if all required fields are set.
+#### [i14.2] Event-anchored deadlines ⬜
 
-## Strip down Aulists
+Needed ASAP. A task can be set whose deadline isn't known at set time, because it hangs off an event that hasn't happened yet — "within 1h of check phone after wake", "within 1h of getting home (chimer resumes)". The event's real time is entered manually later, and the deadline is computed from it: enter `19:37` and the deadline resolves to `20:40`.
 
-- Only lists 1 through 4. Remove list 2.5 and 0.
-- Remove auto-move/auto-reprioritize between lists entirely.
-- Remove the pencil/edit icon from the main view; move it into the hamburger menu.
-- Replace the pencil icon's spot with a copy icon that copies just the item text.
-- Keep swipe-between-lists navigation.
+**Undecided:** nearly all of it. The `19:37` → `20:40` example is +1h and then rounded up to the next 10-minute mark, which matches the app's existing 10-minute offset granularity, but that rounding rule was never stated outright. Also open: where the anchor phrase is authored, what the task displays before its event time is entered, whether the offset is fixed at 1h or configurable per task, whether scoring runs from the resolved deadline exactly as a normal task's does, and what happens if the event time is never entered at all.
 
-## Text fields must line-wrap when editing
 
-Editing text in template fields currently shows as a single-line input that doesn't wrap. It needs to wrap / be multiline.
+## Aulists
 
-## Spending timestamps + bulk buy
+### [i15] Strip down Aulists ⬜
 
-- Spending entries in the ledger need timestamps (currently missing).
-- Buying multiple of the same item should support a quantity multiplier display: text, spend pts, ×count.
+- Lists become `["1", "2", "3", "4"]`. List 0 and list 2.5 are removed; the current chain is `["0", "1", "2", "2.5", "3", "4"]`, so dropping them leaves a sequence that is already in order.
+- No migration code, ever (D7). Whatever sits in list 0 or list 2.5 at upgrade time simply stops being read or written by anything.
+- `applyAutoReturn()` and all auto-move / auto-reprioritize between lists is removed entirely.
+- List 2's randomizer stays, but pools from List 2 alone. It currently also draws from List 2.5, which no longer exists.
+- The boundary mechanism `applyAutoReturn()` used to call — `pushBoundary`, `isBoundary`, `pendingBoundary`, the boundary-confirm UI — **stays**, even though nothing calls it any more, in case something needs it later.
+- The pencil/edit icon leaves the main view. An "Edit" entry is added to the hamburger dropdown, calling the same `startEdit(li, item)` the pencil calls today.
+- Every `buildPencil()` call site — main list rows, Completed-list rows, and any other row type it appears on — gets a copy button in that same visual slot instead, copying the item's text to the clipboard. It uses Falsedge's existing `COPY_ICON` SVG (the two-overlapping-rectangles glyph already used by the ledger and high-scores copy buttons) and toasts success/failure the way Falsedge's copy actions already do. `buildPencil()` gets renamed to `buildCopyBtn()` rather than left with a misleading name.
+- `buildTrashBtn()` — defined but never called anywhere, dead code from an earlier abandoned refactor — gets deleted while this area is being touched.
+- Swipe-between-lists navigation stays.
 
-## DOLI (Double Or Lose It) mechanism
 
-New mechanic. Once per day, a task can be promoted to DOLI status.
+## Hex 2^
 
-**Visual:**
-- Icon: shiny up arrow (flat outline, not filled — like a video game buff icon). Neon, in the task's colour.
-- When active, shows an Aventurine icon on the right side of the "by X for X pts" row, vertically centered.
+### [i16] Board stays shrunk when the click pads are off 🐞 ▫️
 
-**Points:**
-```
-minutes past deadline:  0   10   30    60   120   >120
-points:               12    6    3     2     0     -6
-```
-(0 means completed on time / within deadline.)
+`computeLayout` always reserves `PAD_GAP + PAD_H + 6` of margin for the pad ring, whether the pads are showing or not. Since pads default to off, a fresh visit gets a smaller board than it needs to and an empty margin all round. The board should expand when the pads are hidden, so this needs to be fixed.
 
-The key difference from normal: instead of gracefully decaying to 0, there's only a 1-hour window at 0 before it drops to -6.
 
-**Limits:** Max 1 DOLI task per day. Max 4 per week (not 7).
+## Multi-page items
 
-## Bug: pts calculation not inclusive
+### [i18] Remove refresh buttons ▫️
 
-Reported case:
-- Task: "go downstairs after shower", deadline 07:10 (HL)
-- Completed at 07:15 → 5 min late
-- Got pts = 6+2 = 8, scr = 6+2 = 8
-
-The deadline boundary is supposed to be inclusive (completing at exactly the boundary minute counts as within that tier, not the next one). Something is off with the boundary comparison.
-
-## Bug: ledger export extra line break
-
-When exporting from ledger, code blocks have an extra line break inserted between entries. There's a spurious gap/space being added.
-
-## Complex tasks (exploratory)
-
-Vague idea — support for:
-- Multipliers on tasks (conditional?)
-- +1 bonuses attached to a task
-
-Not fully fleshed out yet.
-
-## Collapsible activate sections
-
-Both ACTIVATE (dailies) and ACTIVATE (others) should be collapsible.
-
-**When open:**
-- Top button: triangle pointing down (indicates "is open"). Tapping it closes.
-- Bottom button: triangle pointing up (indicates "to close"). Tapping it also closes.
-
-**When closed:**
-- Only the top button visible, triangle pointing down. Tapping opens.
-
-**Button style:** Just a triangle, no outline or border. Button hit area is regular button size but shaped wider (2× width) and shorter (½ height). Buttons sit outside the section boxes, horizontally centered.
-
-## Further task deadlines (up to 1 week)
-
-- Optional "add date" field using the native calendar date picker.
-  - this gets unset/cleared after setting a task (swiping left on a template).
-- Max range: 1 week out (7×24h). Can't go further.
-- Further-off tasks display the day abbreviation beside the time (e.g., TU, WE) — only for tasks beyond today/24h.
-- Visual treatment: dimmer than today tasks — less glow, greyer text.
-- Horizontal divider line between further tasks and today/next-24h tasks (no line if no further tasks exist).
-- These can be completed early (no extra reward for early completion — they're intended to be done whenever).
-- Anti-abuse: if a non-daily further task is cancelled, it can't be re-set for 36 hours. This does NOT apply to dailies templates.
-
-## Swap homepage to Falsedge
-
-The index/homepage becomes Falsedge. Aulists becomes the secondary page.
-
-## Add hex game link to Falsedge
-
-At the bottom of Falsedge, two navigation rows:
-1. Hex 2^ button — right-aligned, on its own row.
-2. Aulists button — next row below, normal/centered (no changes to its existing style).
-
-## Remove swipe-right-to-move-down on templates
-
-Swipe right (left-to-right) on template rows currently moves them down. Remove this behaviour — it's not needed.
-
-## Already done? — Edit active task deadlines
-
-(The commit `19d3bcc` says "Let active tasks change deadline and leniency after being set" — this was requested in the babble but may already be shipped.)
+Removing the swipe-nav stuff also removed the capture of swipe-down-to-reload, which means the browser's native pull-to-refresh works again. The manual refresh buttons are now redundant — kill them. Applies to Aulists' `#refreshBtn` as well as Falsedge's.

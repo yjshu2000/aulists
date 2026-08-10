@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<defs>
+<polygon id="hx" points="41.4,0 20.7,35.854 -20.7,35.854 -41.4,0 -20.7,-35.854 20.7,-35.854"/>
+</defs>
+
+<rect width="512" height="512" fill="#12141a"/>
+
+<g fill="#1c2029" stroke="#262b36" stroke-width="1">
+<use href="#hx" x="118" y="256"/>
+<use href="#hx" x="187" y="136.49"/>
+<use href="#hx" x="187" y="375.51"/>
+</g>
+
+<g stroke="#000000" stroke-opacity="0.18" stroke-width="1.38">
+<use href="#hx" x="118" y="176.33" fill="#d53434"/>
+<use href="#hx" x="118" y="335.67" fill="#d53434"/>
+<use href="#hx" x="187" y="216.16" fill="#d5b034"/>
+<use href="#hx" x="187" y="295.84" fill="#7ed534"/>
+<use href="#hx" x="256" y="96.65" fill="#d57234"/>
+<use href="#hx" x="256" y="176.33" fill="#bcd534"/>
+<use href="#hx" x="256" y="256" fill="#34d566"/>
+<use href="#hx" x="256" y="335.67" fill="#348bd5"/>
+<use href="#hx" x="256" y="415.35" fill="#9734d5"/>
+<use href="#hx" x="325" y="136.49" fill="#d5b034"/>
+<use href="#hx" x="325" y="216.16" fill="#40d534"/>
+<use href="#hx" x="325" y="295.84" fill="#34c9d5"/>
+<use href="#hx" x="325" y="375.51" fill="#5934d5"/>
+<use href="#hx" x="394" y="176.33" fill="#7ed534"/>
+<use href="#hx" x="394" y="256" fill="#34d5a4"/>
+<use href="#hx" x="394" y="335.67" fill="#344dd5"/>
+</g>
+
+<g font-family="Segoe UI, ui-sans-serif, system-ui, sans-serif" font-weight="700" text-anchor="middle">
+<text x="118" y="176.33" dy="0.36em" font-size="29.44" fill="#ffffff">2</text>
+<text x="118" y="335.67" dy="0.36em" font-size="29.44" fill="#ffffff">2</text>
+<text x="187" y="216.16" dy="0.36em" font-size="29.44" fill="#171a1f">8</text>
+<text x="187" y="295.84" dy="0.36em" font-size="29.44" fill="#171a1f">32</text>
+<text x="256" y="96.65" dy="0.36em" font-size="29.44" fill="#ffffff">4</text>
+<text x="256" y="176.33" dy="0.36em" font-size="29.44" fill="#171a1f">16</text>
+<text x="256" y="256" dy="0.36em" font-size="25.76" fill="#171a1f">128</text>
+<text x="256" y="335.67" dy="0.36em" font-size="22.08" fill="#ffffff">1024</text>
+<text x="256" y="415.35" dy="0.36em" font-size="22.08" fill="#ffffff">8192</text>
+<text x="325" y="136.49" dy="0.36em" font-size="29.44" fill="#171a1f">8</text>
+<text x="325" y="216.16" dy="0.36em" font-size="29.44" fill="#171a1f">64</text>
+<text x="325" y="295.84" dy="0.36em" font-size="25.76" fill="#171a1f">512</text>
+<text x="325" y="375.51" dy="0.36em" font-size="22.08" fill="#ffffff">4096</text>
+<text x="394" y="176.33" dy="0.36em" font-size="29.44" fill="#171a1f">32</text>
+<text x="394" y="256" dy="0.36em" font-size="25.76" fill="#171a1f">256</text>
+<text x="394" y="335.67" dy="0.36em" font-size="22.08" fill="#ffffff">2048</text>
+</g>
+</svg>

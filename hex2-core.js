@@ -667,7 +667,11 @@ window.Hex2 = (function () {
   // Normal/Jiggly would restart the clock forever.
   const lockout = document.getElementById("lockout");
 
+  // absent on the standalone public build, which is never timed
   function showLockout() {
+    if (!lockout) {
+      return;
+    }
     lockout.classList.add("show");
   }
 

@@ -200,3 +200,7 @@ All four already sit at the project root, alongside `icon.svg`.
 
 **All of them.** Every single-line `<input type="text">` in Falsedge becomes multiline: `SET`'s text field, the `ACTIVATE` adder's text field, the spend row's text field, and the inline-edit inputs (active task text edit, template hamburger edit).
 
+## Q28 — Bulk-buy in the spend row
+
+**Row becomes `[text field] [pts cost] [×N] [spend]`.** `×N` is a new field, same combined dropdown+text-input shape as `pts cost` (via `<input list>` + `<datalist>`, per Q13.3) but with its own fixed suggestion range, 1–9, defaulting to 1. `pts cost` is per-unit; total deducted = cost × N.
+
