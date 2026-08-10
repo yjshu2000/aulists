@@ -3770,10 +3770,4 @@
 
   loadUndoStacks();
   refreshUndoRedoButtons();
-
-  // refresh button
-  document.getElementById("refreshBtn")
-    .addEventListener("click", function () {
-      location.reload();
-    });
 })();

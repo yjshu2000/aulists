@@ -26,6 +26,8 @@ window.Hex2 = (function () {
   const PADS_KEY = "hex2.pads";
   const PAD_H = 60;          // slide-pad thickness, all of it grown outward
   const PAD_GAP = 6;         // board edge to a pad's inner edge
+  const PAD_EDGE = 6;        // pad ring's outer edge to the stage edge
+  const BARE_GAP = 24;       // board edge to stage edge with the pads hidden
   const BOARD_HALF_HEIGHT = SQRT3 * (R + 0.5);
   const PAD_LEN_UNITS = 3 * SQRT3;
 
@@ -307,7 +309,12 @@ window.Hex2 = (function () {
       maxY = Math.max(maxY, p.py + SQRT3 / 2);
     }
 
-    const pad = PAD_GAP + PAD_H + 6;   // clearance for the pad ring
+    // With the pads hidden there is no ring to clear, so the board takes that
+    // space back and keeps only a small breathing gap.
+    let pad = BARE_GAP;
+    if (!canvas.parentElement.classList.contains("pads-off")) {
+      pad = PAD_GAP + PAD_H + PAD_EDGE;
+    }
     const spanX = maxX - minX;
     const spanY = maxY - minY;
     const size = Math.min(
@@ -784,6 +791,9 @@ window.Hex2 = (function () {
         store.set(PADS_KEY, "0");
       }
       applyPads();
+      // the board's margin depends on the pads, and toggling them doesn't
+      // resize the stage, so nothing else would trigger a re-layout
+      relayout();
     });
     applyPads();
 

@@ -2294,10 +2294,6 @@
   undoBtn.addEventListener("click", withCooldown(undo));
   redoBtn.addEventListener("click", withCooldown(redo));
 
-  document.getElementById("refreshBtn").addEventListener("click", function () {
-    location.reload();
-  });
-
   document.addEventListener("click", function (e) {
     if (!e.target.closest(".menu-anchor")) {
       closeAllMenus();

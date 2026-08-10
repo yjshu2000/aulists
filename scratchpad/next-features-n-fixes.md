@@ -221,13 +221,9 @@ Needed ASAP. A task can be set whose deadline isn't known at set time, because i
 
 ## Hex 2^
 
-### [i16] Board stays shrunk when the click pads are off 🐞 ▫️
-
-`computeLayout` always reserves `PAD_GAP + PAD_H + 6` of margin for the pad ring, whether the pads are showing or not. Since pads default to off, a fresh visit gets a smaller board than it needs to and an empty margin all round. The board should expand when the pads are hidden, so this needs to be fixed.
+(nothing pending)
 
 
 ## Multi-page items
 
-### [i18] Remove refresh buttons ▫️
-
-Removing the swipe-nav stuff also removed the capture of swipe-down-to-reload, which means the browser's native pull-to-refresh works again. The manual refresh buttons are now redundant — kill them. Applies to Aulists' `#refreshBtn` as well as Falsedge's.
+(nothing pending)

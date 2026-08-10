@@ -109,12 +109,6 @@ button.primary { background: var(--accent); color: var(--accent-ink); border-col
 
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
-button.refresh {
-  font-size: 0.8rem; padding: 4px 8px; min-height: 32px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
-  color: var(--ink-soft);
-}
-
 .card {
   background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); margin-bottom: var(--gap);
