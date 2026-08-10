@@ -1776,17 +1776,22 @@
   }
 
   /**
-   * Builds the active-tasks region, or the empty state with `[streak broke]`.
-   * @returns {Element} the tasks region.
+   * Builds the ACTIVE TASKS section: a labelled card wrapping the task stack,
+   * or the empty state with `[streak broke]`. The card is the only thing that
+   * glows - the blocks inside keep their per-position border colour but have no
+   * halo of their own.
+   * @returns {Element} the section wrapper.
    */
   function buildTasks() {
+    var section = buildSection("ACTIVE TASKS", "tasksCard", "sec-tasks");
     var wrap = el("div", "tasks");
+    section.card.appendChild(wrap);
     if (!state.activeTasks.length) {
       wrap.appendChild(el("div", "empty-tasks", "(no active tasks)"));
       var brk = el("button", "btn streak-btn", "streak broke");
       brk.addEventListener("click", streakBroke);
       wrap.appendChild(brk);
-      return wrap;
+      return section.wrap;
     }
     var sorted = state.activeTasks.slice().sort(function (a, b) {
       return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
@@ -1794,7 +1799,7 @@
     sorted.forEach(function (task, i) {
       wrap.appendChild(buildTaskBlock(task.id, i, sorted.length));
     });
-    return wrap;
+    return section.wrap;
   }
 
   /**

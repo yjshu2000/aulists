@@ -109,9 +109,9 @@ HL  minutes past deadline:  0    5   15   30    60    >60
 
 **Visual.** A promoted task shows a 64px Aventurine chibi in its own block, in the empty space to the right of the `by X for X pts` lines, vertically centred against that whole group of rows. Four images, one picked at random per page load and stable through re-renders until an actual reload: `assets/aven-play-cards.png`, `assets/aven-cool.png`, `assets/aven-cheers.png`, `assets/aven-throw-money.png`.
 
-**Promotion control.** A 32px rounded square, 10px radius, containing `assets/arrow-promo.svg` at 20px. It exists exactly once on the page, in the `ACTIVE TASKS` wrapper header ([i6]).
+**Promotion control.** A 32px rounded square, 10px radius, containing `assets/arrow-promo.svg` at 20px. It exists exactly once on the page, in the `ACTIVE TASKS` wrapper header (`#tasksCard`).
 
-The square carries no CSS border. Its outline is an SVG rounded rect drawn twice: a flat grey base ring, and a glowing ring over it carrying `pathLength="100"` with a `stroke-dasharray` driven by cooldown progress, so the outline traces itself clockwise from the top-left corner as the 30h elapses. The glowing stroke takes the wrapper's `--glow`, which [i6] sets to `var(--c-green)`. A closed loop means ready, a partial arc means still cooling, and there is no interior fill at any point.
+The square carries no CSS border. Its outline is an SVG rounded rect drawn twice: a flat grey base ring, and a glowing ring over it carrying `pathLength="100"` with a `stroke-dasharray` driven by cooldown progress, so the outline traces itself clockwise from the top-left corner as the 30h elapses. The glowing stroke takes the wrapper's `--glow`, which is `var(--c-green)`. A closed loop means ready, a partial arc means still cooling, and there is no interior fill at any point.
 
 Tapping the square enters pick mode: every active task block gets a full-block overlay reading `select` — the existing `.edit-overlay` treatment reparented to `.task-block`, which is already `position: relative` and so needs no other change. Tapping a block promotes it. Tapping the square again, or anywhere that isn't a task block, leaves pick mode without promoting anything.
 
@@ -120,14 +120,6 @@ Promotion is irreversible. Undo is the only way back, and otherwise the only exi
 **Limits.** One promotion per 30 hours — a rolling cooldown measured from the last promotion. That's the only limiter. Cancelling a DOLI task does not hand the promotion back: the 30h runs from the promotion regardless of what becomes of the task.
 
 The square is inert until its ring closes, so at rest it sits permanently fully lit — a closed ring is the normal state, not a special one.
-
-### [i6] Active tasks visual redesign ⚪
-
-A new outer `.card`-family wrapper goes around `.tasks`, labelled "ACTIVE TASKS" above it the same way `SET` and `ACTIVATE` are labelled — halo + sheen, matching their existing visual treatment. Its `--glow` is `var(--c-green)` (`#46d38a`), already defined in `style-colourful.css`, which Falsedge loads alongside its own stylesheet.
-
-Individual `.task-block`s stay nested inside and keep their border, background, and per-position colour-shifting, but lose their own `box-shadow` glow. Only the outer wrapper glows now.
-
-The wrapper always renders. When there are no active tasks, its contents are the "(no active tasks)" message and the `[streak broke]` button instead of task blocks.
 
 ### [i8] Spend row: backdating, bulk buy, multiline ⬜
 

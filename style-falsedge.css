@@ -59,13 +59,15 @@
   .ledger-region { --glow: var(--c-pale-azure); }
   /* the midpoint falsedge.js hands a lone task, as a fallback only */
   .task-block    { --glow: hsl(215.5, 70%, 56%); }
+  /* deliberately off the blue arc - the one section that isn't part of it */
+  .sec-tasks     { --glow: var(--c-green); }
   .sec-set       { --glow: var(--c-deep-blue); }
   .sec-activate  { --glow: var(--c-indigo); }
   .sec-link      { --glow: var(--c-purple); }
 
   /* halo (outer bloom + hairline) plus inner sheen along the top edge */
   .ledger-region,
-  .task-block,
+  #tasksCard,
   #setCard,
   #activateCard,
   #linkCard {
@@ -252,12 +254,17 @@
   }
 
   /* ------------------------------- active tasks --------------------------- */
+  /* the first block's cancel tab rides half outside its top border, so the
+     card needs more headroom than its default 16px or the tab collides with
+     the card's own edge */
+  #tasksCard {
+    padding-top: 28px;
+  }
   .tasks {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 48px;
-    margin-top: 60px;
   }
   /* each block is only as wide as its own widest line */
   .task-block {
@@ -267,6 +274,9 @@
     background: var(--panel-2);
     border-radius: var(--radius);
     padding: 24px 16px 14px;
+    /* keeps its own per-position border colour, but no halo or sheen - only
+       the ACTIVE TASKS wrapper glows now */
+    border: 1px solid color-mix(in srgb, var(--glow) 34%, var(--line-soft));
   }
   /* rides the block's top border, half in / half out, right edges flush -
      a close button in the corner, just spelled out in words */
