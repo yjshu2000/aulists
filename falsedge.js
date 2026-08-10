@@ -1377,21 +1377,49 @@
   }
 
   /**
-   * Swaps a piece of text for an inline input, wired to commit on Enter or
-   * blur. The `committed` flag matters because Enter commits and then the
-   * input blurs, which would otherwise commit a second time.
+   * Resizes a textarea to fit its content. Height is cleared first so the box
+   * can shrink as well as grow - scrollHeight never reports less than the
+   * height already set.
+   * @param {Element} box - the textarea to fit.
+   */
+  function autoGrow(box) {
+    box.style.height = "auto";
+    box.style.height = box.scrollHeight + "px";
+  }
+
+  /**
+   * Builds an auto-growing textarea. Every text field in Falsedge is one of
+   * these rather than an <input>, so long text wraps into view instead of
+   * scrolling sideways out of it.
+   * @param {string} cls - the element's class.
+   * @param {string} value - the starting text.
+   * @returns {Element} the textarea.
+   */
+  function buildTextArea(cls, value) {
+    var box = el("textarea", cls);
+    box.rows = 1;
+    box.maxLength = 1000;
+    box.value = value;
+    box.addEventListener("input", function () {
+      autoGrow(box);
+    });
+    return box;
+  }
+
+  /**
+   * Swaps a piece of text for an inline textarea, wired to commit on blur.
+   * Enter inserts a newline instead of committing, so blur is the only way out.
+   * The `committed` flag guards against blur firing more than once.
    * @param {Element} target - the element to replace.
-   * @param {string} value - the input's starting value.
-   * @param {Function} onCommit - called once with the input's raw value.
+   * @param {string} value - the textarea's starting value.
+   * @param {Function} onCommit - called once with the raw value.
    */
   function inlineEdit(target, value, onCommit) {
-    var input = el("input", "inline-edit");
-    input.type = "text";
-    input.maxLength = 1000;
-    input.value = value;
-    target.replaceWith(input);
-    input.focus();
-    input.setSelectionRange(input.value.length, input.value.length);
+    var box = buildTextArea("inline-edit", value);
+    target.replaceWith(box);
+    autoGrow(box);
+    box.focus();
+    box.setSelectionRange(box.value.length, box.value.length);
     var committed = false;
     /**
      * Saves the edit exactly once.
@@ -1399,14 +1427,9 @@
     function commit() {
       if (committed) return;
       committed = true;
-      onCommit(input.value);
+      onCommit(box.value);
     }
-    input.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") {
-        commit();
-      }
-    });
-    input.addEventListener("blur", commit);
+    box.addEventListener("blur", commit);
   }
 
   // --------------------------------- builders --------------------------------
@@ -1484,12 +1507,9 @@
     var row = el("div", "spend-row");
     row.appendChild(el("div", "spend-label", "log spent points"));
     var controls = el("div", "spend-controls");
-    var text = el("input", "spend-text");
-    text.type = "text";
+    var text = buildTextArea("spend-text", state.spendDraft.text);
     text.id = "spendText";
-    text.maxLength = 1000;
     text.placeholder = "spent on";
-    text.value = state.spendDraft.text;
     var cost = el("input", "spend-cost");
     cost.type = "number";
     cost.min = "1";
@@ -1925,12 +1945,9 @@
     var now = getNow();
 
     var textRow = el("div", "set-text-row");
-    var input = el("input", "set-text");
-    input.type = "text";
+    var input = buildTextArea("set-text", state.setDraft.text);
     input.id = "setText";
-    input.maxLength = 1000;
     input.placeholder = "task text";
-    input.value = state.setDraft.text;
     input.addEventListener("blur", function () {
       writeSetDraft("text", input.value);
     });
@@ -2109,11 +2126,8 @@
    */
   function buildTemplateAdder() {
     var wrap = el("div", "tpl-adder");
-    var input = el("input", "tpl-adder-text");
-    input.type = "text";
-    input.maxLength = 1000;
+    var input = buildTextArea("tpl-adder-text", adderDraft.text);
     input.placeholder = "Add template...";
-    input.value = adderDraft.text;
     var controls = el("div", "tpl-controls");
     var sel = buildDayTimeSelect(adderDraft.time, true, function (v) {
       adderDraft.time = v;
@@ -2239,6 +2253,9 @@
     if (scoresOpen) {
       openScoresPanel();
     }
+    // scrollHeight only reads true once the element is in the document, so
+    // every textarea is sized after the tree is built rather than on creation
+    appEl.querySelectorAll("textarea").forEach(autoGrow);
   }
 
   // ---------------------------------- toast ----------------------------------

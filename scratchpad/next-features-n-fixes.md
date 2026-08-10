@@ -25,8 +25,6 @@
 
 `SET` stays fully functional. Do not disable any parts of it; it only gets some updates and changes.
 
-`SET`'s text field becomes multiline, along with every other text field in Falsedge — see [i10].
-
 #### [i0.1] Clear-draft button ▫️
 
 `SET`'s bottom row becomes `[clear draft]` left-aligned and `[set task]` right-aligned, on the same row.
@@ -111,6 +109,7 @@ HL  minutes past deadline:  0    5   15   30    60    >60
 
 **Promotion control.** A 32px rounded square, 10px radius, containing `assets/arrow-promo.svg` at 20px. It exists exactly once on the page, in the `ACTIVE TASKS` wrapper header (`#tasksCard`).
 
+
 The square carries no CSS border. Its outline is an SVG rounded rect drawn twice: a flat grey base ring, and a glowing ring over it carrying `pathLength="100"` with a `stroke-dasharray` driven by cooldown progress, so the outline traces itself clockwise from the top-left corner as the 30h elapses. The glowing stroke takes the wrapper's `--glow`, which is `var(--c-green)`. A closed loop means ready, a partial arc means still cooling, and there is no interior fill at any point.
 
 Tapping the square enters pick mode: every active task block gets a full-block overlay reading `select` — the existing `.edit-overlay` treatment reparented to `.task-block`, which is already `position: relative` and so needs no other change. Tapping a block promotes it. Tapping the square again, or anywhere that isn't a task block, leaves pick mode without promoting anything.
@@ -163,19 +162,9 @@ on 2026-08-03
 pts = 45 - 10×3 = 15
 ```
 
-The spend row's text field also becomes multiline (see [i10]).
-
 ### [i9] Add "by" label beside time dropdown ▫️
 
 Both the `ACTIVATE` row's own time control and the adder's time control get a "by" label to their left, so each reads "by [time]" instead of showing a bare time. Same placement style as `SET`'s existing "by" label. Both already route through the shared `buildDayTimeSelect()`, so one change covers both.
-
-### [i10] Text fields must line-wrap when editing ⚪
-
-The goal is wrapping, so a long item is fully visible rather than scrolling sideways out of view. `<input type="text">` cannot wrap at any width, so each one becomes a `<textarea>` that auto-grows with its content — the section reflows as you type and the whole value stays on screen.
-
-Applies to `SET`'s text field, the `ACTIVATE` adder's text field, the spend row's text field, and the inline-edit inputs (active task text edit, template hamburger edit).
-
-Enter inserts a newline in all of them. Three of the four have no Enter handling today, so nothing is lost; the inline-edit field currently commits on Enter and gives that up, leaving blur as its only commit path.
 
 ### [i11] Edit templates styling bug 🐞 ▫️
 
