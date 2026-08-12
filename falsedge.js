@@ -206,7 +206,7 @@
   }
 
   /**
-   * Formats a remaining duration, for a cooling-down row's inline countdown.
+   * Formats a remaining duration, for an on-cooldown row's inline countdown.
    * @param {number} ms - milliseconds remaining.
    * @returns {string} e.g. "31h 12m", or "44m" once under an hour.
    */
@@ -574,7 +574,7 @@
    * Milliseconds left on an `others` row's cancel cooldown.
    * @param {Object} row - the row.
    * @param {Date} now - the reference moment.
-   * @returns {number} the remainder, or 0 if the row isn't cooling down.
+   * @returns {number} the remainder, or 0 if the row isn't on cooldown.
    */
   function cooldownLeft(row, now) {
     if (!row.cooldownUntil) return 0;
@@ -1363,7 +1363,7 @@
     // further up the page, quite possibly offscreen - so say what happened
     var stamp = hhmm(deadline);
     if (isFurther(iso, now)) {
-      stamp = DAY_ABBR[deadline.getDay()] + " " + stamp;
+      stamp = stamp + " (" + DAY_ABBR[deadline.getDay()] + ")";
     }
     toast("task set for " + stamp);
   }
@@ -1868,12 +1868,15 @@
           cls = "tier tier-live";
         }
         // a further task's clock time alone is ambiguous - which TU is it?
-        var stamp = hhmm(tier.at);
+        var line = el("div", cls);
+        line.appendChild(document.createTextNode("by " + hhmm(tier.at)));
         if (further) {
-          stamp = DAY_ABBR[tier.at.getDay()] + " " + stamp;
+          line.appendChild(document.createTextNode(" "));
+          line.appendChild(el("span", "day-tag",
+            "(" + DAY_ABBR[tier.at.getDay()] + ")"));
         }
-        tierWrap.appendChild(el("div", cls,
-          "by " + stamp + " for " + tier.pts + " pts"));
+        line.appendChild(document.createTextNode(" for " + tier.pts + " pts"));
+        tierWrap.appendChild(line);
       });
       attachTimeEdit(tierWrap, id);
       block.appendChild(tierWrap);
@@ -2262,7 +2265,7 @@
   /**
    * Builds one ACTIVATE row: its text, then the control row of time dropdown,
    * optional date picker, WL/HL toggles and hamburger. Swipe left activates it
-   * outright, swipe right prefills SET. A cooling-down `others` row dims and
+   * outright, swipe right prefills SET. An `others` row on cooldown dims and
    * carries its remaining time inline, but stays fully editable - only
    * activation is blocked.
    * @param {string} kind - "dailies" or "others".
@@ -2277,8 +2280,8 @@
     if (kind === "others") {
       var left = cooldownLeft(r, now);
       if (left > 0) {
-        row.classList.add("row-cooling");
-        row.appendChild(el("div", "row-cooldown",
+        row.classList.add("row-oncooldown");
+        row.appendChild(el("div", "row-oncooldown-note",
           "on cooldown - " + fmtLeft(left) + " left"));
       }
     }

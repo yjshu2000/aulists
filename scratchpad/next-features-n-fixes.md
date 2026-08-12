@@ -21,76 +21,6 @@
 
 ## Falsedge
 
-### [i0] SET (set task section) modifications ⚪
-
-`SET` stays fully functional. Do not disable any parts of it; it only gets some updates and changes.
-
-#### [i0.1] Clear-draft button ▫️
-
-`SET`'s bottom row becomes `[clear draft]` left-aligned and `[set task]` right-aligned, on the same row.
-
-`[clear draft]` wipes all four draft fields at once — text, time, WL/HL, and the date from [i0.3] — with no confirmation step. It pushes onto the existing undo stack, so a mis-tap is one undo away.
-
-There is no `[save template]` button. That idea only existed as a replacement for the `ACTIVATE` adder, and the adder is being kept.
-
-#### [i0.2] Move SET to the bottom ▫️
-
-`SET` moves to the very bottom of the page, below both `ACTIVATE` sections. The full render order becomes ledger → scores → active tasks → `ACTIVATE (dailies)` → `ACTIVATE (others)` → `SET`, replacing today's ledger → scores → tasks → `SET` → `ACTIVATE` → `LINK`.
-
-#### [i0.3] Optional date field ⚪
-
-`SET` gains the same optional date field `ACTIVATE (others)` has (up to 1 week out — see [i3]), as a separate independent control alongside the existing time dropdown + quick buttons. When no date is picked, behaviour is unchanged: the deadline resolves to the next occurrence of the chosen time within 24h. When a date is picked, the chosen time pairs with that date directly, with no next-occurrence resolution.
-
-### [i1] Restructure Falsedge into two activate sections ⬜
-
-Aulists-linking is removed entirely — no connection to `aulists.listdata` in any form. No `🔗`, no `linkedItemId`, no propagation. The `LINK` section goes, along with `buildLink()`, `readAulistsListZero()`, and the `.link-*` CSS. The two sections that replace the linkables concept:
-
-**ACTIVATE (dailies)**
-- Every template that exists today becomes a `dailies` row. They all already carry a time, since the current adder requires one, so they satisfy the dailies rules unchanged. `ACTIVATE (others)` starts empty and gets populated by hand.
-- Rows stay pure disposable presets, exactly like today's templates. No `lastDone`, no cooldown, no persistent identity.
-- Time is mandatory. `--:--` stays available in the dropdown, but the add button is gated (blocked) when time isn't set.
-- Sorts purely by time, ascending from `00:00` — an absolute order that never shifts with the current time. (this is already what it currently does. unchanged)
-- Never gets a date field, and never gets the 36h cancel cooldown.
-
-**ACTIVATE (others)**
-- Rows are persistent records with their own identity, not disposable presets. The word "template" no longer fits — a row effectively *is* the item now, not a preset that spawns disposable copies.
-- Two things are tracked per row across its lifecycle: `lastDone`, and a cancel-cooldown timestamp (see [i3]).
-- `lastDone` updates on completion, on-time or late — but not on cancel. It is independent of Aulists entirely.
-- Sorts by `lastDone`, descending — most recently completed at the top. A row that has never been completed has no `lastDone` and pins above everything, so anything new or untouched is the first thing in this section.
-- Time is optional to store, and `--:--` must remain available. Time is still required to activate (see [i2]).
-- Carries an optional date, up to 1 week out (see [i3]).
-- Its adder does not exist yet and has to be built — Phase 3 only ever built a dailies-shaped `ACTIVATE` adder.
-- Its hamburger gains a `Clear datetime` entry, clearing the row's stored date and time together.
-- An active task spawned from an `others` row stores that row's id in a `sourceRowId` field, taking over the slot `linkedItemId` vacates. `dailies`-spawned tasks carry no such field and are fully detached the moment they're created. `sourceRowId` is what makes the rest of this section work: it's how completion knows which row to stamp `lastDone` on, how cancelling knows which row to put on cooldown, and how a row with a live task already out refuses a second swipe-left (with a toast).
-- Deleting an `others` row is never blocked, even while a task it spawned is still live. That task keeps running with a `sourceRowId` pointing at nothing: completing it stamps no `lastDone`, cancelling it sets no cooldown. Every `sourceRowId` lookup has to tolerate a missing row.
-
-Both sections:
-- WL/HL is optional to store, required to activate.
-- Swipe left (right→left) directly creates the active task, bypassing `SET` (see [i2]).
-- Swipe right (left→right) prefills `SET` with the row's text, time, and WL/HL — plus date, for `others` rows — without touching the row or creating an active task. This is what Phase 3's swipe-left used to do.
-- There is no lap/skip mechanic anywhere: no swipe bumps a row's position, no hamburger `Skip` entry, no `lap` field.
-
-### [i2] Full-template instant activation ⚪
-
-Swiping left on an `ACTIVATE` row, in either section, bypasses `SET` entirely and directly creates a new active task.
-
-Required in both sections: text, WL/HL, and time. Date is the only optional field, and only exists on `others` rows. If any required field is missing, the swipe refuses with the same toast `SET` showed on refusal — a dateless `ACTIVATE (others)` row still needs a time before swipe-left will do anything.
-
-For a row with no date, the time resolves the same way `SET`'s does: the next occurrence of that time within the next 24h. For an `others` row with a date, the time pairs with that date directly.
-
-### [i3] Further task deadlines (up to 1 week) ⬜
-
-A "further task" is an `ACTIVATE (others)` row with its date set. Once activated, it becomes an active task whose deadline is that specific date + time.
-
-- Optional date field, using the native calendar date picker. It lives on `ACTIVATE (others)` rows and on the `others` adder, and on `SET` ([i0]). `ACTIVATE (dailies)` rows and their adder never get one.
-- Max range is 1 week out (7×24h). Can't go further. Enforced twice: `min`/`max` attributes on the input so the native picker greys out anything past 7 days, plus a submit-time check that refuses with a toast.
-- The date clears after a task is set from it (swipe-left).
-- A task counts as **further** when its deadline is more than 24 hours away. This is a rolling window, not a calendar-day boundary: at 17:00 today, a deadline of 09:00 tomorrow is only 16h out and is therefore not further, despite falling on a different day.
-- The display treatment happens in the **active tasks stack**, separating near-term active tasks from far-off ones — not in the `ACTIVATE (others)` row list. Further tasks are dimmer (less glow, greyer text) and show the day abbreviation beside the time (TU, WE, …). A horizontal divider line separates further tasks from the rest, with no line when no further tasks exist.
-- Further tasks can be completed early, with no extra reward for doing so — they're intended to be done whenever.
-- Anti-abuse: cancelling an active task that was activated **with a date set** blocks re-setting that row for 36 hours. A dateless `ACTIVATE (others)` row that gets cancelled can be re-set immediately. This never applies to `ACTIVATE (dailies)`.
-- A row on cooldown dims and shows its remaining time inline, so the block is visible without having to swipe at it. The row stays fully interactive otherwise — editing its text and fields still works; only activation is blocked.
-
 ### [i5] DOLI (Double Or Lose It) mechanism ⬜
 
 Ships complete: state schema, scoring curve, limits, and the promotion control itself.
@@ -161,18 +91,6 @@ chips ×3
 on 2026-08-03
 pts = 45 - 10×3 = 15
 ```
-
-### [i9] Add "by" label beside time dropdown ▫️
-
-Both the `ACTIVATE` row's own time control and the adder's time control get a "by" label to their left, so each reads "by [time]" instead of showing a bare time. Same placement style as `SET`'s existing "by" label. Both already route through the shared `buildDayTimeSelect()`, so one change covers both.
-
-### [i11] Edit templates styling bug 🐞 ▫️
-
-The template rows have basically no gap between the text and the controls row beneath it. It's most visible when editing (because the borders appear and make the collision obvious), but it applies to both the regular rows and the inline edit UI. Just needs slightly more spacing between the two rows.
-
-### [i12] Swipe-right on templates stops moving rows down ▫️
-
-Swipe right (left-to-right) on template rows currently moves them down. That behaviour is removed — swipe right now prefills `SET` instead (see [i1]). Nothing bumps a row's position any more.
 
 ### [i13] Swap homepage to Falsedge ⚪
 

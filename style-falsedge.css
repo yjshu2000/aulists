@@ -344,6 +344,10 @@
     font-size: 14px;
     color: var(--text);
   }
+  .day-tag {
+    font-size: .82em;
+    letter-spacing: .04em;
+  }
   .task-actions {
     margin-top: 10px;
   }
@@ -473,6 +477,7 @@
     padding: 8px;
     border-radius: 10px;
     background: var(--panel-2);
+    border: 1px solid color-mix(in srgb, var(--glow) 55%, var(--line-soft));
   }
   /* the gap has to clear the inline editor's border too, not just the text -
      editing is where the two rows used to visibly collide */
@@ -505,13 +510,13 @@
     min-height: 40px;
     padding: 0 8px;
   }
-  .row-cooling {
+  .row-oncooldown {
     background: color-mix(in srgb, var(--c-red) 8%, var(--panel-2));
   }
-  .row-cooling .tpl-text {
+  .row-oncooldown .tpl-text {
     color: var(--muted);
   }
-  .row-cooldown {
+  .row-oncooldown-note {
     font-size: 12px;
     color: var(--c-red);
     margin-bottom: 10px;

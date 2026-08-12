@@ -28,12 +28,13 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
-    <h3>v2.4 <span class="changelog-date">2026-08-10 01H</span></h3>
+    <h3>v2.4 <span class="changelog-date">2026-08-11 22H</span></h3>
     <ul>
       <li>ACTIVATE is two boxes now. <b>Dailies</b> are the old templates, unchanged: disposable presets sorted by clock time. <b>Others</b> are persistent rows that remember when you last completed them and sort most-recent-first, so anything new or untouched sits at the top.</li>
       <li>Swipe left on any row sets it as a task straight away, skipping SET. It needs text, a time and WL/HL, and refuses with a toast if any are missing.</li>
       <li>Swipe right prefills SET instead. Swiping no longer moves rows down the list &mdash; the lap/skip mechanic is gone entirely.</li>
-      <li>Others rows can carry a date, up to a week out. A task more than 24h away is a <b>further</b> task: dimmer, shows the day beside the time (TU, WE...), and sits below a divider line in the active stack. You can finish them early, for no extra points.</li>
+      <li>Others rows can carry a date, up to a week out. A task more than 24h away is a <b>further</b> task: dimmer, tags the day after the time (<code>by 14:30 (TU) for 6 pts</code>), and sits below a divider line in the active stack. You can finish them early, for no extra points.</li>
+      <li>Every row in both ACTIVATE boxes is outlined in its section's colour now &mdash; a plain outline, no glow.</li>
       <li>Cancelling a task you set <em>with</em> a date locks that row for 36 hours. The row dims and shows the time remaining. Dateless rows and dailies are never locked.</li>
       <li>SET moved to the bottom of the page, gained the same optional date field, and gained a <b>[clear draft]</b> button that wipes all four fields at once. It's undoable, so no confirmation.</li>
       <li>Time dropdowns read "by [time]" on the rows and adders now, matching SET.</li>
