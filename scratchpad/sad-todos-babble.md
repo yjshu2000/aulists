@@ -247,3 +247,92 @@ hex game button right aligned on its own row; Aulists button on the next row jus
 
 oh yeah btw btw don't forget to get rid of swipe right to move down; don't need that.
 for like the templates thing 
+
+---
+
+ — 2026-08-10 07:24
+NEW BABBLES
+
+YUHHH
+completing a DOLI task immediately unlocks cooldown if there was any!!! (failing has no effect.)
+
+...I forgot how the item based cooldown works. ;w; not sure if the two are redundant now...
+
+ — 2026-08-10 08:37
+
+yo wait also uhhh also
+also the
+??? frick I immediately forgot wtf. 
+OH RIGHT RIGHT. TRACK HOW LONG. SINCE. NO ACTIVE TASKS but also count from last task deadline. like, if last deadline was 0:00 but I didn't cancel it til 8:00, it would immediately say 8h since last active task or smth.
+refreshes on refresh. idc if it's stale. 
+
+ — 2026-08-10 09:57
+also
+
+spend bar - why not also have auto fill? that'd be nice :3 also prefills to last value that it had. 
+... actually no nvm that's stupid. nvm. maybe not. idk.
+
+2026-08-11 23:23
+bro the toast can NOT be that colour. make the text Sky or something
+
+2026-08-12 06:56
+finishing a further task should use the 8 4 2 1
+...no wait that's . that's just 8. yeah
+
+2026-08-12 07:36
+lower the doli cooldown to 18h per setting (upgrading) 1 item to DOLI
+
+ — 2026-08-12 07:37
+wait no nvm. maybe we don't need that...?
+
+---
+
+micro tasks: 
+- NL (no leniency)
+- worth +1 pt
+- 1 hard deadline 
+- can come in a set with the same deadline (but can be checked off individually)
+- can go in templates (dailies or others). 
+- can be attached to another item (ie, when swiping that item to activate it, its micro tasks set also gets activated)
+
+actually we might as well make NL = micro task. so "NL" automatically comes with the 1pt, no leniencies, etc.
+
+---
+
+yo this might be kinda low priority but don't forget the hex2^ needs UI rearranging pretty badly lol
+
+---
+
+anywayyy about the undo stacks thing... yeah, yes. we should figure out what the heck is with the whole "dif only" version and does it really matter how much storage that saves??
+wait no THE WHOLE POINT WAS THAT UNDO IS SUPPOSED TO PERSIST IN LOCAL STORAGE FROM NOW ON. 
+
+---
+
+ABSOLUTELY NEED DATE PICKER ON FURTHER ITEMS. if an item is showing a day of week, we need to be able to change it >:T
+
+---
+
+wait shouldn't we have some way to export all app data? like all the templates and everything? probably yeah...
+
+---
+
+ANOTHER VERSION OF HEX2^: 
+"focused mode". branch of normal mode. also has its own save data and shared highscores like the others. 
+in focused mode, if you swipe in a direction that *can't* merge, there's actual consequences!!!
+not sure what consequences yet tho... limited lives could be interesting... 3 hearts, and then you can also gain hearts sometimes - maybe every x swipes or smth. or hearts appear on the board to collect but honestly that's almost the same thing anyway. 
+in focused mode the entire board shakes - not like jiggly mode's jiggling, but shakes like there was an explosion effect. and also flashes white (flashbang! rahh) in a kind of fade out, and also lose a heart. 
+
+---
+
+DOLI - change to no cooldown on setting (cooldown on canceling) 
+limit of x doli task active at a time
+start with 1
+limit increases by 0.1? 0.2? each success. decreases on cancel failure
+
+---
+
+CHARTS. DAILY AT 0:00
+record the score. maybe also pts? be able to show line chart graph of records
+
+🟩🟩🟩🟩🟩🟩🟩🟩 ^ all items above are added to doc ^ 🟩🟩🟩🟩🟩🟩🟩🟩
+
