@@ -1162,6 +1162,18 @@
   }
 
   /**
+   * Bonus for finishing a further task early: +2 per whole 24h remaining.
+   * @param {Object} task - the task.
+   * @param {Date} now - the completion moment.
+   * @returns {number} the bonus, 0 for anything not further.
+   */
+  function earlyBonus(task, now) {
+    var early = new Date(task.deadline).getTime() - now.getTime();
+    if (early <= DAY_MS) return 0;
+    return 2 * Math.floor(early / DAY_MS);
+  }
+
+  /**
    * Completes a task at the present moment, awarding whatever tier is live
    * right now - including 0 once every tier has passed.
    * @param {string} id - the task id.
@@ -1175,7 +1187,7 @@
     var award = 0;
     var byText = "none (failed)";
     if (idx !== -1) {
-      award = tiers[idx].pts;
+      award = tiers[idx].pts + earlyBonus(task, now);
       byText = hhmm(now);
     }
     resolveTask(id, now, award, byText, "complete", "complete now");

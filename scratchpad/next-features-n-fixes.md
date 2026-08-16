@@ -157,10 +157,6 @@ At 00:00 each day, record the day's score into a history array, then draw a line
 
 **Undecided:** whether points are recorded alongside score, how a 00:00 snapshot fires at all given the page only runs while open (most likely: on load, backfill every midnight that has passed since the last record), how far back the chart shows, and whether it lives on the Falsedge page or behind a link.
 
-### [i23] Further-task completion award ▫️
-
-A further task completed early (>24h) grants +8 instead of 6. The bonus is +2 for each 24h: eg, >48h early would be +10.
-
 ### [i26] Export all app data ⚪
 
 A full Falsedge state export — templates, ledger, points, scores, the lot — so data survives a device change or a breaking schema change without being retyped. D7 makes this load-bearing rather than a nicety: with no migration code ever, export → hand-edit → re-import is the *only* path through a schema change.
