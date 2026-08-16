@@ -698,15 +698,21 @@ window.Hex2 = (function () {
     }
     const span = FAKE_AD_MAX_MS - FAKE_AD_MIN_MS;
     fakeAdTotal = FAKE_AD_MIN_MS + Math.floor(Math.random() * (span + 1));
-    fakeAdEnd = Date.now() + fakeAdTotal;
     fakeAdReady = false;
     fakeAd.disabled = true;
     fakeAd.classList.remove("ready");
+    restartFakeAd();
+  }
+
+  function restartFakeAd() {
+    if (fakeAdRaf) {
+      cancelAnimationFrame(fakeAdRaf);
+      fakeAdRaf = 0;
+    }
+    fakeAdEnd = Date.now() + fakeAdTotal;
     tickFakeAd();
   }
 
-  // Time left comes off a stored end stamp, never off accumulated frames, so
-  // backgrounding the tab cannot pause the wait.
   function tickFakeAd() {
     fakeAdRaf = 0;
     const left = fakeAdEnd - Date.now();
@@ -863,6 +869,19 @@ window.Hex2 = (function () {
 
     if (fakeAd) {
       fakeAd.addEventListener("click", closeFakeAd);
+      document.addEventListener("visibilitychange", function () {
+        if (fakeAdReady || !lockout.classList.contains("show")) {
+          return;
+        }
+        if (document.hidden) {
+          if (fakeAdRaf) {
+            cancelAnimationFrame(fakeAdRaf);
+            fakeAdRaf = 0;
+          }
+          return;
+        }
+        restartFakeAd();
+      });
     }
 
     computeLayout();
