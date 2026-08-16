@@ -28,7 +28,14 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
-    <h3>v2.6 <span class="changelog-date">2026-08-16 02H</span></h3>
+    <h3>v2.5.1 <span class="changelog-date">2026-08-16 03H</span></h3>
+    <ul>
+      <li>Fixed: Hex 2^'s undo button came back greyed out after leaving the page and returning. The history was always there, the button just never re-enabled.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
+    <h3>v2.5 <span class="changelog-date">2026-08-16 02H</span></h3>
     <ul>
       <li>Falsedge undo/redo survives the app being closed. History used to live in sessionStorage and died with the session; it now sits in a fixed-size ring of localStorage slots, written on every action, holding the last 60 steps.</li>
       <li>Falsedge tells you when it can't save instead of failing silently, and drops the oldest undo history to make room before it gives up &mdash; data always gets first claim on storage.</li>
@@ -37,7 +44,7 @@
   </div>
 
   <div class="changelog-entry">
-    <h3>v2.5 <span class="changelog-date">2026-08-15 18H</span></h3>
+    <h3>v2.4.1 <span class="changelog-date">2026-08-15 18H</span></h3>
     <ul>
       <li>Toast messages are sky blue now, instead of the low-contrast body grey they were borrowing.</li>
       <li>Hex 2^ splits its header subtitle onto two lines &mdash; "shamelessly vibecoded" and the mode name no longer share one cramped line.</li>

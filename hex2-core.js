@@ -808,12 +808,12 @@ window.Hex2 = (function () {
 
     computeLayout();
     updateScores();
-    updateUndo();
     if (!load()) {
       spawn();
       spawn();
       save();
     }
+    updateUndo();
     drawStatic();
     startBreakTimer();
   }
