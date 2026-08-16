@@ -22,6 +22,8 @@ window.Hex2 = (function () {
   const BREAK_KEY = "hex2.break.start";
   const UNDO_DEPTH = 6;
   const BREAK_MS = 30 * 1000;
+  const FAKE_AD_MIN_MS = 30 * 1000;
+  const FAKE_AD_MAX_MS = 120 * 1000;
   const SWIPE_MIN = 22;      // px of travel before a drag counts as a swipe
   const PADS_KEY = "hex2.pads";
   const PAD_H = 60;          // slide-pad thickness, all of it grown outward
@@ -674,12 +676,65 @@ window.Hex2 = (function () {
   // Normal/Jiggly would restart the clock forever.
   const lockout = document.getElementById("lockout");
 
+  const fakeAd = document.getElementById("fake-ad");
+  const fakeAdLabel = document.getElementById("fake-ad-label");
+  let fakeAdTotal = 0;
+  let fakeAdEnd = 0;
+  let fakeAdReady = false;
+  let fakeAdRaf = 0;
+
   // absent on the standalone public build, which is never timed
   function showLockout() {
     if (!lockout) {
       return;
     }
     lockout.classList.add("show");
+    startFakeAd();
+  }
+
+  function startFakeAd() {
+    if (!fakeAd) {
+      return;
+    }
+    const span = FAKE_AD_MAX_MS - FAKE_AD_MIN_MS;
+    fakeAdTotal = FAKE_AD_MIN_MS + Math.floor(Math.random() * (span + 1));
+    fakeAdEnd = Date.now() + fakeAdTotal;
+    fakeAdReady = false;
+    fakeAd.disabled = true;
+    fakeAd.classList.remove("ready");
+    tickFakeAd();
+  }
+
+  // Time left comes off a stored end stamp, never off accumulated frames, so
+  // backgrounding the tab cannot pause the wait.
+  function tickFakeAd() {
+    fakeAdRaf = 0;
+    const left = fakeAdEnd - Date.now();
+    if (left <= 0) {
+      fakeAdReady = true;
+      fakeAd.disabled = false;
+      fakeAd.classList.add("ready");
+      fakeAd.style.setProperty("--fake-ad-p", "1");
+      fakeAdLabel.textContent = "×";
+      return;
+    }
+    const done = 1 - left / fakeAdTotal;
+    fakeAd.style.setProperty("--fake-ad-p", done.toFixed(4));
+    fakeAdLabel.textContent = String(Math.ceil(left / 1000));
+    fakeAdRaf = requestAnimationFrame(tickFakeAd);
+  }
+
+  function closeFakeAd() {
+    if (!fakeAdReady) {
+      return;
+    }
+    if (fakeAdRaf) {
+      cancelAnimationFrame(fakeAdRaf);
+      fakeAdRaf = 0;
+    }
+    lockout.classList.remove("show");
+    store.set(BREAK_KEY, String(Date.now()));
+    startBreakTimer();
   }
 
   function startBreakTimer() {
@@ -804,6 +859,10 @@ window.Hex2 = (function () {
       link.addEventListener("click", function () {
         store.set(BREAK_KEY, "0");
       });
+    }
+
+    if (fakeAd) {
+      fakeAd.addEventListener("click", closeFakeAd);
     }
 
     computeLayout();

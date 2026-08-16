@@ -183,15 +183,25 @@ Aulists already has exactly this and is the model to copy: `exportJSON()` (`JSON
 
 ### [i24] Focused mode ⬜
 
-A third mode alongside normal and jiggly, branching off normal. It keeps its own save data, but shares the high-score table the other modes already write to.
+A third mode alongside normal and jiggly, in a new `hex2-focused.js`. Branches off normal in the code sense — it copies `hex2-base.js`'s slide-then-pop animation model, not jiggly's continuous wobble. Own save key (`hex2.focused.save.v1`, the good prefix, since it is new), shares `hexadecimal.best.v1` for high scores.
 
-The hook: a swipe in a direction that can't merge anything has a consequence instead of being a silent no-op. On such a swipe the whole board shakes — a single explosion-like jolt, not jiggly's continuous wobble — flashes white and fades that flash out, and a life is lost.
+The mode button cycles normal → focused → jiggly → normal.
 
-**Undecided:** the life system. Three hearts to start is the working assumption. Regaining them is open: either one every N swipes, or hearts spawning on the board to be collected — which amount to nearly the same thing.
+**The jostle.** A swipe that moves nothing — `applyMove().moved === false`, the case that is a silent no-op in every other mode — instead jostles the board: one explosion-like jolt, a white flash that fades out, and **every tile is shuffled into a new cell**. The multiset of tiles is untouched; only their positions change. Nothing is gained, nothing is lost, your structure is destroyed. Not a penalty in points, a penalty in shape.
+
+A jostle pushes an undo snapshot, in focused mode only, so it can be undone like any move. This is the one place the mode diverges from the rest of the codebase's rule that only `commit()` snapshots.
+
+**Hearts.** Three to start. Nothing else in the mode costs a heart — **only undo does, at 1 heart per use**. The jostle is free; undoing it is what you pay for. That is the whole tension: flailing costs nothing directly, but the board it leaves you is bad enough that you buy your way back, and the buying is finite. At zero hearts the undo button simply greys out. Hearts are undo currency, not a life bar — focused mode adds no new way to die, and the run still ends only when no move is possible.
+
+A merge that lands on a **2048** tile grants +1 heart. Detected off `mergedDests` at commit time, so there is no counter to persist — a 2048 exists only because two 1024s merged.
+
+Hearts sit outside the undo snapshot. They must not rewind, or undo would refund its own cost.
+
+**Undecided:** whether the shuffle uses the existing seeded `rng` (which snapshots, so undoing and re-jostling reproduces the same shuffle and cannot be re-rolled) or `Math.random` (a fresh shuffle every time, which lets a player spend hearts re-rolling for a good board). Also open: whether a jostle re-runs the game-over check, since a shuffle can leave a full board with no moves.
 
 
 ## Multi-page items
 
-### [i100] (low priority/far future) - Server side ⬜⬜⬜
+### [i27] (low priority/far future) - Server side ⬜⬜⬜
 
 Storing data in server instead of locally. Would need to buy/rent server space or something... idk

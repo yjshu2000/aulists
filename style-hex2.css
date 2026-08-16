@@ -266,6 +266,48 @@
     min-width: 180px;
     min-height: 46px;
   }
+  /* the close button an ad would give you, in the corner an ad would put it */
+  .fake-ad {
+    --fake-ad-p: 0;
+    position: absolute;
+    top: calc(14px + env(safe-area-inset-top));
+    right: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: conic-gradient(
+      var(--hex-accent) calc(var(--fake-ad-p) * 1turn),
+      var(--hex-line) 0
+    );
+    color: var(--hex-ink);
+    font-family: inherit;
+    font-size: 17px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .fake-ad::before {
+    content: "";
+    position: absolute;
+    inset: 5px;
+    border-radius: 50%;
+    background: var(--hex-panel-2);
+  }
+  .fake-ad span {
+    position: relative;
+  }
+  .fake-ad.ready {
+    background: var(--hex-accent);
+    color: var(--hex-bg);
+    font-size: 24px;
+  }
+  .fake-ad.ready::before {
+    display: none;
+  }
 
   /* ---------------------------------- footer ---------------------------- */
   footer {
