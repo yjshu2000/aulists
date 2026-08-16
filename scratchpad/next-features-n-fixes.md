@@ -137,17 +137,11 @@ Computed at render and refreshed only by a page refresh. Deliberately allowed to
 
 **Undecided:** where on the page it sits, and its exact wording.
 
-### [i18] Undo/redo persists in localStorage ⚪ 🆗
-
-Undo history moves off sessionStorage onto a fixed-size localStorage ring, written on every action, so it survives the app being closed or OS-killed rather than dying with the session. Full snapshots, not diffs — the thing being fixed is per-tap write cost, not size, and a ring fixes that in ~10 lines where a differ costs ~70 and corrupts silently when wrong.
-
-Already fully specced: `scratchpad/undo-redo-ring-plan.md` holds the step-by-step plan, the quota rules, and a "Decisions" section that is binding. Nothing here is open — it just hasn't been built.
-
 ### [i19] Delete individual ledger entries ⚪
 
 An entry can be deleted on its own. Today the only way anything leaves `state.ledger` is `splice(0, batch.count)` after a copy-export, so a wrong entry is stuck the moment undo can no longer reach back to it.
 
-Deletion runs through `pushUndo()` like every other mutation, so it lands in the undo timeline — and with [i18] in place that timeline outlives the session.
+Deletion runs through `pushUndo()` like every other mutation, so it lands in the undo timeline, which now outlives the session.
 
 **Undecided:** the control's shape and where it hangs off the entry box, and whether it needs a confirm step given deletion is undoable.
 
@@ -162,10 +156,6 @@ Same 1-week ceiling that applies to setting a further task in the first place. P
 At 00:00 each day, record the day's score into a history array, then draw a line chart over those records.
 
 **Undecided:** whether points are recorded alongside score, how a 00:00 snapshot fires at all given the page only runs while open (most likely: on load, backfill every midnight that has passed since the last record), how far back the chart shows, and whether it lives on the Falsedge page or behind a link.
-
-### [i22] Toast text colour ▫️ 🐞 🆗
-
-`.toast` sets no `color` and so inherits body text, which is too low-contrast against its `--panel-2` background. Give it `var(--c-sky)`.
 
 ### [i23] Further-task completion award ▫️
 
@@ -203,11 +193,9 @@ The hook: a swipe in a direction that can't merge anything has a consequence ins
 
 **Undecided:** the life system. Three hearts to start is the working assumption. Regaining them is open: either one every N swipes, or hearts spawning on the board to be collected — which amount to nearly the same thing.
 
-### [i25] Split the header subtitle onto two lines ▫️ 🆗
-
-`hex2.html:19` runs both halves of the subtitle on one line, joined by a `&middot;`: `shamelessly vibecoded · normal mode`. Drop the separator and put `shamelessly vibecoded` and the `#mode-name` span on their own lines.
-
 
 ## Multi-page items
 
-(nothing pending)
+### [i100] (low priority/far future) - Server side ⬜⬜⬜
+
+Storing data in server instead of locally. Would need to buy/rent server space or something... idk

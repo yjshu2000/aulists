@@ -336,3 +336,4 @@ record the score. maybe also pts? be able to show line chart graph of records
 
 🟩🟩🟩🟩🟩🟩🟩🟩 ^ all items above are added to doc ^ 🟩🟩🟩🟩🟩🟩🟩🟩
 
+YO YO YO WAIT WHAT WDYM RELOADING CLEARS THE UNDO STACKS IN HEX GAME TOO?!?!! NAUUURRR NO NO NO NO! PRESERVE THAT TOO!

@@ -5,9 +5,7 @@
   var UNDO_SESSION_KEY = "aulists.undo";
   var WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-  // chain order for movement
   var CHAIN = ["0", "1", "2", "2.5", "3", "4"];
-  // stored recurrence dicts against this list
   var RECURRENCE_KINDS = ["daily", "everyNDays", "everyNWeeksOnDays",
     "dayOfMonth", "nthWeekdayOfMonth", "monthOfYear", "yearly"];
 
@@ -90,10 +88,8 @@
   function redo() { step("redo"); }
 
   /**
-   * Persists both stacks so they survive navigating to Falsedge and back.
-   * sessionStorage, not localStorage: the stacks should outlive a navigation
-   * but not the app being closed. Written only on the way out, so no action
-   * pays the cost of serialising up to 120 whole-state snapshots.
+   * Persists both stacks to sessionStorage on the way out, so they survive a
+   * navigation to Falsedge but not the app closing.
    */
   function saveUndoStacks() {
     try {
@@ -146,8 +142,7 @@
   var debugNowOverride = null;
 
   /**
-   * Reads a previously-set debug "now" override out of localStorage on boot, so
-   * the override survives a page reload during testing.
+   * Reads a persisted debug "now" override at boot, so it survives a reload.
    */
   (function loadDebugNow() {
     try {
@@ -164,8 +159,7 @@
   })();
 
   /**
-   * Returns the current moment the app should treat as "now" - either the real
-   * clock, or the debug override set via the temp debug panel.
+   * The moment the app treats as "now" - the real clock, or the debug override.
    * @returns {Date} a fresh Date instance (safe for callers to mutate).
    */
   function getNow() {
@@ -176,10 +170,8 @@
   }
 
   /**
-   * Sets or clears the debug "now" override and persists the choice to
-   * localStorage.
-   * @param {Date|null} dateOrNull - the fake "now" to use, or null to resume
-   *   using the real clock.
+   * Sets or clears the debug "now" override, persisting the choice.
+   * @param {Date|null} dateOrNull - the fake "now", or null for the real clock.
    */
   function setDebugNow(dateOrNull) {
     debugNowOverride = dateOrNull;
@@ -193,8 +185,8 @@
   }
 
   /**
-   * Builds a brand-new, empty state object - the baseline used on first run,
-   * and the starting point `normalise` fills in from parsed JSON.
+   * Builds an empty state object - the first-run baseline, and what `normalise`
+   * fills in from parsed JSON.
    * @returns {Object} an empty-but-well-formed state object.
    */
   function freshState() {
@@ -225,7 +217,7 @@
 
   /**
    * Loads and sanitizes state from localStorage, falling back to a fresh state
-   * if nothing is stored or the stored JSON can't be parsed.
+   * if nothing is stored or the JSON can't be parsed.
    * @returns {Object} a fully-formed state object.
    */
   function load() {
@@ -237,9 +229,8 @@
   }
 
   /**
-   * Sanitizes an arbitrary parsed-JSON blob (from localStorage or an import)
-   * into a fully-formed state object. Anything malformed, partial, or garbage
-   * is dropped or defaulted rather than allowed to corrupt `state`.
+   * Sanitizes an untrusted parsed-JSON blob into a complete state object.
+   * Anything malformed is dropped or defaulted, never left to corrupt `state`.
    * @param {Object} obj - parsed JSON, untrusted.
    * @returns {Object} a complete, safe-to-use state object.
    */
@@ -344,8 +335,8 @@
 
   // ----------------------- schedule (compute on open) ------------------------
   /**
-   * Returns the schedule boundary (midnight + `atMin` minutes) for a given
-   * calendar day, ignoring whatever time-of-day `date` itself carries.
+   * The schedule boundary (midnight + `atMin`) for a calendar day, ignoring
+   * whatever time-of-day `date` itself carries.
    * @param {Date} date - any moment on the calendar day to anchor to.
    * @param {number} atMin - minutes after midnight the boundary sits at.
    * @returns {Date} the boundary moment on `date`'s calendar day.
@@ -370,12 +361,11 @@
   }
 
   /**
-   * Finds the most recent scheduled return boundary that has already passed,
-   * relative to `now` - the moment List 2's contents last should have returned
-   * to List 1 (whether or not that return actually ran yet).
+   * The most recent return boundary already passed - when List 2's contents
+   * should have returned to List 1, whether or not that return ran.
    * @param {Date} now - the moment to search backward from.
    * @returns {Date|null} the boundary, or null if `state.lastReturn`'s anchor
-   *   is itself still in the future (nothing has passed yet).
+   *   is itself still in the future.
    */
   function lastBoundaryBefore(now) {
     var atMin = state.schedule.atMinutes;

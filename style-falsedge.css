@@ -604,6 +604,7 @@
     background: var(--panel-2);
     border: 1px solid var(--line);
     border-radius: 10px;
+    color: var(--c-sky);
     font-size: 13px;
     opacity: 0;
     pointer-events: none;

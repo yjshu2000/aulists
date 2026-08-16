@@ -2,8 +2,11 @@
   "use strict";
 
   var STORAGE_KEY = "falsedge.data";
-  var UNDO_SESSION_KEY = "falsedge.undo";
+  var UNDO_SLOT_PREFIX = "falsedge.undo.slot.";
+  var UNDO_INDEX_KEY = "falsedge.undo.index";
   var UNDO_CAP = 60;
+  var UNDO_RING_SIZE = UNDO_CAP + 1;
+  var UNDO_BYTE_BUDGET = 2 * 1024 * 1024;
   var EXPORT_LIMIT = 2000;
   var COPY_WINDOW_MS = 10 * 60 * 1000;
   var MIN_LEAD_MS = 20 * 60 * 1000;
@@ -29,8 +32,14 @@
     '</svg>';
 
   var state = load();
-  var undoStack = [];
-  var redoStack = [];
+  var undoRing = new Array(UNDO_RING_SIZE);
+  var undoLabels = new Array(UNDO_RING_SIZE);
+  var undoSlotBytes = new Array(UNDO_RING_SIZE).fill(0);
+  var undoBytesUsed = 0;
+  // timeline positions, never wrapped; a position's slot is n % UNDO_RING_SIZE
+  var undoOldest = 0;
+  var undoPointer = 0;
+  var undoNewest = 0;
 
   // view-only state: deliberately not in `state`, so it never reaches undo
   // and never survives an actual page load.
@@ -376,17 +385,24 @@
   }
 
   /**
-   * Persists Falsedge's in-memory state to its own localStorage key.
+   * Persists Falsedge's in-memory state to its own localStorage key, evicting
+   * undo history to make room before it gives up.
    */
   function save() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch (e) {}
+    while (true) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        return;
+      } catch (e) {}
+      if (undoOldest >= undoPointer) break;
+      dropOldestUndo();
+    }
+    toast("Could not save to this browser's storage.");
   }
 
   // ---------------------------------- undo -----------------------------------
   /**
-   * Deep-clones the whole state object for the undo/redo stacks.
+   * Deep-clones the whole state object for the undo ring.
    * @returns {Object} a detached copy of `state`.
    */
   function snapshotState() {
@@ -394,102 +410,276 @@
   }
 
   /**
-   * Records the pre-mutation state on the undo stack. Must be called before
-   * the mutation.
+   * localStorage key for a position's ring slot.
+   * @param {number} n - timeline position.
+   * @returns {string} the slot key.
+   */
+  function undoSlotKey(n) {
+    return UNDO_SLOT_PREFIX + (n % UNDO_RING_SIZE);
+  }
+
+  /**
+   * Writes a snapshot to a position's slot, updating the byte figures.
+   * @param {number} n - timeline position.
+   * @param {Object} snapshot - state clone to store.
+   * @returns {boolean} false if storage threw.
+   */
+  function writeUndoSlot(n, snapshot) {
+    var slot = n % UNDO_RING_SIZE;
+    var raw = JSON.stringify(snapshot);
+    try {
+      localStorage.setItem(undoSlotKey(n), raw);
+    } catch (e) {
+      return false;
+    }
+    undoBytesUsed += raw.length - undoSlotBytes[slot];
+    undoSlotBytes[slot] = raw.length;
+    return true;
+  }
+
+  /**
+   * Reads a position's slot back, refreshing its byte figure.
+   * @param {number} n - timeline position.
+   * @returns {Object|null} the snapshot, or null on a miss.
+   */
+  function readUndoSlot(n) {
+    var slot = n % UNDO_RING_SIZE;
+    try {
+      var raw = localStorage.getItem(undoSlotKey(n));
+      if (raw) {
+        var obj = JSON.parse(raw);
+        undoBytesUsed += raw.length - undoSlotBytes[slot];
+        undoSlotBytes[slot] = raw.length;
+        return obj;
+      }
+    } catch (e) {}
+    undoBytesUsed -= undoSlotBytes[slot];
+    undoSlotBytes[slot] = 0;
+    return null;
+  }
+
+  /**
+   * Persists the counters and labels.
+   * @returns {boolean} false if storage threw.
+   */
+  function writeUndoIndex() {
+    try {
+      localStorage.setItem(UNDO_INDEX_KEY, JSON.stringify({
+        undoOldest: undoOldest,
+        undoPointer: undoPointer,
+        undoNewest: undoNewest,
+        undoLabels: undoLabels
+      }));
+    } catch (e) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Retires the oldest position. Never drops the one the app sits on.
+   */
+  function dropOldestUndo() {
+    if (undoOldest >= undoPointer) return;
+    var slot = undoOldest % UNDO_RING_SIZE;
+    undoRing[slot] = null;
+    undoLabels[slot] = null;
+    undoBytesUsed -= undoSlotBytes[slot];
+    undoSlotBytes[slot] = 0;
+    try {
+      localStorage.removeItem(undoSlotKey(undoOldest));
+    } catch (e) {}
+    undoOldest += 1;
+  }
+
+  /**
+   * Clears every slot key and zeroes the byte figures.
+   */
+  function wipeAllUndoSlots() {
+    for (var i = 0; i < UNDO_RING_SIZE; i++) {
+      try {
+        localStorage.removeItem(UNDO_SLOT_PREFIX + i);
+      } catch (e) {}
+      undoSlotBytes[i] = 0;
+    }
+    undoBytesUsed = 0;
+  }
+
+  /**
+   * Snapshot for a position, from RAM if present, else from disk.
+   * @param {number} n - timeline position.
+   * @returns {Object|null} the snapshot, or null when neither has it.
+   */
+  function undoStateAt(n) {
+    var cached = undoRing[n % UNDO_RING_SIZE];
+    if (cached) return cached;
+    return readUndoSlot(n);
+  }
+
+  /**
+   * Runs a ring write, dropping history and retrying when storage is full.
+   * @param {Function} write - returns false if storage threw.
+   */
+  function undoWriteWithRetry(write) {
+    while (!write()) {
+      if (undoOldest >= undoPointer) return;
+      dropOldestUndo();
+    }
+  }
+
+  /**
+   * Drops history until the ring is back under its byte ceiling.
+   */
+  function trimUndoToBudget() {
+    while (undoBytesUsed > UNDO_BYTE_BUDGET && undoOldest < undoPointer) {
+      dropOldestUndo();
+    }
+  }
+
+  /**
+   * @param {*} v - value to test.
+   * @returns {boolean} true when `v` is a non-negative integer.
+   */
+  function isUndoCounter(v) {
+    return typeof v === "number" && isFinite(v)
+      && Math.floor(v) === v && v >= 0;
+  }
+
+  /**
+   * Whether a parsed index can be trusted to describe the ring.
+   * @param {Object|null} idx - the parsed index.
+   * @returns {boolean} true when the counters and labels all check out.
+   */
+  function undoIndexIsTrusted(idx) {
+    if (!idx) return false;
+    if (!isUndoCounter(idx.undoOldest)) return false;
+    if (!isUndoCounter(idx.undoPointer)) return false;
+    if (!isUndoCounter(idx.undoNewest)) return false;
+    if (idx.undoOldest > idx.undoPointer) return false;
+    if (idx.undoPointer > idx.undoNewest) return false;
+    if (idx.undoNewest - idx.undoOldest > UNDO_CAP) return false;
+    if (!Array.isArray(idx.undoLabels)) return false;
+    return idx.undoLabels.length === UNDO_RING_SIZE;
+  }
+
+  /**
+   * Records the pre-mutation state. Must be called before the mutation.
    * @param {string} label - the label the toast renders after "Undid: ".
    */
   function pushUndo(label) {
-    undoStack.push({
-      snapshot: snapshotState(),
-      label: label
+    var snapshot = snapshotState();
+    var at = undoPointer;
+    undoRing[at % UNDO_RING_SIZE] = snapshot;
+    undoLabels[at % UNDO_RING_SIZE] = label;
+    trimUndoToBudget();
+    undoWriteWithRetry(function () {
+      return writeUndoSlot(at, snapshot);
     });
-    if (undoStack.length > UNDO_CAP) {
-      undoStack.shift();
+    undoPointer += 1;
+    undoNewest = undoPointer;
+    if (undoPointer - undoOldest > UNDO_CAP) {
+      dropOldestUndo();
     }
-    redoStack = [];
+    undoWriteWithRetry(writeUndoIndex);
     refreshUndoRedoButtons();
   }
 
   /**
-   * Moves one step along the undo/redo stacks, swapping the current state onto
-   * the opposite stack on the way.
-   * @param {string} direction - "undo" or "redo".
+   * Moves the timeline one position, storing the position being left.
+   * @param {number} delta - -1 to undo, +1 to redo.
+   * @returns {boolean} false if the target slot was unrecoverable.
    */
-  function step(direction) {
-    var from;
-    var to;
-    var prefix;
-    if (direction === "undo") {
-      from = undoStack;
-      to = redoStack;
-      prefix = "Undid: ";
-    } else {
-      from = redoStack;
-      to = undoStack;
-      prefix = "Redid: ";
-    }
-    if (!from.length) return;
-    var entry = from.pop();
-    to.push({
-      snapshot: snapshotState(),
-      label: entry.label
+  function stepUndoTo(delta) {
+    var current = snapshotState();
+    var at = undoPointer;
+    undoRing[at % UNDO_RING_SIZE] = current;
+    undoWriteWithRetry(function () {
+      return writeUndoSlot(at, current);
     });
-    state = entry.snapshot;
+    var target = undoStateAt(undoPointer + delta);
+    if (!target) return false;
+    undoPointer += delta;
+    undoRing[undoPointer % UNDO_RING_SIZE] = target;
+    state = JSON.parse(JSON.stringify(target));
     save();
+    undoWriteWithRetry(writeUndoIndex);
     render();
     refreshUndoRedoButtons();
-    toast(prefix + entry.label);
+    return true;
   }
 
   /**
-   * Persists both stacks so they survive navigating to Aulists and back.
-   * sessionStorage, not localStorage: the stacks should outlive a navigation
-   * but not the app being closed. Written only on the way out, so an action
-   * never pays the cost of serialising 60 whole-state snapshots.
+   * Rebuilds the ring from localStorage at boot.
    */
-  function saveUndoStacks() {
+  function loadUndoRing() {
+    var i;
+    for (i = 0; i < UNDO_RING_SIZE; i++) {
+      undoRing[i] = null;
+      undoLabels[i] = null;
+      undoSlotBytes[i] = 0;
+    }
+    undoBytesUsed = 0;
+    undoOldest = 0;
+    undoPointer = 0;
+    undoNewest = 0;
+
+    var idx = null;
     try {
-      sessionStorage.setItem(UNDO_SESSION_KEY, JSON.stringify({
-        undo: undoStack,
-        redo: redoStack
-      }));
+      var raw = localStorage.getItem(UNDO_INDEX_KEY);
+      if (raw) idx = JSON.parse(raw);
+    } catch (e) {}
+
+    if (!undoIndexIsTrusted(idx)) {
+      wipeAllUndoSlots();
+      undoRing[0] = snapshotState();
       return;
-    } catch (e) {}
-    // over quota: keep the newest few steps rather than losing all of them
-    try {
-      sessionStorage.setItem(UNDO_SESSION_KEY, JSON.stringify({
-        undo: undoStack.slice(-10),
-        redo: redoStack.slice(-10)
-      }));
-    } catch (e) {}
-  }
+    }
+    undoOldest = idx.undoOldest;
+    undoPointer = idx.undoPointer;
+    undoNewest = idx.undoNewest;
+    for (i = 0; i < UNDO_RING_SIZE; i++) {
+      undoLabels[i] = idx.undoLabels[i];
+    }
+    for (i = undoOldest; i <= undoNewest; i++) {
+      if (i !== undoPointer) {
+        undoRing[i % UNDO_RING_SIZE] = readUndoSlot(i);
+      }
+    }
+    undoRing[undoPointer % UNDO_RING_SIZE] = snapshotState();
 
-  /**
-   * Restores both stacks at boot, if this tab left any behind.
-   */
-  function loadUndoStacks() {
-    try {
-      var raw = sessionStorage.getItem(UNDO_SESSION_KEY);
-      if (!raw) return;
-      var obj = JSON.parse(raw);
-      if (!obj) return;
-      if (Array.isArray(obj.undo)) undoStack = obj.undo;
-      if (Array.isArray(obj.redo)) redoStack = obj.redo;
-    } catch (e) {}
+    // narrow to the contiguous run around the pointer, so no hole is steppable
+    var lo = undoPointer;
+    while (lo > undoOldest && undoRing[(lo - 1) % UNDO_RING_SIZE]) {
+      lo -= 1;
+    }
+    undoOldest = lo;
+    var hi = undoPointer;
+    while (hi < undoNewest && undoRing[(hi + 1) % UNDO_RING_SIZE]) {
+      hi += 1;
+    }
+    undoNewest = hi;
   }
 
   /**
    * Steps one entry backwards.
    */
   function undo() {
-    step("undo");
+    if (undoPointer <= undoOldest) return;
+    var label = undoLabels[(undoPointer - 1) % UNDO_RING_SIZE];
+    if (stepUndoTo(-1)) {
+      toast("Undid: " + label);
+    }
   }
 
   /**
    * Steps one entry forwards.
    */
   function redo() {
-    step("redo");
+    if (undoPointer >= undoNewest) return;
+    var label = undoLabels[undoPointer % UNDO_RING_SIZE];
+    if (stepUndoTo(1)) {
+      toast("Redid: " + label);
+    }
   }
 
   // ------------------------------ state lookups ------------------------------
@@ -2475,8 +2665,8 @@
    */
   function refreshUndoRedoButtons() {
     if (!undoBtn) return;
-    undoBtn.disabled = undoStack.length === 0;
-    redoBtn.disabled = redoStack.length === 0;
+    undoBtn.disabled = undoPointer <= undoOldest;
+    redoBtn.disabled = undoPointer >= undoNewest;
   }
 
   /**
@@ -2519,17 +2709,13 @@
   document.addEventListener("visibilitychange", function () {
     flushDrafts();
     if (document.hidden) {
-      saveUndoStacks();
       return;
     }
     render();
     refreshUndoRedoButtons();
   });
 
-  // pagehide is the one that fires on an actual navigation to Aulists
-  window.addEventListener("pagehide", saveUndoStacks);
-
-  loadUndoStacks();
+  loadUndoRing();
   render();
   refreshUndoRedoButtons();
 })();
