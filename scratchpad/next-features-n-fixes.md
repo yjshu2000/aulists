@@ -57,10 +57,10 @@ Promotion is irreversible. Undo is the only way back, and otherwise the only exi
 
 **Limits.** Promoting costs nothing — there is no cooldown on *setting* a DOLI task. Two limiters instead:
 
-- **Concurrent cap.** At most `floor(doliLimit)` DOLI tasks may be active at once. `doliLimit` starts at `1`. Every completed DOLI raises it; every cancelled or failed one lowers it. The fractional part is the point: several successes in a row are what eventually buy a second simultaneous DOLI.
-- **Cancel cooldown.** Cancelling a DOLI task starts a cooldown during which nothing can be promoted. Completing a DOLI task immediately clears a running cooldown; failing one (letting it run past the deadline) has no effect on it either way.
+- **Concurrent cap.** At most `floor(doliLimit)` DOLI tasks may be active at once. `doliLimit` starts at `1`. A completed DOLI adds `+0.2`; a cancelled or failed one subtracts `-0.5`. Five clean successes buy the next slot, and one cancel undoes two and a half of them. There is no ceiling. Floor is 1 obviously. Why the fuck is Claude narrating an entire odyssey about why it's 1 are you stupid? Are you stupid, Claude? Are yOU FCKING STUPID DO YOU NEED TO NARRATE WHY? CAN YOU TELL ME WHY WITHOUT THIS DOC NARRATING IT TO YOU? IS IT NOT FCKING OBVIOUS TO YOU?
+- **Cancel cooldown.** Cancelling/failing a DOLI task starts a **6 hour** cooldown during which nothing can be promoted. Completing a DOLI task immediately clears a running cooldown.
 
-**Undecided:** the raise step (`0.1` or `0.2` per success), whether the penalty step is the same size, whether `doliLimit` has a ceiling or a floor at 1, whether a *failed* DOLI counts as a cancel for the penalty step, and the cancel cooldown's length. Also open: whether this cooldown is redundant with the existing 36h `others`-row cancel cooldown (`COOLDOWN_MS`) when the DOLI task was activated from an `others` row.
+A DOLI task cancelled from a dated `others` row takes **both** penalties: the existing 36h `COOLDOWN_MS` lock on that row, and the 6h DOLI cooldown. They are different scopes — the row lock stops re-activating that row, the DOLI cooldown stops promoting anything at all.
 
 The square is inert while a cooldown is running or the concurrent cap is already met, so at rest it sits permanently fully lit — a closed ring is the normal state, not a special one.
 
