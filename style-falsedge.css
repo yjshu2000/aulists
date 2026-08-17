@@ -345,6 +345,9 @@
     flex-wrap: wrap;
     padding: 4px 0 2px;
   }
+  .task-edit-rows .task-time-edit + .task-time-edit {
+    padding-top: 6px;
+  }
   .tier {
     line-height: 1.6;
   }

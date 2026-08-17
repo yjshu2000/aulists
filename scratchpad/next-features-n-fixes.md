@@ -68,59 +68,6 @@ The square is inert while a cooldown is running or the concurrent cap is already
 
 Negative awards have never run through `resolveTask()`. `taskEntryText()` branches on `award > 0 && ptsDelta === 0` and has no case for a negative, so the ledger line for a `-6` is unwritten.
 
-### [i8] Spend row: backdating, bulk buy, multiline ⬜ 🔴 🆗
-
-The row grows to two lines and gains a date, a multiplier, and a draft clear.
-
-**Backdating.** A spend is still *appended* to the ledger at the position corresponding to when it was logged (creation order, same as today), but the date stamped on the entry can be set into the past — recording when the money was actually spent, not when it was logged. A spend entry's stamped date and its position in the ledger array can therefore disagree: an entry near the end of the ledger can carry an earlier date than one before it.
-
-**UI.** Two rows. Text, cost and `×N` on the first; the date picker, `[clear draft]` and `[spend]` on the second.
-
-```
-┌────────────────────┐
-│ Current pts: 42  ^ │
-└────────────────────┘
-log spent points
-
-[ text field         ]  [cost▾]  [×N▾]
-[ (date picker - blank by default for today) ] [clear draft] [spend]
-┌────────────────────┐
-│ Current scr: 127 > │
-└────────────────────┘
-```
-
-The date input is **blank by default, meaning today** — it is not pre-filled. The draft stores `""` for that, and a blank resolves to today at the moment `[spend]` is tapped. Its maximum is today: the field backdates only, never forward.
-
-`[clear draft]` wipes all four fields at once — text, cost, `×N`, and the date back to blank. Undoable, so no confirmation, exactly like SET's.
-
-**Ledger text.** The date becomes a new second line, sitting between the text and the `pts` line — the same position a task entry's `by` line occupies. It is printed on every spend, including one logged for today:
-
-```
-new headphones
-on 2026-08-03
-pts = 45 - 50 = -5
-```
-
-At `N = 1` no multiplier appears anywhere — not on the text line, not in the arithmetic. A single-unit spend reads exactly as it does today, plus the new `on` line.
-
-**`pts cost`** becomes a combined dropdown + text input (`<input list>` + `<datalist>`) and shrinks in width. Its suggestions are the 10 most-frequently-used cost values, sorted by numerical value in the dropdown itself, not by frequency.
-
-**Frequency data** comes from a new `spendCostCounts` map in state, `{cost: timesUsed}`, incremented every time `[spend]` is tapped. It must be a plain object, not a `Map` — a `Map` serializes to `{}` and would be silently emptied by `save()`. It grows only with the number of *distinct* cost values ever used, not with total spend count — a repeated cost increments its existing counter. It is not derived by re-parsing ledger entry strings, consistent with how the rest of Falsedge avoids re-deriving things from pre-rendered ledger text.
-
-**`×N`** is a new field, the same combined dropdown + text input shape as `pts cost`, but with its own fixed suggestion range of 1–9, defaulting to 1. `pts cost` is per-unit; the total deducted is cost × N.
-
-A bulk buy shows the count in both the text line and the `pts` line, so the unit cost stays visible and the total stays checkable:
-
-```
-chips ×3
-on 2026-08-03
-pts = 45 - 10×3 = 15
-```
-
-An empty `×N` is read as 1 rather than blocking the row: `[spend]` stays gated on text and a positive integer cost alone, exactly as it is today.
-
-All four fields persist in `spendDraft`, so a half-written spend survives a reload the way text and cost already do.
-
 ### [i13] Swap homepage to Falsedge ⚪ 🟡 🆗
 
 Done as a file rename. The current `index.html` (Aulists) becomes `aulists.html`, and `falsedge.html` becomes `index.html`. Cross-links, `manifest.json`'s `start_url`, and `sw.js`'s `SHELL` list all get updated to match the new filenames.
@@ -166,12 +113,6 @@ An entry can be deleted on its own. Today the only way anything leaves `state.le
 Deletion runs through `pushUndo()` like every other mutation, so it lands in the undo timeline, which now outlives the session.
 
 **Undecided:** the control's shape and where it hangs off the entry box, and whether it needs a confirm step given deletion is undoable.
-
-### [i20] Date picker on further tasks ⚪ 🔴
-
-A further task shows a weekday (`TU`, `WE`) next to its clock time, and that day currently cannot be changed: `applyTaskEdit()` deliberately preserves the existing date because the editor only offers clock times (`falsedge.js:1047`). Add a native date input to the edit flow so the day itself can be moved.
-
-Same 1-week ceiling that applies to setting a further task in the first place. Pulling the date back into the next 24h must work too, since that is what un-further-ing a task means.
 
 ### [i21] Daily score chart ⬜ 🟡
 

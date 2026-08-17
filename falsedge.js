@@ -1368,6 +1368,27 @@
   }
 
   /**
+   * Moves an active task's deadline to a new day, keeping its clock time. An
+   * empty date re-resolves to the clock time's next occurrence, which is how
+   * a further task is pulled back inside 24h.
+   * @param {string} id - the task id.
+   * @param {string} date - a day key, "YYYY-MM-DD", or "" for none.
+   */
+  function editTaskDate(id, date) {
+    var task = findTask(id);
+    if (!task) return;
+    var now = getNow();
+    if (date && !dateInRange(date, now)) {
+      toast("date must be within 1 week");
+      render();
+      return;
+    }
+    var clock = hhmm(new Date(task.deadline));
+    commitTaskDeadline(id, resolveDeadline(clock, date, now), now,
+      "edit task date", "invalid datetime");
+  }
+
+  /**
    * Moves an active task's deadline. Validated exactly as SET validates a new
    * one - resolved from `getNow()` at tap time, held to the same 20-minute
    * floor, and refused if another active task already holds that instant. The
@@ -1390,8 +1411,24 @@
     } else {
       deadline = resolveClockTime(clock, now);
     }
+    commitTaskDeadline(id, deadline, now, "edit task time", "refreshed");
+  }
+
+  /**
+   * Holds a proposed deadline to the 20-minute floor and the overlap rule,
+   * then commits it. The task's own deadline is excluded from the overlap
+   * check, since a task can hardly clash with itself.
+   * @param {string} id - the task id.
+   * @param {Date} deadline - the proposed replacement.
+   * @param {Date} now - the reference moment.
+   * @param {string} label - the undo label.
+   * @param {string} tooSoon - toast for a deadline under the floor.
+   */
+  function commitTaskDeadline(id, deadline, now, label, tooSoon) {
+    var task = findTask(id);
+    if (!task) return;
     if (deadline.getTime() - now.getTime() < MIN_LEAD_MS) {
-      toast("refreshed");
+      toast(tooSoon);
       render();
       return;
     }
@@ -1405,7 +1442,7 @@
     }
     var iso = deadline.toISOString();
     if (task.deadline === iso) return;
-    pushUndo("edit task time");
+    pushUndo(label);
     task.deadline = iso;
     save();
     render();
@@ -2175,14 +2212,15 @@
 
   /**
    * Builds the deadline/leniency editor that replaces a task's tier rows
-   * while it's open. Both controls commit on change, and the editor stays
-   * open across a commit so time and mode can be changed in one go.
+   * while it's open. Every control commits on change, and the editor stays
+   * open across a commit so time, mode and date can be changed in one go.
    * @param {string} id - the task id.
    * @param {Date} now - the moment the dropdown is built against.
-   * @returns {Element} the editor row.
+   * @returns {Element} the editor rows.
    */
   function buildTaskTimeEditor(id, now) {
     var task = findTask(id);
+    var wrap = el("div", "task-edit-rows");
     var row = el("div", "task-time-edit");
     var opts = dropdownOptions(now);
     var sel = el("select", "time-select");
@@ -2209,7 +2247,19 @@
       if (!next) return;
       editTaskMode(id, next);
     }));
-    return row;
+    wrap.appendChild(row);
+
+    // an overdue deadline sits outside the picker's bounds, so show it empty
+    var held = dayKey(new Date(task.deadline));
+    if (!dateInRange(held, now)) {
+      held = "";
+    }
+    var dateRow = el("div", "task-time-edit");
+    dateRow.appendChild(buildDateInput(held, now, function (v) {
+      editTaskDate(id, v);
+    }));
+    wrap.appendChild(dateRow);
+    return wrap;
   }
 
   /**
