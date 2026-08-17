@@ -511,23 +511,26 @@ window.Hex2 = (function () {
     updateUndo();
   }
 
-  // Fisher-Yates over the occupied cells, off the seeded rng so it rewinds
-  // with everything else. The multiset is untouched - positions only.
+  // Scatters every tile across the whole board, not just the cells that were
+  // already occupied - any of the 19 is equally likely, including the one a
+  // tile started on. Fisher-Yates over the cell keys, off the seeded rng so it
+  // rewinds with everything else. The multiset is untouched, positions only.
   function shuffleBoard() {
-    const keys = [];
     const tiles = [];
     for (const entry of board) {
-      keys.push(entry[0]);
       tiles.push(entry[1]);
     }
-    for (let i = tiles.length - 1; i > 0; i--) {
+    const keys = cells.map(function (c) {
+      return c.key;
+    });
+    for (let i = keys.length - 1; i > 0; i--) {
       const j = Math.floor(nextRandom() * (i + 1));
-      const swap = tiles[i];
-      tiles[i] = tiles[j];
-      tiles[j] = swap;
+      const swap = keys[i];
+      keys[i] = keys[j];
+      keys[j] = swap;
     }
     board = new Map();
-    for (let i = 0; i < keys.length; i++) {
+    for (let i = 0; i < tiles.length; i++) {
       board.set(keys[i], tiles[i]);
     }
   }
