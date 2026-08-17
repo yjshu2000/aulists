@@ -15,6 +15,8 @@
   const JOLT_MS = 250;
   const JOLT_AMP = 0.34;        // of a tile radius, at the first hit
   const JOLT_KICK = 0.28;       // the counter-swing, as a share of the hit
+  const FLASH_MS = 1000;        // outlives the shake; input stays locked
+  const FLASH_HOLD = 0.25;      // share of FLASH_MS held at full white
   const FLASH_ALPHA = 0.5;
 
   let busy = false;          // input lock while an animation is playing
@@ -107,13 +109,25 @@
 
   // The board is already shuffled by the time this runs; the flash and shake
   // are cosmetic, so an interrupting swipe can cut them off safely.
+  // Full white for the first quarter, then a linear fade to nothing.
+  function flashAlpha(t) {
+    if (t <= FLASH_HOLD) {
+      return FLASH_ALPHA;
+    }
+    return FLASH_ALPHA * (1 - (t - FLASH_HOLD) / (1 - FLASH_HOLD));
+  }
+
+  // The shake and the flash run on separate clocks - the board settles in
+  // JOLT_MS while the white lingers for FLASH_MS.
   function animateJolt(then) {
     const start = performance.now();
     const angle = Math.random() * Math.PI * 2;
     function frame(now) {
-      const t = Math.min(1, (now - start) / JOLT_MS);
+      const el = now - start;
+      const jt = Math.min(1, el / JOLT_MS);
+      const ft = Math.min(1, el / FLASH_MS);
       const layout = Hex2.getLayout();
-      const amp = layout.size * JOLT_AMP * joltOffset(t);
+      const amp = layout.size * JOLT_AMP * joltOffset(jt);
       const ox = Math.cos(angle) * amp;
       const oy = Math.sin(angle) * amp;
       Hex2.drawBoardBase(ox, oy);
@@ -121,12 +135,11 @@
         const p = Hex2.posOf(entry[0]);
         drawTile(p.x + ox, p.y + oy, layout.size, entry[1].value, 1);
       }
-      const a = FLASH_ALPHA * Math.pow(1 - t, 2);
       const ctx = Hex2.getCtx();
-      ctx.fillStyle = "rgba(255,255,255," + a.toFixed(3) + ")";
+      ctx.fillStyle = "rgba(255,255,255," + flashAlpha(ft).toFixed(3) + ")";
       ctx.fillRect(0, 0, layout.cssW, layout.cssH);
       Hex2.endFrame();
-      if (t < 1) {
+      if (ft < 1) {
         requestAnimationFrame(frame);
         return;
       }
