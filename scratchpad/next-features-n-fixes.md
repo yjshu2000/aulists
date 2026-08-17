@@ -55,6 +55,8 @@ Tapping the square enters pick mode: every active task block gets a full-block o
 
 Promotion is irreversible. Undo is the only way back, and otherwise the only exit is cancelling the task outright — the mechanic is a gamble on commitment, so there is no un-promote.
 
+A promoted task is frozen. Neither edit overlay is attached to it: not `edit time?` on `.tier-rows`, which also carries the date row, and not the text editor on `.task-text-row`. Text, clock time, date and WL/HL are all fixed at the moment of promotion. Without that, a promoted task could have its deadline pushed out and collect 12 points for nothing.
+
 **Limits.** Promoting costs nothing — there is no cooldown on *setting* a DOLI task. Two limiters instead:
 
 - **Concurrent cap.** At most `floor(doliLimit)` DOLI tasks may be active at once. `doliLimit` starts at `1`, floors at `1`, and has no ceiling. A completed DOLI adds `+0.2`; a cancelled or failed one subtracts `-0.5`.
