@@ -8,7 +8,7 @@
 (function () {
   "use strict";
 
-  const SAVE_KEY = "hexadecimal.jiggly.save.v1";
+  const SAVE_KEY = "hex2.jiggly.save";
   const SLIDE_MS = 160;
   const POP_MS = 2600;        // long cosmetic slosh; never blocks input
   const BLOCK_MS = 520;

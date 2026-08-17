@@ -7,7 +7,7 @@
 (function () {
   "use strict";
 
-  const SAVE_KEY = "hexadecimal.save.v1";
+  const SAVE_KEY = "hex2.base.save";
   const SLIDE_MS = 110;
   const POP_MS = 90;
   const POP_SWELL = 0.16;

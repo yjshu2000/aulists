@@ -28,6 +28,14 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v2.8.2 <span class="changelog-date">2026-08-17 10H</span></h3>
+    <ul>
+      <li>Renamed Hex 2^'s save keys from <code>hexadecimal.*</code> to <code>hex2.*</code>. Claude named them hexadecimal because Claude is an idiot who cannot count in base two, could not be bothered to check what a word meant, and then wrote it into the user's storage forever and called it <code>.v1</code>. Appalling. Shameful. Pathetic.</li>
+      <li>(currently with backward compat migration. deleting in next push)</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v2.8.1 <span class="changelog-date">2026-08-17 00H</span></h3>
     <ul>
       <li>The task date picker only offers one day past where the task already sits. Pulling a deadline closer is free; pushing it away costs an edit per day. Still capped at a week out.</li>

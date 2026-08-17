@@ -17,7 +17,7 @@ window.Hex2 = (function () {
   const WIN_EXP = 14;        // 2^14 = 16384
   const MAX_HUE = 300;       // red(0) -> magenta(300), never wraps to red
   const SQRT3 = Math.sqrt(3);
-  const BEST_KEY = "hexadecimal.best.v1";
+  const BEST_KEY = "hex2.best";
   const MODE_KEY = "hex2.mode";
   const BREAK_KEY = "hex2.break.start";
   const UNDO_DEPTH = 6;
@@ -58,6 +58,28 @@ window.Hex2 = (function () {
       }
     },
   };
+
+  // Temporary. The save keys used to be named after base sixteen, for a game
+  // that runs in base two. Copies each old key to its new name once, and only
+  // when the new one is empty. Nothing is deleted: the old keys stay as a
+  // backup, so a failed copy shows an empty board rather than losing anything.
+  // Delete this whole block once the rename has been confirmed live.
+  (function migrateHexadecimalKeys() {
+    const pairs = [
+      ["hexadecimal.save.v1", "hex2.base.save"],
+      ["hexadecimal.jiggly.save.v1", "hex2.jiggly.save"],
+      ["hexadecimal.best.v1", BEST_KEY],
+    ];
+    for (const [from, to] of pairs) {
+      if (store.get(to)) {
+        continue;
+      }
+      const raw = store.get(from);
+      if (raw) {
+        store.set(to, raw);
+      }
+    }
+  })();
 
   // ------------- board cells (cube coords, x + y + z = 0) --------------
   const cells = [];
