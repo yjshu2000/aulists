@@ -533,6 +533,19 @@
     color: var(--c-red);
     margin-bottom: 10px;
   }
+  .row-lastdone-note {
+    font-size: 12px;
+    font-style: italic;
+    color: var(--muted);
+    margin: 10px 0;
+  }
+  /* mirrored, because stupid Unicode has right-then-up but not left-then-up */
+  .row-out-mark {
+    display: inline-block;
+    margin-right: 6px;
+    transform: scaleX(-1);
+    color: var(--c-sky);
+  }
   .tpl-adder {
     border-top: 1px solid var(--line-soft);
     margin-top: 12px;

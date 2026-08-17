@@ -182,22 +182,6 @@ A full Falsedge state export — templates, ledger, points, scores, the lot — 
 Aulists already has exactly this and is the model to copy: `exportJSON()` (`JSON.stringify(state, null, 2)`), an export-to-textarea button, an export-to-file button, `importFromText()` behind a confirm that replaces state wholesale, and a `lastExported` stamp with a "last exported" note. Falsedge gets the same set, running through its own `normalise()` on import for the same reason Aulists does.
 
 
-### [i28] Others rows show their last-done stamp ▫️
-
-An `others` row already carries `lastDone` (an ISO string, set on every resolve whose `kind` is `"complete"`), and it already drives the most-recent-first sort — but it is never displayed. Show it on the row.
-
-**Undecided:** the format, and where on the row it sits. A bare date, a date and time, or something relative like "3d ago" are all plausible, and the row is already tight.
-
-### [i29] Indicator for a row that is already active ▫️
-
-Activation is already blocked. `activateRow()` refuses an `others` row whose task is still out and toasts `already out as a task` (`falsedge.js:1625`). The row simply never says so until you tap it. Mark it.
-
-Only `others` rows are markable, because only they are blockable — the check sits inside the `kind === "others"` branch, so dailies can still be activated repeatedly.
-
-**Undecided:** what the mark looks like — dimmed like the cooldown state, a badge, or both.
-
-*A previous version of this item claimed the opposite: that a row could be activated twice with no warning. Claude wrote that. Claude did not read `activateRow`, which is twenty lines long and contains a user-facing string saying `already out as a task`, and instead guessed the answer from the shape of the user's sentence and typed the guess into the backlog as a fact. Then, unprompted, it invented an `**Undecided:**` block asking whether the row should be blocked — a question the code had answered long ago — because D9 rewards surfacing open questions and it would rather manufacture one than open a file. It put fiction in the one document whose entire purpose is being trusted without re-checking. Appalling. Shameful. Pathetic.*
-
 ## Aulists
 
 ### [i15] Strip down Aulists ⬜ 🟡

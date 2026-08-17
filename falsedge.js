@@ -115,6 +115,24 @@
   }
 
   /**
+   * Formats an elapsed duration, for a row's last-done stamp.
+   * @param {number} ms - milliseconds since.
+   * @returns {string} e.g. "just now", "42m ago", "5h ago", "3d ago".
+   */
+  function fmtAgo(ms) {
+    if (ms < 60 * 1000) {
+      return "just now";
+    }
+    if (ms < 60 * 60 * 1000) {
+      return Math.floor(ms / (60 * 1000)) + "m ago";
+    }
+    if (ms < DAY_MS) {
+      return Math.floor(ms / (60 * 60 * 1000)) + "h ago";
+    }
+    return Math.floor(ms / DAY_MS) + "d ago";
+  }
+
+  /**
    * Adds whole minutes to a moment without mutating the original.
    * @param {Date} d - the base moment.
    * @param {number} m - minutes to add.
@@ -786,6 +804,18 @@
     var until = new Date(row.cooldownUntil).getTime();
     if (isNaN(until)) return 0;
     return Math.max(0, until - now.getTime());
+  }
+
+  /**
+   * Whether an `others` row already has a task of its own out, which is what
+   * `activateRow` refuses on.
+   * @param {string} id - the row id.
+   * @returns {boolean} true if a live task came from this row.
+   */
+  function rowIsOut(id) {
+    return state.activeTasks.some(function (t) {
+      return t.sourceRowId === id;
+    });
   }
 
   /**
@@ -1622,10 +1652,7 @@
         toast("on cooldown - " + fmtLeft(left) + " left");
         return;
       }
-      var out = state.activeTasks.some(function (t) {
-        return t.sourceRowId === id;
-      });
-      if (out) {
+      if (rowIsOut(id)) {
         toast("already out as a task");
         return;
       }
@@ -2635,7 +2662,13 @@
     var r = findRow(kind, id);
     var now = getNow();
     var row = el("div", "tpl-row");
-    row.appendChild(el("div", "tpl-text", r.text));
+    var textBox = el("div", "tpl-text");
+    if (kind === "others" && rowIsOut(id)) {
+      row.classList.add("row-isout");
+      textBox.appendChild(el("span", "row-out-mark", "⤴"));
+    }
+    textBox.appendChild(document.createTextNode(r.text));
+    row.appendChild(textBox);
     if (kind === "others") {
       var left = cooldownLeft(r, now);
       if (left > 0) {
@@ -2648,10 +2681,21 @@
     controls.appendChild(buildDayTimeSelect(r.time || "", true, function (v) {
       editRow(kind, id, "time", v);
     }));
+    // only `others` splits; dailies doesn't split line
     if (kind === "others") {
       controls.appendChild(buildDateInput(r.date || "", now, function (v) {
         editRow(kind, id, "date", v);
       }));
+      row.appendChild(controls);
+      if (r.lastDone) {
+        var done = new Date(r.lastDone);
+        if (!isNaN(done.getTime())) {
+          row.appendChild(el("div", "row-lastdone-note",
+            "last done: " + fmtDateTime(done) + " · " +
+            fmtAgo(now.getTime() - done.getTime())));
+        }
+      }
+      controls = el("div", "tpl-controls");
     }
     controls.appendChild(buildModeToggles(function () {
       var live = findRow(kind, id);
