@@ -1374,6 +1374,24 @@
    * @param {string} id - the task id.
    * @param {string} date - a day key, "YYYY-MM-DD", or "" for none.
    */
+  /**
+   * The furthest day a task's deadline may be moved to: one day past where it
+   * already sits, and never beyond the picker's own week.
+   * @param {Object} task - the active task.
+   * @param {Date} now - the reference moment.
+   * @returns {string} a day key, "YYYY-MM-DD".
+   */
+  function taskDateCeiling(task, now) {
+    var d = new Date(task.deadline);
+    d.setDate(d.getDate() + 1);
+    var key = dayKey(d);
+    var max = dateBounds(now).max;
+    if (key > max) {
+      return max;
+    }
+    return key;
+  }
+
   function editTaskDate(id, date) {
     var task = findTask(id);
     if (!task) return;
@@ -2257,7 +2275,7 @@
     var dateRow = el("div", "task-time-edit");
     dateRow.appendChild(buildDateInput(held, now, function (v) {
       editTaskDate(id, v);
-    }));
+    }, taskDateCeiling(task, now)));
     wrap.appendChild(dateRow);
     return wrap;
   }
@@ -2478,9 +2496,10 @@
    * @param {string} value - the currently held day key, or "".
    * @param {Date} now - the reference moment, for the bounds.
    * @param {Function} onChange - called with the new value.
+   * @param {string} [maxDay] - a tighter ceiling than the week, if any.
    * @returns {Element} the caption and input in their wrapper.
    */
-  function buildDateInput(value, now, onChange) {
+  function buildDateInput(value, now, onChange, maxDay) {
     var wrap = el("div", "field-pair");
     wrap.appendChild(el("span", "field-label", "on"));
     var input = el("input", "date-input");
@@ -2488,6 +2507,9 @@
     var bounds = dateBounds(now);
     input.min = bounds.min;
     input.max = bounds.max;
+    if (maxDay && maxDay < input.max) {
+      input.max = maxDay;
+    }
     input.value = value || "";
     input.addEventListener("change", function () {
       onChange(input.value);
