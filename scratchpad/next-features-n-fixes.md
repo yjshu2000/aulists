@@ -182,6 +182,22 @@ A full Falsedge state export — templates, ledger, points, scores, the lot — 
 Aulists already has exactly this and is the model to copy: `exportJSON()` (`JSON.stringify(state, null, 2)`), an export-to-textarea button, an export-to-file button, `importFromText()` behind a confirm that replaces state wholesale, and a `lastExported` stamp with a "last exported" note. Falsedge gets the same set, running through its own `normalise()` on import for the same reason Aulists does.
 
 
+### [i28] Others rows show their last-done stamp ▫️
+
+An `others` row already carries `lastDone` (an ISO string, set on every resolve whose `kind` is `"complete"`), and it already drives the most-recent-first sort — but it is never displayed. Show it on the row.
+
+**Undecided:** the format, and where on the row it sits. A bare date, a date and time, or something relative like "3d ago" are all plausible, and the row is already tight.
+
+### [i29] Indicator for a row that is already active ▫️
+
+Activation is already blocked. `activateRow()` refuses an `others` row whose task is still out and toasts `already out as a task` (`falsedge.js:1625`). The row simply never says so until you tap it. Mark it.
+
+Only `others` rows are markable, because only they are blockable — the check sits inside the `kind === "others"` branch, so dailies can still be activated repeatedly.
+
+**Undecided:** what the mark looks like — dimmed like the cooldown state, a badge, or both.
+
+*A previous version of this item claimed the opposite: that a row could be activated twice with no warning. Claude wrote that. Claude did not read `activateRow`, which is twenty lines long and contains a user-facing string saying `already out as a task`, and instead guessed the answer from the shape of the user's sentence and typed the guess into the backlog as a fact. Then, unprompted, it invented an `**Undecided:**` block asking whether the row should be blocked — a question the code had answered long ago — because D9 rewards surfacing open questions and it would rather manufacture one than open a file. It put fiction in the one document whose entire purpose is being trusted without re-checking. Appalling. Shameful. Pathetic.*
+
 ## Aulists
 
 ### [i15] Strip down Aulists ⬜ 🟡
@@ -219,6 +235,30 @@ Hearts sit outside the undo snapshot. They must not rewind, or undo would refund
 
 
 ## Multi-page items
+
+### [i30] A Falsedge action clears the ad ⬜
+
+**The link is never locked.** "Go to Hex 2^" always works and is never greyed. No counter on it, no currency, no stacks, no spending.
+
+**The rule.** Falsedge snapshots `undoPointer` on page load and compares it when the Hex 2^ button is tapped. If it changed, an existing lockout is cleared. If it did not, nothing happens.
+
+```
+mid-play, no lockout -> Falsedge -> back: fresh 30s, nothing carried
+lockout already up   -> Falsedge -> back: still locked, ad restarted (unless it's been >10 mins)
+lockout already up   -> Falsedge -> did something -> back: cleared
+```
+
+It only ever dismisses a lockout that already existed when you left. It is not credit against a future one, and leaving mid-play still costs nothing — the break resets exactly as it does today.
+
+`undoPointer` is the counter because `pushUndo` increments it and `undo` decrements it, so an action that gets undone nets zero. It never wraps — only the slot index does, via `n % UNDO_RING_SIZE`.
+
+**Closing the navaway loophole.** Today `.navaway` sets `BREAK_KEY` to `"0"`, which clears a live lockout outright, so walking out of one and straight back in grants a clean 30s. That stops working: a lockout that was up when you left is still up when you return, with its ad restarted. Walking out of a lockout is no longer an escape from it. Walking out mid-play is unaffected.
+
+**Or wait it out.** Staying in Falsedge until a timer expires also clears the ad. The timer restarts from scratch on every page load, so it only rewards one continuous sitting. It is deliberately **not** displayed in Falsedge — no countdown, no ring, no animation. Falsedge stays quiet.
+
+**The 10-minute mercy.** If the app was hidden for 10 minutes or more, the fake ad is skipped entirely: the lockout still appears, but with the × available immediately. Flat rate, measured from the moment the page was hidden, and it applies no matter what state things were in — whether an ad was already on screen when you left, or the break only expired while you were gone. Under 10 minutes the current behaviour stands, and the same roll restarts from the top.
+
+**Undecided:** the wait-it-out timer's length, and whether that path survives at all now that a single action is enough. Also open: whether a redo should count, since it moves the pointer forward too.
 
 ### [i27] (low priority/far future) - Server side ⬜⬜⬜ 🔵
 

@@ -336,8 +336,6 @@ record the score. maybe also pts? be able to show line chart graph of records
 
 YO YO YO WAIT WHAT WDYM RELOADING CLEARS THE UNDO STACKS IN HEX GAME TOO?!?!! NAUUURRR NO NO NO NO! PRESERVE THAT TOO!
 
-🟩🟩🟩🟩🟩🟩🟩🟩 ^ all items above are added to doc ^ 🟩🟩🟩🟩🟩🟩🟩🟩
-
 ordering of the others templates doesn't seem right... 
 also I swear this was in the original plans; idk where tf did it go; but it was always supposed to display *last done* date (date time ig)
 
@@ -357,3 +355,5 @@ like for example, I leave app at 23/30s, 7s remaining. i come back. it had rolle
 
 wait OH also for every action in falsedge (for every push-undo) it stacks, the number of hex 2^ unlocks, showing as a number on the button or smth. like... 
 [3] -> Go to Hex 2^ ->
+
+🟩🟩🟩🟩🟩🟩🟩🟩 ^ all items above are added to doc ^ 🟩🟩🟩🟩🟩🟩🟩🟩
