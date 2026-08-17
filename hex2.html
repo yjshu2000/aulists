@@ -24,6 +24,7 @@
     <div class="score"><div class="k">Best</div><div class="v" id="best">0</div></div>
   </div>
   <div class="row-break"></div>
+  <div class="hearts" id="hearts"></div>
   <button class="hexbtn" id="undo" disabled>&#8630;&nbsp;Undo</button>
   <div class="row-break"></div>
   <button class="hexbtn" id="newgame">New game</button>
@@ -69,8 +70,9 @@
   // scripts live. async = false is what keeps core ahead of the mode.
   var mode = "base";
   try {
-    if (localStorage.getItem("hex2.mode") === "jiggly") {
-      mode = "jiggly";
+    var saved = localStorage.getItem("hex2.mode");
+    if (saved === "jiggly" || saved === "challenge") {
+      mode = saved;
     }
   } catch (e) {
     // storage blocked; fall back to normal mode

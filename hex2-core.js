@@ -21,6 +21,9 @@ window.Hex2 = (function () {
   const MODE_KEY = "hex2.mode";
   const BREAK_KEY = "hex2.break.start";
   const UNDO_DEPTH = 6;
+  const START_HEARTS = 3;
+  const MAX_HEARTS = 5;
+  const HEART_TILE = 2048;
   const BREAK_MS = 30 * 1000;
   const FAKE_AD_MIN_MS = 30 * 1000;
   const FAKE_AD_MAX_MS = 120 * 1000;
@@ -149,6 +152,11 @@ window.Hex2 = (function () {
   let history = [];          // undo snapshots, capped at UNDO_DEPTH
   let mode = null;           // the config object handed to boot()
   let saveKey = "";
+  // challenge mode only: undo currency, deliberately outside the snapshot so
+  // undoing cannot refund its own cost
+  let hearts = START_HEARTS;
+  // switching modes reloads the page, so this is fixed for the session
+  let isChallenge = false;
 
   // sfc32, seeded from real OS entropy. Math.random() would do the job except
   // that its state is hidden, so undo cannot rewind it and it would've enabled
@@ -301,6 +309,14 @@ window.Hex2 = (function () {
     if (score > best) {
       best = score;
       store.set(BEST_KEY, String(best));
+    }
+    if (isChallenge) {
+      for (const key of res.mergedDests) {
+        const t = board.get(key);
+        if (t && t.value === HEART_TILE) {
+          grantHeart();
+        }
+      }
     }
     updateScores();
   }
@@ -495,6 +511,27 @@ window.Hex2 = (function () {
     updateUndo();
   }
 
+  // Fisher-Yates over the occupied cells, off the seeded rng so it rewinds
+  // with everything else. The multiset is untouched - positions only.
+  function shuffleBoard() {
+    const keys = [];
+    const tiles = [];
+    for (const entry of board) {
+      keys.push(entry[0]);
+      tiles.push(entry[1]);
+    }
+    for (let i = tiles.length - 1; i > 0; i--) {
+      const j = Math.floor(nextRandom() * (i + 1));
+      const swap = tiles[i];
+      tiles[i] = tiles[j];
+      tiles[j] = swap;
+    }
+    board = new Map();
+    for (let i = 0; i < keys.length; i++) {
+      board.set(keys[i], tiles[i]);
+    }
+  }
+
   function undo() {
     if (!history.length) {
       return;
@@ -502,9 +539,13 @@ window.Hex2 = (function () {
     if (mode.canUndo && !mode.canUndo()) {
       return;
     }
+    if (isChallenge && hearts === 0) {
+      return;
+    }
     if (mode.onUndo) {
       mode.onUndo();
     }
+    spendHeart();
     const snap = history.pop();
     board = new Map();
     for (const row of snap.tiles) {
@@ -585,6 +626,7 @@ window.Hex2 = (function () {
   const scoreEl = document.getElementById("score");
   const bestEl = document.getElementById("best");
   const undoBtn = document.getElementById("undo");
+  let heartsBox = document.getElementById("hearts");
 
   function updateScores() {
     scoreEl.textContent = score;
@@ -592,7 +634,40 @@ window.Hex2 = (function () {
   }
 
   function updateUndo() {
-    undoBtn.disabled = history.length === 0;
+    undoBtn.disabled = history.length === 0 ||
+      (isChallenge && hearts === 0);
+  }
+
+  // three base slots that hollow out as they empty, then earned hearts on the
+  // end; absent entirely outside challenge mode
+  function updateHearts() {
+    if (!heartsBox) {
+      return;
+    }
+    let out = "";
+    for (let i = 0; i < Math.max(START_HEARTS, hearts); i++) {
+      if (i < hearts) {
+        out += "♥";
+      } else {
+        out += "♡";
+      }
+    }
+    heartsBox.textContent = out;
+  }
+
+  function spendHeart() {
+    if (!isChallenge) {
+      return;
+    }
+    hearts = Math.max(0, hearts - 1);
+    updateHearts();
+    updateUndo();
+  }
+
+  function grantHeart() {
+    hearts = Math.min(MAX_HEARTS, hearts + 1);
+    updateHearts();
+    updateUndo();
   }
 
   function save() {
@@ -607,6 +682,7 @@ window.Hex2 = (function () {
       announcedWin: announcedWin,
       rng: rng,
       history: history,
+      hearts: hearts,
     }));
   }
 
@@ -633,6 +709,10 @@ window.Hex2 = (function () {
       if (Array.isArray(data.history)) {
         history = data.history.slice(-UNDO_DEPTH);
       }
+      hearts = START_HEARTS;
+      if (typeof data.hearts === "number") {
+        hearts = Math.min(MAX_HEARTS, Math.max(0, data.hearts));
+      }
       return board.size > 0;
     } catch (e) {
       return false;
@@ -646,6 +726,7 @@ window.Hex2 = (function () {
     announcedWin = false;
     history = [];
     idCounter = 1;
+    hearts = START_HEARTS;
     seedRng();
     if (mode.onReset) {
       mode.onReset();
@@ -654,6 +735,7 @@ window.Hex2 = (function () {
     spawn();
     spawn();
     updateScores();
+    updateHearts();
     updateUndo();
     save();
     drawStatic();
@@ -783,18 +865,21 @@ window.Hex2 = (function () {
   // own listeners, so there is no way to unload one at runtime - switching
   // reloads the page and lets the bootstrap pick the other file.
   function currentMode() {
-    if (store.get(MODE_KEY) === "jiggly") {
-      return "jiggly";
+    const m = store.get(MODE_KEY);
+    if (m === "jiggly" || m === "challenge") {
+      return m;
     }
     return "base";
   }
 
+  const NEXT_MODE = {
+    base: "challenge",
+    challenge: "jiggly",
+    jiggly: "base",
+  };
+
   function switchMode() {
-    if (currentMode() === "jiggly") {
-      store.set(MODE_KEY, "base");
-    } else {
-      store.set(MODE_KEY, "jiggly");
-    }
+    store.set(MODE_KEY, NEXT_MODE[currentMode()]);
     location.reload();
   }
 
@@ -805,14 +890,22 @@ window.Hex2 = (function () {
 
     const modeBtn = document.getElementById("mode");
     const modeName = document.getElementById("mode-name");
-    if (currentMode() === "jiggly") {
-      modeBtn.textContent = "Go to Normal";
-      modeName.textContent = "jiggly mode";
-    } else {
-      modeBtn.textContent = "Go to Jiggly";
-      modeName.textContent = "normal mode";
-    }
+    const LABELS = {
+      base: ["Go to Challenge", "normal mode"],
+      challenge: ["Go to Jiggly", "challenge mode"],
+      jiggly: ["Go to Normal", "jiggly mode"],
+    };
+    const here = currentMode();
+    isChallenge = here === "challenge";
+    modeBtn.textContent = LABELS[here][0];
+    modeName.textContent = LABELS[here][1];
     modeBtn.addEventListener("click", switchMode);
+
+    // the box only exists in challenge mode - not greyed, not empty, absent
+    if (heartsBox && !isChallenge) {
+      heartsBox.remove();
+      heartsBox = null;
+    }
 
     document.getElementById("newgame").addEventListener("click", reset);
     undoBtn.addEventListener("click", undo);
@@ -913,6 +1006,7 @@ window.Hex2 = (function () {
       spawn();
       save();
     }
+    updateHearts();
     updateUndo();
     drawStatic();
     startBreakTimer();
@@ -941,6 +1035,9 @@ window.Hex2 = (function () {
     spawn: spawn,
     save: save,
     settle: settle,
+    snapshot: snapshot,
+    shuffleBoard: shuffleBoard,
+    endGame: endGame,
 
     // painting helpers for a mode's drawTile
     beginFrame: beginFrame,

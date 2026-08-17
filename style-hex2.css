@@ -119,6 +119,26 @@
   #undo {
     margin-left: auto;
   }
+  /* fixed width for five, so it never resizes or nudges undo as it changes */
+  .hearts {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin-left: auto;
+    width: 104px;
+    min-height: 40px;
+    padding: 0 10px;
+    border: 1px solid var(--hex-line);
+    border-radius: 12px;
+    background: var(--hex-panel-2);
+    color: var(--hex-accent);
+    font-size: 16px;
+    letter-spacing: 0.08em;
+  }
+  /* undo keeps the right edge; the box sits just inside it */
+  .hearts + #undo {
+    margin-left: 8px;
+  }
   #mode {
     border-color: var(--hex-accent);
     color: var(--hex-accent);

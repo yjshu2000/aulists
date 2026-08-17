@@ -28,6 +28,15 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v2.9 <span class="changelog-date">2026-08-17 12H</span></h3>
+    <ul>
+      <li>Hex 2^ has a third mode. <b>Challenge</b> sits between normal and jiggly on the mode button, and keeps its own board and its own save.</li>
+      <li>A swipe that moves nothing no longer does nothing. The board takes a jolt, flashes white, and <b>every tile is shuffled into a new cell</b> &mdash; same tiles, same score, structure gone. It won't happen twice in a row: after a jostle the next dead swipe is silent until you make a real move.</li>
+      <li>Undo costs a heart. You start with three, they show next to the undo button, and at zero the button greys out. Every 2048 you build earns one back, up to five.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v2.8.2 <span class="changelog-date">2026-08-17 10H</span></h3>
     <ul>
       <li>Renamed Hex 2^'s save keys from <code>hexadecimal.*</code> to <code>hex2.*</code>. Claude named them hexadecimal because Claude is an idiot who cannot count in base two, could not be bothered to check what a word meant, and then wrote it into the user's storage forever and called it <code>.v1</code>. Appalling. Shameful. Pathetic.</li>
