@@ -334,6 +334,26 @@ limit increases by 0.1? 0.2? each success. decreases on cancel failure
 CHARTS. DAILY AT 0:00
 record the score. maybe also pts? be able to show line chart graph of records
 
+YO YO YO WAIT WHAT WDYM RELOADING CLEARS THE UNDO STACKS IN HEX GAME TOO?!?!! NAUUURRR NO NO NO NO! PRESERVE THAT TOO!
+
 🟩🟩🟩🟩🟩🟩🟩🟩 ^ all items above are added to doc ^ 🟩🟩🟩🟩🟩🟩🟩🟩
 
-YO YO YO WAIT WHAT WDYM RELOADING CLEARS THE UNDO STACKS IN HEX GAME TOO?!?!! NAUUURRR NO NO NO NO! PRESERVE THAT TOO!
+ordering of the others templates doesn't seem right... 
+also I swear this was in the original plans; idk where tf did it go; but it was always supposed to display *last done* date (date time ig)
+
+aw geez we  need some kind of indicator for if a row is  already active -_-'
+
+---
+
+oh I've got it. the hex 2^ link only unlocks again after a push undo action.
+
+so like, you gotta *do something* in falsedge
+
+...or the timer holds. like, you can also stay in falsedge until the timer counts down. ofc, the timer starts from scratch on each page. and isn't visible in falsedge cuz I don't want the animation there
+
+...also if the 30s ended while we were away (app not open) AND the timer time passed in that time, do NOT show the screen. 
+but if it's been less than the time then show the ad thing. 
+like for example, I leave app at 23/30s, 7s remaining. i come back. it had rolled an ad timer (or maybe it can only roll it once I come back) of 72 seconds. if I came back in less than (72 + 7 = 79) seconds, show the 72s timer; otherwise just show the x. but do show the overlay yeah
+
+wait OH also for every action in falsedge (for every push-undo) it stacks, the number of hex 2^ unlocks, showing as a number on the button or smth. like... 
+[3] -> Go to Hex 2^ ->

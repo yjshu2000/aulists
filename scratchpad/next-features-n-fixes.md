@@ -57,33 +57,40 @@ Promotion is irreversible. Undo is the only way back, and otherwise the only exi
 
 The square is inert while a cooldown is running or the concurrent cap is already met, so at rest it sits permanently fully lit — a closed ring is the normal state, not a special one.
 
-### [i8] Spend row: backdating, bulk buy, multiline ⬜
+### [i8] Spend row: backdating, bulk buy, multiline ⬜ 🆗
 
-The row becomes `[text field] [pts cost] [×N] [spend]`, with a date picker on its own line above it.
+The row grows to two lines and gains a date, a multiplier, and a draft clear.
 
 **Backdating.** A spend is still *appended* to the ledger at the position corresponding to when it was logged (creation order, same as today), but the date stamped on the entry can be set into the past — recording when the money was actually spent, not when it was logged. A spend entry's stamped date and its position in the ledger array can therefore disagree: an entry near the end of the ledger can carry an earlier date than one before it.
 
-**UI.** A native date-picker input on its own new line, defaulting to today, sitting between the "log spent points" label and the row's existing controls — not merged into that controls row.
+**UI.** Two rows. Text, cost and `×N` on the first; the date picker, `[clear draft]` and `[spend]` on the second.
 
 ```
 ┌────────────────────┐
 │ Current pts: 42  ^ │
 └────────────────────┘
 log spent points
-[ 2026-08-03 📅 ]
-[ text field         ]  [cost▾]  [×N▾]  [spend]
+
+[ text field         ]  [cost▾]  [×N▾]
+[ (date picker - blank by default for today) ] [clear draft] [spend]
 ┌────────────────────┐
 │ Current scr: 127 > │
 └────────────────────┘
 ```
 
-**Ledger text.** The date becomes a new second line, sitting between the text and the `pts` line — the same position a task entry's `by` line occupies:
+The date input is **blank by default, meaning today** — it is not pre-filled. The draft stores `""` for that, and a blank resolves to today at the moment `[spend]` is tapped. Its maximum is today: the field backdates only, never forward.
+
+`[clear draft]` wipes all four fields at once — text, cost, `×N`, and the date back to blank. Undoable, so no confirmation, exactly like SET's.
+
+**Ledger text.** The date becomes a new second line, sitting between the text and the `pts` line — the same position a task entry's `by` line occupies. It is printed on every spend, including one logged for today:
 
 ```
 new headphones
 on 2026-08-03
 pts = 45 - 50 = -5
 ```
+
+At `N = 1` no multiplier appears anywhere — not on the text line, not in the arithmetic. A single-unit spend reads exactly as it does today, plus the new `on` line.
 
 **`pts cost`** becomes a combined dropdown + text input (`<input list>` + `<datalist>`) and shrinks in width. Its suggestions are the 10 most-frequently-used cost values, sorted by numerical value in the dropdown itself, not by frequency.
 
@@ -98,6 +105,10 @@ chips ×3
 on 2026-08-03
 pts = 45 - 10×3 = 15
 ```
+
+An empty `×N` is read as 1 rather than blocking the row: `[spend]` stays gated on text and a positive integer cost alone, exactly as it is today.
+
+All four fields persist in `spendDraft`, so a half-written spend survives a reload the way text and cost already do.
 
 ### [i13] Swap homepage to Falsedge ⚪ 🆗
 

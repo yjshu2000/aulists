@@ -1174,6 +1174,20 @@
   }
 
   /**
+   * The "completed by:" text: a bare clock time, or a full date and time when
+   * the completion fell on a different day than the deadline.
+   * @param {Object} task - the task being resolved.
+   * @param {Date} when - the effective completion moment.
+   * @returns {string} the formatted moment.
+   */
+  function completedByText(task, when) {
+    if (dayKey(when) === dayKey(new Date(task.deadline))) {
+      return hhmm(when);
+    }
+    return fmtDateTime(when);
+  }
+
+  /**
    * Completes a task at the present moment, awarding whatever tier is live
    * right now - including 0 once every tier has passed.
    * @param {string} id - the task id.
@@ -1188,7 +1202,7 @@
     var byText = "none (failed)";
     if (idx !== -1) {
       award = tiers[idx].pts + earlyBonus(task, now);
-      byText = hhmm(now);
+      byText = completedByText(task, now);
     }
     resolveTask(id, now, award, byText, "complete", "complete now");
   }
@@ -1205,8 +1219,8 @@
     if (!task) return;
     var tier = tierList(task)[tierIndex];
     if (!tier) return;
-    resolveTask(id, tier.at, tier.pts, hhmm(tier.at), "complete",
-      "completed before");
+    resolveTask(id, tier.at, tier.pts, completedByText(task, tier.at),
+      "complete", "completed before");
   }
 
   /**
