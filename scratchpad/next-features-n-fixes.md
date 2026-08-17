@@ -199,23 +199,52 @@ Aulists already has exactly this and is the model to copy: `exportJSON()` (`JSON
 
 ## Hex 2^
 
-### [i24] Focused mode ⬜ 🟢
+### [i24] Challenge mode ⬜ 🟢 🆗
 
-A third mode alongside normal and jiggly, in a new `hex2-focused.js`. Branches off normal in the code sense — it copies `hex2-base.js`'s slide-then-pop animation model, not jiggly's continuous wobble. Own save key (`hex2.focused.save.v1`, the good prefix, since it is new), shares `hexadecimal.best.v1` for high scores.
+A third mode alongside normal and jiggly, in a new `hex2-challenge.js`. Branches off normal in the code sense — it copies `hex2-base.js`'s slide-then-pop animation model, not jiggly's continuous wobble. Own save key (`hex2.challenge.save`, matching the naming the rename settles on rather than the `hexadecimal.*` keys it replaces), shares the high score table with the other modes.
 
-The mode button cycles normal → focused → jiggly → normal.
+The mode button cycles normal → challenge → jiggly → normal.
 
-**The jostle.** A swipe that moves nothing — `applyMove().moved === false`, the case that is a silent no-op in every other mode — instead jostles the board: one explosion-like jolt, a white flash that fades out, and **every tile is shuffled into a new cell**. The multiset of tiles is untouched; only their positions change. Nothing is gained, nothing is lost, your structure is destroyed. Not a penalty in points, a penalty in shape.
+**The jostle.** A swipe where `applyMove().moved === false` jostles the board: one explosion-like jolt, a white flash that fades out, and **every tile is shuffled into a new cell**. The multiset is untouched — positions only, no spawn, no score change.
 
-A jostle pushes an undo snapshot, in focused mode only, so it can be undone like any move. This is the one place the mode diverges from the rest of the codebase's rule that only `commit()` snapshots.
+A jostle pushes an undo snapshot. This is the one place in the codebase where something other than `commit()` snapshots.
 
-**Hearts.** Three to start. Nothing else in the mode costs a heart — **only undo does, at 1 heart per use**. The jostle is free; undoing it is what you pay for. That is the whole tension: flailing costs nothing directly, but the board it leaves you is bad enough that you buy your way back, and the buying is finite. At zero hearts the undo button simply greys out. Hearts are undo currency, not a life bar — focused mode adds no new way to die, and the run still ends only when no move is possible.
+**Hearts.** Three to start. Nothing else in the mode costs a heart — **only undo does, at 1 heart per use**. The jostle is free; undoing it is what you pay for. That is the whole tension: flailing costs nothing directly, but the board it leaves you is bad enough that you buy your way back, and the buying is finite. At zero hearts the undo button simply greys out. Hearts are undo currency, not a life bar — challenge mode adds no new way to die beyond a jostle that scrambles the board dead.
 
-A merge that lands on a **2048** tile grants +1 heart. Detected off `mergedDests` at commit time, so there is no counter to persist — a 2048 exists only because two 1024s merged.
+A merge that lands on a **2048** tile grants +1 heart, up to a hard cap of 5. A 2048 earned at 5 grants nothing. Detected off `mergedDests` at commit time, so there is no counter to persist — a 2048 exists only because two 1024s merged.
 
-Hearts sit outside the undo snapshot. They must not rewind, or undo would refund its own cost.
+Hearts sit outside the undo snapshot. They must not rewind, or undo would refund its own cost. They *are* written to the save blob, so a run survives the app closing exactly as the board and score do. `reset()` puts them back to three.
 
-**Undecided:** whether the shuffle uses the existing seeded `rng` (which snapshots, so undoing and re-jostling reproduces the same shuffle and cannot be re-rolled) or `Math.random` (a fresh shuffle every time, which lets a player spend hearts re-rolling for a good board). Also open: whether a jostle re-runs the game-over check, since a shuffle can leave a full board with no moves.
+**Display.** A box on the undo button's row, left of the button and also right aligned (slight gap in between undo and itself).
+
+The box carries no label, only the glyphs, and is **fixed size** — wide enough for five, with the glyphs **left aligned** inside it, so it never resizes or shifts the undo button as hearts come and go. It takes the panel styling the rest of the header uses: `--hex-panel-2` fill, `--hex-line` border, the same 12px radius and 40px min-height as `.hexbtn`, so it sits level with the button beside it.
+
+The glyphs are the text characters **♥ (U+2665)** filled and **♡ (U+2661)** empty — not emoji. Both states are `var(--hex-accent)`. They sit a little larger than the button text, around 16px against `.hexbtn`'s 13px, with the box's vertical padding reduced to match, so the glyphs fill it without making it taller than its neighbour.
+
+Three base slots are always drawn, filling with ♡ as they empty; hearts above three appear as extra ♥ on the end. 
+
+It updates instantly on gain or loss, with no animation. It does not exist at all in normal or jiggly mode — not greyed, not empty, absent.
+
+```
+0  ♡ ♡ ♡
+1  ♥ ♡ ♡
+2  ♥ ♥ ♡
+3  ♥ ♥ ♥      start
+4  ♥ ♥ ♥ ♥
+5  ♥ ♥ ♥ ♥ ♥  cap
+```
+
+**The shuffle uses the existing seeded `rng`,** not `Math.random`, so it snapshots with everything else.
+
+**No two jostles in a row.** A jostle disarms itself: the next dead swipe is a silent no-op, exactly as in normal mode. Any live swipe re-arms it.
+
+**The jolt is an impact, not a wobble.** One large displacement, one much smaller counter-swing, over in about 250ms. No sustained oscillation, no squash, no rotation. Do not reuse jiggly's `BLOCK_*` curve — that is a 520ms damped quiver with `BLOCK_SQUASH` and `BLOCK_ROT` on top, and copying it gives jiggly with a flash on it.
+
+The white flash covers the canvas only, not the whole viewport.
+
+**A jostle re-runs the game-over check.** A shuffle can scramble a live board into one with no legal moves, and with consecutive jostles blocked there is no way out of that, so the run has to end there. Reaching it is very unlikely — a full board is hard to get to in this game at all — but without the check the run would neither end nor continue.
+
+**This is not only a new file — `hex2-core.js` needs three changes.** `snapshot()` is not on the `Hex2` export list and has to be, or a jostle cannot push an undo entry. `updateUndo()` is `undoBtn.disabled = history.length === 0` and has to consult `mode.canUndo` too, or at zero hearts the button looks live and silently does nothing. `save()` and `load()` write a fixed field list and need a way to carry hearts. `mode.onUndo` and `mode.onReset` already exist and fire where hearts need to change.
 
 
 ## Multi-page items
