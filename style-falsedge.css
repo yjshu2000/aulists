@@ -539,11 +539,7 @@
     color: var(--muted);
     margin: 10px 0;
   }
-  /* mirrored, because stupid Unicode has right-then-up but not left-then-up */
-  .row-out-mark {
-    display: inline-block;
-    margin-right: 6px;
-    transform: scaleX(-1);
+  .row-isout .tpl-text {
     color: var(--c-sky);
   }
   .tpl-adder {

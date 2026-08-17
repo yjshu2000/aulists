@@ -2662,13 +2662,10 @@
     var r = findRow(kind, id);
     var now = getNow();
     var row = el("div", "tpl-row");
-    var textBox = el("div", "tpl-text");
     if (kind === "others" && rowIsOut(id)) {
       row.classList.add("row-isout");
-      textBox.appendChild(el("span", "row-out-mark", "⤴"));
     }
-    textBox.appendChild(document.createTextNode(r.text));
-    row.appendChild(textBox);
+    row.appendChild(el("div", "tpl-text", r.text));
     if (kind === "others") {
       var left = cooldownLeft(r, now);
       if (left > 0) {
