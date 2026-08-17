@@ -315,7 +315,8 @@
       templates: [],
       others: [],
       setDraft: { text: "", time: null, mode: null, date: "" },
-      spendDraft: { text: "", cost: null },
+      spendDraft: { text: "", cost: null, count: null, date: "" },
+      spendCostCounts: {},
       lastCopyAt: null,
       ledgerCollapsed: true
     };
@@ -361,6 +362,20 @@
       if (typeof raw.spendDraft.cost === "number") {
         s.spendDraft.cost = raw.spendDraft.cost;
       }
+      if (typeof raw.spendDraft.count === "number") {
+        s.spendDraft.count = raw.spendDraft.count;
+      }
+      if (typeof raw.spendDraft.date === "string") {
+        s.spendDraft.date = raw.spendDraft.date;
+      }
+    }
+    if (raw.spendCostCounts && typeof raw.spendCostCounts === "object") {
+      Object.keys(raw.spendCostCounts).forEach(function (k) {
+        var n = raw.spendCostCounts[k];
+        if (/^\d+$/.test(k) && typeof n === "number" && n > 0) {
+          s.spendCostCounts[k] = n;
+        }
+      });
     }
     if (typeof raw.lastCopyAt === "string") s.lastCopyAt = raw.lastCopyAt;
     if (typeof raw.ledgerCollapsed === "boolean") {
@@ -878,16 +893,24 @@
   }
 
   /**
-   * Pre-renders a spend's ledger entry: the text and the `pts` line only,
-   * since nothing else moved.
+   * Pre-renders a spend's ledger entry. No `scr` line, since nothing else
+   * moved. The multiplier is omitted entirely at a count of 1.
    * @param {string} text - what the points were spent on.
-   * @param {number} cost - points spent.
+   * @param {number} cost - points spent per unit.
+   * @param {number} count - units bought.
+   * @param {string} day - the date the spend is stamped with, "YYYY-MM-DD".
    * @param {number} oldPts - `pts` before the spend.
    * @returns {string} the finished entry.
    */
-  function spendEntryText(text, cost, oldPts) {
-    return text + "\npts = " + fmtPts(oldPts) + " - " + cost +
-      " = " + fmtPts(oldPts - cost);
+  function spendEntryText(text, cost, count, day, oldPts) {
+    var head = text;
+    var owed = cost;
+    if (count > 1) {
+      head = text + " ×" + count;
+      owed = cost + "×" + count;
+    }
+    return head + "\non " + day + "\npts = " + fmtPts(oldPts) + " - " +
+      owed + " = " + fmtPts(oldPts - cost * count);
   }
 
   /**
@@ -1059,20 +1082,81 @@
   }
 
   /**
-   * Subtracts a cost from `pts`, leaves `scr` alone, and appends a spend entry
-   * to the ledger. `pts` is allowed to go negative.
-   * @param {string} rawText - what the points were spent on.
-   * @param {*} rawCost - the raw cost input value.
+   * Reads a raw `×N` input, treating anything invalid as a single unit.
+   * @param {*} raw - the raw input value.
+   * @returns {number} the count, at least 1.
    */
-  function doSpend(rawText, rawCost) {
+  function spendCount(raw) {
+    if (!positiveInt(raw)) {
+      return 1;
+    }
+    return parseInt(String(raw).trim(), 10);
+  }
+
+  /**
+   * Subtracts cost × count from `pts`, leaves `scr` alone, and appends a spend
+   * entry to the ledger. `pts` is allowed to go negative. A blank date means
+   * today, resolved here rather than when the field was filled in.
+   * @param {string} rawText - what the points were spent on.
+   * @param {*} rawCost - the raw per-unit cost input value.
+   * @param {*} rawCount - the raw `×N` input value.
+   * @param {string} rawDate - "YYYY-MM-DD", or "" for today.
+   */
+  function doSpend(rawText, rawCost, rawCount, rawDate) {
     var text = rawText.trim();
     if (!text) return;
     if (!positiveInt(rawCost)) return;
     var cost = parseInt(String(rawCost).trim(), 10);
+    var count = spendCount(rawCount);
+    var day = rawDate;
+    if (!day) {
+      day = dayKey(getNow());
+    }
     pushUndo("spend");
-    state.ledger.push(spendEntryText(text, cost, state.pts));
-    state.pts = state.pts - cost;
-    state.spendDraft = { text: "", cost: null };
+    state.ledger.push(spendEntryText(text, cost, count, day, state.pts));
+    state.pts = state.pts - cost * count;
+    bumpSpendCost(cost);
+    state.spendDraft = { text: "", cost: null, count: null, date: "" };
+    save();
+    render();
+  }
+
+  /**
+   * Counts one use of a cost value, for the `pts cost` suggestion list.
+   * @param {number} cost - the per-unit cost just spent.
+   */
+  function bumpSpendCost(cost) {
+    var key = String(cost);
+    if (!state.spendCostCounts[key]) {
+      state.spendCostCounts[key] = 0;
+    }
+    state.spendCostCounts[key] += 1;
+  }
+
+  /**
+   * The 10 most-used cost values, sorted numerically rather than by frequency.
+   * @returns {number[]} the suggestions.
+   */
+  function topSpendCosts() {
+    var keys = Object.keys(state.spendCostCounts);
+    keys.sort(function (a, b) {
+      return state.spendCostCounts[b] - state.spendCostCounts[a];
+    });
+    var top = keys.slice(0, 10).map(function (k) {
+      return parseInt(k, 10);
+    });
+    top.sort(function (a, b) {
+      return a - b;
+    });
+    return top;
+  }
+
+  /**
+   * Wipes all four spend draft fields at once. Undoable, so no confirmation.
+   */
+  function clearSpendDraft() {
+    pushUndo("clear spend draft");
+    state.spendDraft = { text: "", cost: null, count: null, date: "" };
     save();
     render();
   }
@@ -1094,7 +1178,7 @@
   /**
    * Writes one field of the spend draft, on the same changed-only rule as the
    * SET draft.
-   * @param {string} field - "text" or "cost".
+   * @param {string} field - "text", "cost", "count" or "date".
    * @param {*} value - the new value.
    */
   function writeSpendDraft(field, value) {
@@ -1822,25 +1906,35 @@
   function buildSpendRow() {
     var row = el("div", "spend-row");
     row.appendChild(el("div", "spend-label", "log spent points"));
+
     var controls = el("div", "spend-controls");
     var text = buildTextArea("spend-text", state.spendDraft.text);
     text.id = "spendText";
     text.placeholder = "spent on";
-    var cost = el("input", "spend-cost");
-    cost.type = "number";
-    cost.min = "1";
-    cost.step = "1";
-    cost.placeholder = "pts cost";
-    if (state.spendDraft.cost !== null) {
-      cost.value = state.spendDraft.cost;
-    }
+    var cost = buildSuggestInput("spend-cost", "pts cost",
+      state.spendDraft.cost, topSpendCosts(), "spendCostList", controls);
+    var count = buildSuggestInput("spend-count", "×N",
+      state.spendDraft.count, [1, 2, 3, 4, 5, 6, 7, 8, 9], "spendCountList",
+      controls);
+    controls.appendChild(text);
+    controls.appendChild(cost);
+    controls.appendChild(count);
+    row.appendChild(controls);
+
+    var second = el("div", "spend-controls");
+    var date = el("input", "spend-date");
+    date.type = "date";
+    date.max = dayKey(getNow());
+    date.value = state.spendDraft.date;
+    var clearBtn = el("button", "btn", "clear draft");
     var btn = el("button", "btn", "spend");
+
     /**
      * Greys `[spend]` unless the row holds text and a positive integer cost.
+     * `×N` never gates it - a blank one just means one.
      */
     function refresh() {
-      var ok = text.value.trim() !== "" && positiveInt(cost.value);
-      btn.disabled = !ok;
+      btn.disabled = !(text.value.trim() !== "" && positiveInt(cost.value));
     }
     text.addEventListener("input", refresh);
     cost.addEventListener("input", refresh);
@@ -1848,21 +1942,70 @@
       writeSpendDraft("text", text.value);
     });
     cost.addEventListener("change", function () {
-      var v = null;
-      if (positiveInt(cost.value)) {
-        v = parseInt(cost.value.trim(), 10);
-      }
-      writeSpendDraft("cost", v);
+      writeSpendDraft("cost", intOrNull(cost.value));
     });
+    count.addEventListener("change", function () {
+      writeSpendDraft("count", intOrNull(count.value));
+    });
+    date.addEventListener("change", function () {
+      writeSpendDraft("date", date.value);
+    });
+    clearBtn.addEventListener("click", clearSpendDraft);
     btn.addEventListener("click", function () {
-      doSpend(text.value, cost.value);
+      doSpend(text.value, cost.value, count.value, date.value);
     });
     refresh();
-    controls.appendChild(text);
-    controls.appendChild(cost);
-    controls.appendChild(btn);
-    row.appendChild(controls);
+    second.appendChild(date);
+    second.appendChild(clearBtn);
+    second.appendChild(btn);
+    row.appendChild(second);
     return row;
+  }
+
+  /**
+   * Parses an input's value as a positive integer.
+   * @param {*} v - the raw value.
+   * @returns {number|null} the integer, or null if it isn't one.
+   */
+  function intOrNull(v) {
+    if (!positiveInt(v)) {
+      return null;
+    }
+    return parseInt(String(v).trim(), 10);
+  }
+
+  /**
+   * Builds a number field backed by a `<datalist>`, so it takes a free-typed
+   * value or one picked off the dropdown.
+   * @param {string} cls - the input's class.
+   * @param {string} placeholder - placeholder text.
+   * @param {number|null} value - the starting value.
+   * @param {number[]} options - the suggestions, in display order.
+   * @param {string} listId - id shared by the input and its datalist.
+   * @param {Element} parent - node the datalist is appended to; an <input> is
+   *   void and cannot hold it.
+   * @returns {Element} the input.
+   */
+  function buildSuggestInput(cls, placeholder, value, options, listId,
+    parent) {
+    var box = el("input", cls);
+    box.type = "number";
+    box.min = "1";
+    box.step = "1";
+    box.placeholder = placeholder;
+    box.setAttribute("list", listId);
+    if (value !== null) {
+      box.value = value;
+    }
+    var list = el("datalist");
+    list.id = listId;
+    options.forEach(function (n) {
+      var opt = el("option");
+      opt.value = n;
+      list.appendChild(opt);
+    });
+    parent.appendChild(list);
+    return box;
   }
 
   /**

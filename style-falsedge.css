@@ -217,7 +217,19 @@
   }
   .spend-cost {
     flex: 0 0 auto;
-    width: 104px;
+    width: 88px;
+  }
+  .spend-count {
+    flex: 0 0 auto;
+    width: 62px;
+  }
+  .spend-date {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  /* the second row sits under the first, not beside it */
+  .spend-controls + .spend-controls {
+    margin-top: 8px;
   }
 
   /* high scores panel: floats over the page, nothing underneath reflows */

@@ -19,11 +19,18 @@
 
 **D8. Every item's heading ends with a tag.** ⬜ big task, ⚪ medium task, ▫️ minor or trivial to implement. 🐞 marks a bug fix rather than new work, and sits alongside a size tag rather than replacing it. Sub-items are tagged on their own merits, independently of their parent.
 
-**D9. 🆗 means buildable as-is, right now.** It is Claude's assertion about the item's completeness — not a priority, and not the user's approval to start. It says the item can be built start to finish with no further questions asked and no assumption made that could turn out wrong: every question that *could* be asked about it has already been asked and answered. It goes last in the heading, after the size tag. Its absence says nothing about importance — only that at least one detail would still have to be guessed at. A lack of an `**Undecided:**` block is *not* enough on its own to earn it, since an item can list no open questions and still leave something unwritten. Claude adds it; anything that raises a new question about the item strips it again.
+**D9. 🆗 means buildable as-is, right now.** It is Claude's assertion about the item's completeness — not a priority, and not the user's approval to start. It says the item can be built start to finish with no further questions asked and no assumption made that could turn out wrong: every question that *could* be asked about it has already been asked and answered. It goes last in the heading, after the priority. Its absence says nothing about importance — only that at least one detail would still have to be guessed at. A lack of an `**Undecided:**` block is *not* enough on its own to earn it, since an item can list no open questions and still leave something unwritten. Claude adds it; anything that raises a new question about the item strips it again.
+
+**D10. Every item also carries a priority, between the size tag and 🆗.** Legend listed below. Priority is the user's call, not Claude's — Claude assigns 🆗, the user assigns the colour. It says nothing about size or readiness: a 🔴 can be ⬜ and unspecced, a 🔵 can be ▫️ and 🆗. So a full heading reads `### [iN] Title ⬜ 🔴 🆗`.
+🔴 critical
+🟠 high/medium
+🟡 low but should
+🟢 extra/bonus
+🔵 far future
 
 ## Falsedge
 
-### [i5] DOLI (Double Or Lose It) mechanism ⬜
+### [i5] DOLI (Double Or Lose It) mechanism ⬜ 🔴
 
 Ships complete: state schema, scoring curve, limits, and the promotion control itself.
 
@@ -57,7 +64,7 @@ Promotion is irreversible. Undo is the only way back, and otherwise the only exi
 
 The square is inert while a cooldown is running or the concurrent cap is already met, so at rest it sits permanently fully lit — a closed ring is the normal state, not a special one.
 
-### [i8] Spend row: backdating, bulk buy, multiline ⬜ 🆗
+### [i8] Spend row: backdating, bulk buy, multiline ⬜ 🔴 🆗
 
 The row grows to two lines and gains a date, a multiplier, and a draft clear.
 
@@ -110,7 +117,7 @@ An empty `×N` is read as 1 rather than blocking the row: `[spend]` stays gated 
 
 All four fields persist in `spendDraft`, so a half-written spend survives a reload the way text and cost already do.
 
-### [i13] Swap homepage to Falsedge ⚪ 🆗
+### [i13] Swap homepage to Falsedge ⚪ 🟡 🆗
 
 Done as a file rename. The current `index.html` (Aulists) becomes `aulists.html`, and `falsedge.html` becomes `index.html`. Cross-links, `manifest.json`'s `start_url`, and `sw.js`'s `SHELL` list all get updated to match the new filenames.
 
@@ -118,17 +125,17 @@ Done as a file rename. The current `index.html` (Aulists) becomes `aulists.html`
 
 ### [i14] Complex tasks ⬜
 
-#### [i14.1] Multipliers and bonuses (exploratory) ⬜
+#### [i14.1] Multipliers and bonuses (exploratory) ⬜ 🟢
 
 Vague idea — support for multipliers on tasks, conditional on something unspecified. Not fleshed out.
 
-#### [i14.2] Event-anchored deadlines ⬜
+#### [i14.2] Event-anchored deadlines ⬜ 🟡
 
-Needed ASAP. A task can be set whose deadline isn't known at set time, because it hangs off an event that hasn't happened yet — "within 1h of check phone after wake", "within 1h of getting home (chimer resumes)". The event's real time is entered manually later, and the deadline is computed from it: enter `19:37` and the deadline resolves to `20:40`.
+A task can be set whose deadline isn't known at set time, because it hangs off an event that hasn't happened yet — "within 1h of check phone after wake", "within 1h of getting home (chimer resumes)". The event's real time is entered manually later, and the deadline is computed from it: enter `19:37` and the deadline resolves to `20:40`.
 
 **Undecided:** nearly all of it. The `19:37` → `20:40` example is +1h and then rounded up to the next 10-minute mark, which matches the app's existing 10-minute offset granularity, but that rounding rule was never stated outright. Also open: where the anchor phrase is authored, what the task displays before its event time is entered, whether the offset is fixed at 1h or configurable per task, whether scoring runs from the resolved deadline exactly as a normal task's does, and what happens if the event time is never entered at all.
 
-### [i16] Micro tasks (NL) ⬜
+### [i16] Micro tasks (NL) ⬜ 🟠
 
 A second, smaller class of task. `NL` (no leniency) *is* the micro-task marker — tagging an item NL hands it the whole package rather than only switching leniency off, so there is no separate "micro" toggle to set.
 
@@ -140,7 +147,7 @@ A second, smaller class of task. `NL` (no leniency) *is* the micro-task marker �
 - Cancelling works at either granularity: one micro task on its own, or the whole set at once.
 - DOLI does not apply to micro tasks — a +1 task is not worth a gamble slot.
 
-### [i17] Time since last active task ⚪
+### [i17] Time since last active task ⚪ 🟠
 
 A readout of how long there has been nothing active at all. It counts from the last task's *deadline*, not from when that task was resolved: a task due at 0:00 that went uncancelled until 8:00 shows `8h` the moment it clears, not `0h`.
 
@@ -148,7 +155,7 @@ Computed at render and refreshed only by a page refresh. Deliberately allowed to
 
 **Undecided:** where on the page it sits, and its exact wording.
 
-### [i19] Delete individual ledger entries ⚪
+### [i19] Delete individual ledger entries ⚪ 🟡
 
 An entry can be deleted on its own. Today the only way anything leaves `state.ledger` is `splice(0, batch.count)` after a copy-export, so a wrong entry is stuck the moment undo can no longer reach back to it.
 
@@ -156,19 +163,19 @@ Deletion runs through `pushUndo()` like every other mutation, so it lands in the
 
 **Undecided:** the control's shape and where it hangs off the entry box, and whether it needs a confirm step given deletion is undoable.
 
-### [i20] Date picker on further tasks ⚪
+### [i20] Date picker on further tasks ⚪ 🔴
 
 A further task shows a weekday (`TU`, `WE`) next to its clock time, and that day currently cannot be changed: `applyTaskEdit()` deliberately preserves the existing date because the editor only offers clock times (`falsedge.js:1047`). Add a native date input to the edit flow so the day itself can be moved.
 
 Same 1-week ceiling that applies to setting a further task in the first place. Pulling the date back into the next 24h must work too, since that is what un-further-ing a task means.
 
-### [i21] Daily score chart ⬜
+### [i21] Daily score chart ⬜ 🟡
 
 At 00:00 each day, record the day's score into a history array, then draw a line chart over those records.
 
 **Undecided:** whether points are recorded alongside score, how a 00:00 snapshot fires at all given the page only runs while open (most likely: on load, backfill every midnight that has passed since the last record), how far back the chart shows, and whether it lives on the Falsedge page or behind a link.
 
-### [i26] Export all app data ⚪
+### [i26] Export all app data ⚪ 🔴
 
 A full Falsedge state export — templates, ledger, points, scores, the lot — so data survives a device change or a breaking schema change without being retyped. D7 makes this load-bearing rather than a nicety: with no migration code ever, export → hand-edit → re-import is the *only* path through a schema change.
 
@@ -177,7 +184,7 @@ Aulists already has exactly this and is the model to copy: `exportJSON()` (`JSON
 
 ## Aulists
 
-### [i15] Strip down Aulists ⬜
+### [i15] Strip down Aulists ⬜ 🟡
 
 - Lists become `["1", "2", "3", "4"]`. List 0 and list 2.5 are removed; the current chain is `["0", "1", "2", "2.5", "3", "4"]`, so dropping them leaves a sequence that is already in order.
 - No migration code, ever (D7). Whatever sits in list 0 or list 2.5 at upgrade time simply stops being read or written by anything.
@@ -192,7 +199,7 @@ Aulists already has exactly this and is the model to copy: `exportJSON()` (`JSON
 
 ## Hex 2^
 
-### [i24] Focused mode ⬜
+### [i24] Focused mode ⬜ 🟢
 
 A third mode alongside normal and jiggly, in a new `hex2-focused.js`. Branches off normal in the code sense — it copies `hex2-base.js`'s slide-then-pop animation model, not jiggly's continuous wobble. Own save key (`hex2.focused.save.v1`, the good prefix, since it is new), shares `hexadecimal.best.v1` for high scores.
 
@@ -213,6 +220,6 @@ Hearts sit outside the undo snapshot. They must not rewind, or undo would refund
 
 ## Multi-page items
 
-### [i27] (low priority/far future) - Server side ⬜⬜⬜
+### [i27] (low priority/far future) - Server side ⬜⬜⬜ 🔵
 
 Storing data in server instead of locally. Would need to buy/rent server space or something... idk
