@@ -57,12 +57,16 @@ Promotion is irreversible. Undo is the only way back, and otherwise the only exi
 
 **Limits.** Promoting costs nothing — there is no cooldown on *setting* a DOLI task. Two limiters instead:
 
-- **Concurrent cap.** At most `floor(doliLimit)` DOLI tasks may be active at once. `doliLimit` starts at `1`. A completed DOLI adds `+0.2`; a cancelled or failed one subtracts `-0.5`. Five clean successes buy the next slot, and one cancel undoes two and a half of them. There is no ceiling. Floor is 1 obviously. Why the fuck is Claude narrating an entire odyssey about why it's 1 are you stupid? Are you stupid, Claude? Are yOU FCKING STUPID DO YOU NEED TO NARRATE WHY? CAN YOU TELL ME WHY WITHOUT THIS DOC NARRATING IT TO YOU? IS IT NOT FCKING OBVIOUS TO YOU?
+- **Concurrent cap.** At most `floor(doliLimit)` DOLI tasks may be active at once. `doliLimit` starts at `1`, floors at `1`, and has no ceiling. A completed DOLI adds `+0.2`; a cancelled or failed one subtracts `-0.5`.
 - **Cancel cooldown.** Cancelling/failing a DOLI task starts a **6 hour** cooldown during which nothing can be promoted. Completing a DOLI task immediately clears a running cooldown.
 
 A DOLI task cancelled from a dated `others` row takes **both** penalties: the existing 36h `COOLDOWN_MS` lock on that row, and the 6h DOLI cooldown. They are different scopes — the row lock stops re-activating that row, the DOLI cooldown stops promoting anything at all.
 
 The square is inert while a cooldown is running or the concurrent cap is already met, so at rest it sits permanently fully lit — a closed ring is the normal state, not a special one.
+
+**Undecided:** the tier system only has four rungs. `tierList()` zips `WL_OFFSETS`/`HL_OFFSETS` against `TIER_POINTS`, all length four, and `liveTierIndex()` returns `-1` past the last one, which every caller reads as "failed, award 0". DOLI's table needs six rungs and a `-6`, so both functions need a second shape and `-1` stops meaning what it means today.
+
+Negative awards have never run through `resolveTask()`. `taskEntryText()` branches on `award > 0 && ptsDelta === 0` and has no case for a negative, so the ledger line for a `-6` is unwritten.
 
 ### [i8] Spend row: backdating, bulk buy, multiline ⬜ 🔴 🆗
 
