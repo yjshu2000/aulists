@@ -1,8 +1,7 @@
 // Hex 2^ - challenge mode.
 //
-// Normal mode's slide-then-pop, except a swipe that moves nothing jostles the
-// board instead of doing nothing: one jolt, a white flash, and every tile
-// shuffled into a new cell. Undo costs a heart.
+// Normal mode's slide-then-pop, plus the jostle: a swipe that moves nothing
+// shakes the board, flashes white, and scatters every tile.
 
 (function () {
   "use strict";
@@ -97,8 +96,7 @@
     requestAnimationFrame(frame);
   }
 
-  // One hit and a small counter-swing, not a wobble: a single sine lobe with
-  // the tail inverted and scaled down. No squash, no rotation.
+  // one sine lobe, then its tail inverted and scaled down
   function joltOffset(t) {
     if (t < 0.4) {
       return Math.sin((t / 0.4) * Math.PI);
@@ -109,7 +107,6 @@
 
   // The board is already shuffled by the time this runs; the flash and shake
   // are cosmetic, so an interrupting swipe can cut them off safely.
-  // Full white for the first quarter, then a linear fade to nothing.
   function flashAlpha(t) {
     if (t <= FLASH_HOLD) {
       return FLASH_ALPHA;
@@ -117,8 +114,7 @@
     return FLASH_ALPHA * (1 - (t - FLASH_HOLD) / (1 - FLASH_HOLD));
   }
 
-  // The shake and the flash run on separate clocks - the board settles in
-  // JOLT_MS while the white lingers for FLASH_MS.
+  // separate clocks: the board settles in JOLT_MS, the white lasts FLASH_MS
   function animateJolt(then) {
     const start = performance.now();
     const angle = Math.random() * Math.PI * 2;

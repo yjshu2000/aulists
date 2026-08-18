@@ -15,6 +15,11 @@
   // cancelling a dated `others` activation locks that row out this long
   var COOLDOWN_MS = 36 * 60 * 60 * 1000;
   var TIER_POINTS = [6, 3, 2, 1];
+  // Leniency: minutes past the deadline that still score, one entry per tier.
+  // WL = whole leniency
+  // HL = half leniency
+  // NL = no leniency (not built yet)
+  // ML = mega leniency (not built yet)
   var WL_OFFSETS = [0, 10, 30, 60];
   var HL_OFFSETS = [0, 5, 15, 30];
   var DAY_ABBR = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];

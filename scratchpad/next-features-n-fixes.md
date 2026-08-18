@@ -193,6 +193,8 @@ The white flash covers the canvas only, not the whole viewport.
 
 **This is not only a new file — `hex2-core.js` needs three changes.** `snapshot()` is not on the `Hex2` export list and has to be, or a jostle cannot push an undo entry. `updateUndo()` is `undoBtn.disabled = history.length === 0` and has to consult `mode.canUndo` too, or at zero hearts the button looks live and silently does nothing. `save()` and `load()` write a fixed field list and need a way to carry hearts. `mode.onUndo` and `mode.onReset` already exist and fire where hearts need to change.
 
+### [i31] Mobile landscape-orientation compatibility 🟢
+game is broken in landscape right now but like whateverrr i dont play in landscape so who caaaares
 
 ## Multi-page items
 

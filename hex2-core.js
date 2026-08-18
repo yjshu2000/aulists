@@ -24,6 +24,9 @@ window.Hex2 = (function () {
   const START_HEARTS = 3;
   const MAX_HEARTS = 5;
   const HEART_TILE = 2048;
+  const CHALLENGE_EDGE = "#ff0000";
+  const OUTLINE_R = 0.1;     // gap off the board, as a share of a cell
+  const OUTLINE_W = 0.1;    // stroke width, also as a share of a cell
   const BREAK_MS = 30 * 1000;
   const FAKE_AD_MIN_MS = 30 * 1000;
   const FAKE_AD_MAX_MS = 120 * 1000;
@@ -62,11 +65,8 @@ window.Hex2 = (function () {
     },
   };
 
-  // Temporary. The save keys used to be named after base sixteen, for a game
-  // that runs in base two. Copies each old key to its new name once, and only
-  // when the new one is empty. Nothing is deleted: the old keys stay as a
-  // backup, so a failed copy shows an empty board rather than losing anything.
-  // Delete this whole block once the rename has been confirmed live.
+  // Temporary. Copies each old key to its new name when the new one is empty,
+  // and deletes nothing. Remove once the rename is confirmed live.
   (function migrateHexadecimalKeys() {
     const pairs = [
       ["hexadecimal.save.v1", "hex2.base.save"],
@@ -152,8 +152,7 @@ window.Hex2 = (function () {
   let history = [];          // undo snapshots, capped at UNDO_DEPTH
   let mode = null;           // the config object handed to boot()
   let saveKey = "";
-  // challenge mode only: undo currency, deliberately outside the snapshot so
-  // undoing cannot refund its own cost
+  // challenge only, and outside the snapshot so undo cannot refund its cost
   let hearts = START_HEARTS;
   // switching modes reloads the page, so this is fixed for the session
   let isChallenge = false;
@@ -373,6 +372,7 @@ window.Hex2 = (function () {
       });
     }
     layout = { size: size, pos: pos, cssW: cssW, cssH: cssH };
+    outlineRing = null;
 
     // The pad ring rides the board's own radius so a resize moves both.
     // --pad-inner is the ring's INNER edge, so thickening a pad only ever
@@ -471,6 +471,111 @@ window.Hex2 = (function () {
     ctx.restore();
   }
 
+  // neighbour across edge i, which runs from vertex 60i to vertex 60(i+1)
+  const EDGE_NEIGHBOURS = [
+    [1, -1, 0], [0, -1, 1], [-1, 0, 1],
+    [-1, 1, 0], [0, 1, -1], [1, 0, -1],
+  ];
+
+  // The board's boundary as one closed ring of points, walked by chaining
+  // each unbacked cell edge onto the next. Cached: it only moves on resize.
+  let outlineRing = null;
+
+  function buildOutlineRing() {
+    const step = [];               // vertex key -> the vertex it leads to
+    const at = new Map();
+    function key(p) {
+      return Math.round(p.x * 100) + "," + Math.round(p.y * 100);
+    }
+    for (const c of cells) {
+      const p = layout.pos.get(c.key);
+      for (let i = 0; i < 6; i++) {
+        const n = EDGE_NEIGHBOURS[i];
+        const nk = (c.x + n[0]) + "," + (c.y + n[1]) + "," + (c.z + n[2]);
+        if (cellIndex.has(nk)) {
+          continue;
+        }
+        const a1 = Math.PI / 180 * (60 * i);
+        const a2 = Math.PI / 180 * (60 * (i + 1));
+        const v1 = {
+          x: p.x + layout.size * Math.cos(a1),
+          y: p.y + layout.size * Math.sin(a1),
+        };
+        const v2 = {
+          x: p.x + layout.size * Math.cos(a2),
+          y: p.y + layout.size * Math.sin(a2),
+        };
+        at.set(key(v1), v1);
+        step[key(v1)] = key(v2);
+      }
+    }
+    const first = Object.keys(step)[0];
+    const ring = [];
+    let k = first;
+    do {
+      ring.push(at.get(k));
+      k = step[k];
+    } while (k !== first && ring.length < 64);
+    // edgeNormal assumes one winding; flip if the walk came out the other way
+    let area = 0;
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i];
+      const b = ring[(i + 1) % ring.length];
+      area += a.x * b.y - b.x * a.y;
+    }
+    if (area < 0) {
+      ring.reverse();
+    }
+    return ring;
+  }
+
+  // Slides every vertex along the bisector of its two edges, far enough that
+  // both edges end up `gap` from where they were. Corners stay sharp.
+  function offsetRing(ring, gap, dx, dy) {
+    const out = [];
+    for (let i = 0; i < ring.length; i++) {
+      const prev = ring[(i - 1 + ring.length) % ring.length];
+      const cur = ring[i];
+      const next = ring[(i + 1) % ring.length];
+      const n1 = edgeNormal(prev, cur);
+      const n2 = edgeNormal(cur, next);
+      let bx = n1.x + n2.x;
+      let by = n1.y + n2.y;
+      const len = Math.hypot(bx, by) || 1;
+      bx = bx / len;
+      by = by / len;
+      const reach = gap / Math.max(0.2, bx * n1.x + by * n1.y);
+      out.push({ x: cur.x + bx * reach + dx, y: cur.y + by * reach + dy });
+    }
+    return out;
+  }
+
+  // outward normal of a ring edge, given the ring runs clockwise on canvas
+  function edgeNormal(a, b) {
+    const ex = b.x - a.x;
+    const ey = b.y - a.y;
+    const len = Math.hypot(ex, ey) || 1;
+    return { x: ey / len, y: -ex / len };
+  }
+
+  function drawBoardOutline(dx, dy) {
+    if (!outlineRing) {
+      outlineRing = buildOutlineRing();
+    }
+    const pts = offsetRing(outlineRing, layout.size * OUTLINE_R, dx, dy);
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) {
+      ctx.lineTo(pts[i].x, pts[i].y);
+    }
+    ctx.closePath();
+    ctx.lineWidth = Math.max(2, layout.size * OUTLINE_W);
+    ctx.strokeStyle = CHALLENGE_EDGE;
+    ctx.lineJoin = "miter";
+    ctx.miterLimit = 4;
+    ctx.stroke();
+  }
+
   // Empty cells only, optionally shoved by (ox, oy). Opens a frame that the
   // caller closes with endFrame() after painting its own tiles.
   function drawBoardBase(ox, oy) {
@@ -480,6 +585,9 @@ window.Hex2 = (function () {
     for (const c of cells) {
       const p = layout.pos.get(c.key);
       drawEmpty(p.x + dx, p.y + dy, layout.size);
+    }
+    if (isChallenge) {
+      drawBoardOutline(dx, dy);
     }
   }
 
@@ -511,10 +619,7 @@ window.Hex2 = (function () {
     updateUndo();
   }
 
-  // Scatters every tile across the whole board, not just the cells that were
-  // already occupied - any of the 19 is equally likely, including the one a
-  // tile started on. Fisher-Yates over the cell keys, off the seeded rng so it
-  // rewinds with everything else. The multiset is untouched, positions only.
+  // every tile to a random cell of all 19; seeded rng, so undo rewinds it
   function shuffleBoard() {
     const tiles = [];
     for (const entry of board) {
@@ -641,8 +746,7 @@ window.Hex2 = (function () {
       (isChallenge && hearts === 0);
   }
 
-  // three base slots that hollow out as they empty, then earned hearts on the
-  // end; absent entirely outside challenge mode
+  // three base slots hollow out as they empty; earned hearts append
   function updateHearts() {
     if (!heartsBox) {
       return;
@@ -904,7 +1008,6 @@ window.Hex2 = (function () {
     modeName.textContent = LABELS[here][1];
     modeBtn.addEventListener("click", switchMode);
 
-    // the box only exists in challenge mode - not greyed, not empty, absent
     if (heartsBox && !isChallenge) {
       heartsBox.remove();
       heartsBox = null;
