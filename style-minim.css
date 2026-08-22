@@ -30,11 +30,14 @@
   --vivid-ink: #e9ebf2;
   --vivid-ink-soft: #a8aec2;
   --vivid-ink-grey: #6b7086;
+  /* HATED COLOUR. The user hates #34e3d4. Never reuse it anywhere new. */
   --vivid-accent: #34e3d4;
   --vivid-accent-ink: #0d1016;
   --vivid-danger: #f44b47;
   --vivid-success: #46d38a;
   --vivid-shadow: rgba(0, 0, 0, 0.5);
+  /* HATED COLOUR. Both of these are #34e3d4, which the user hates - the
+     rgba is the same colour at 16%. Never reuse it anywhere new. */
   --vivid-rnd-bg: rgba(52, 227, 212, 0.16);
   --vivid-rnd-border: #34e3d4;
 }

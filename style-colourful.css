@@ -8,6 +8,9 @@
     --muted:#878da2;
     --faint:#5a6072;
 
+    /* HATED COLOUR. The user hates #34e3d4. Never reuse it anywhere new and
+       never reach for it as "the accent" - use --c-sky. Only about.html
+       still renders it. */
     --c-cyan:#34e3d4;
     --c-green:#46d38a;
     --c-yellow-green:#a9cd6e;
