@@ -357,3 +357,159 @@ wait OH also for every action in falsedge (for every push-undo) it stacks, the n
 [3] -> Go to Hex 2^ ->
 
 🟩🟩🟩🟩🟩🟩🟩🟩 ^ all items above are added to doc ^ 🟩🟩🟩🟩🟩🟩🟩🟩
+
+ouuuhhh something about uuhhh DOLI tasks are +4 instead of +2 for early (like for each 24h early)... hrmm that's pretty OP we should make DOLI tasks more limited...
+
+also we uhhh also something about killing all failed path. didnt finish in time -> just cancel it man whatever. lastDone isn't that strict nor accuracy needed 
+
+uuhh also the ad timer freezes when leave app and come back but like whatever man i dont feel like any falsedge thing works well so whatever. i mean like the coming back from falsedge thing. whatever.
+
+ML (mega leniency) was supposed to be for declinations of days instead of within hours, but it's kinda useless for now and not good for the balancing so whatever.  just a reserved acronym.
+
+------
+
+yooo 
+so that coworker guy (our singular player base) pointed out that if we just let it keep shuffling intentionally then it can eventually settle back into something favourable again. well. damn. maybe we should cap the jostle at at most every 32 swipes. so like a cooldown. like if there's been a jostle then there has to be 32 swipes before the next one can trigger another jostle.
+
+then it'll be really punishing mode >:p 
+— 2026-08-19 08:49
+ooouhhh I finally got better idea for DOLI balancing.
+6 day cooldown on promoting a task at all. success reduces cooldown by 6h. (wait the immediate cooldown or the cooldown number?) (ermmm. hrm. haven't figured that out yet.) 
+...why not just make the cooldown absolutely minimum 18h... or even 24h... probably 18 if anything. so even on success or anything. must wait at least 18h from last promoting task. can only promote at most every 18h. yeah  .... then it's like... at most 1 a day right...? 
+the concurrency limit can stay. and with the increase reward. that's fine. 
+
+oh also completing early rewards +1 instead of +2. scales down actually bcuz the base is too high
+no, wait. screw this. why not once per calendar. 1 promotion per calendar day allowed
+although I kinda also liked the idea of like... being able to stack them but only if you collect them - like, once a promotion is available, you can tap icon to "promote a task" but one of the options in that mode is "save to bank" or inventory or smth. 
+
+that way it's every 18 or 24h or whatever  but you can also stock up only if you actively play (so no reward for inactivity or ignoring it)
+actually no that's stupid.
+— 2026-08-19 08:52
+we should just go with this actually T-T
+— 2026-08-19 20:06
+---
+
+
+NEW HEX GAME MODE IDEA.
+
+CONTINUOUS. you swipe a direction and the game continues moving in that direction (as if you kept swiping the same direction) until no more moves or merges.
+
+this isn't really harder or easier I think... just faster... 
+---
+— 2026-08-19 20:13
+we finally figured out condition for streak broke.
+
+no tasks completed in 48h. "completed before" counts as the completed before time, ofc. it's not 48h of not hitting the complete button or whatever. 
+
+also ofc we can submit vacation time but only ahead of time. vacation time is a date only (no time granularity). can be 1 day or more. probably using the calendar picker and a "from" "to" field. "to" defaults to same day (ie  1 day). 
+
+the 48h resumes the 0:00 of after vacation day.
+
+btw the streak broke button will still exist but this makes it so there can be active (further) tasks and still streak can be broken. 
+no wait no.
+since tasks can be backdated, the streak broke status is actually tentative until confirmed or until all tasks that could have saved it are canceled. for example, 
+let's start on Monday. tasks set for Tuesday and Wednesday. we don't check in on the app until Thursday. somewhere in UI (not sure where yet) it says "streak broke?"  probably in red probably a lil faint (not actually faint tho just slightly)
+now two paths:
+1, I complete (backdate) the Tuesday or Wednesday tasks. the streak broke text goes away. 
+or 2, I cancel the Tuesday and Wednesday tasks. toast in RED: "streak broke". center of screen. so I guess not rly toast. not the same CSS for sure. 
+immediately change score to zero and all that. 
+
+ofc, if I undo cancel task that'll undo all of that.
+
+
+btw I'm just using Tuesday and Wednesday as examples. it should have 48h exact granularity, not follow calendar dates. if the last completed task was actually Monday 8am, then completing a task backdating to Wednesday 10am ain't gonna cut it. 
+— 2026-08-19 20:30
+---
+also finally FINALLY FIGURED OUT WHAT I WANT WITH THE COOLDOWN BETWEEN FALSEDGE AND HEX2^.
+
+10 seconds. 10s cooldown when falsedge loads, on the go to hex 2^ button; shows as a bar filling or smth idk, not numbers tho. it can tic once a second idk unless it's not too bad to animate? idk. I just hope this isn't tearing the whole thing down to animate one part y'know. 
+
+anyway. ok. yeah. 10 seconds. enough to have to pause, but much shorter than the minimums to stay in hex game.
+— Yesterday at 05:35
+---
+— Yesterday at 05:36
+y'know what. let's actually do the add 1 blocks thing. 
+like actual number 1. 1+1=2 after all.
+
+only on the jostle thing 
+— Yesterday at 05:48
+---
+oh heck we've been thinking about this one but I don't think we've outlined it properly yet.
+
+custom task setting (with custom rewards and everything). 
+
+I'm not sure about the UI yet. probably smth branching off of set block like smth to toggle or smth...
+
+then, you can set the exact pts award, leniency tiers (still including the defaults), etc. everything editable. actually no. that's overcomplicated actually. 
+
+simpler.
+
+task text, deadline, pts awarded... these are all literally just free text. heck, there's not even real deadline. custom tasks are positioned either pinned to top or bottom of the list of active tasks. actually maybe even top of soon, bottom of soon, or bottom of further. 
+
+so the actual task is just... 
+text
+and thats it. just a single slot for free multiline text. and then after setting the task, while it's active, the complete now is instead "complete now for x pts" and the x is a dropdown or can type there. dropdown has numbers 1-6, 8, 10, 12. as in like  suggestions field. (btw for the spent pts part... I got to see what it looks like... it looks so weird on mobile they're horizontal TwT but whatever) 
+
+ok. that should be good. so basically the custom task has uhh oh right ofc it also has cancel yes. 
+and then the body just has the text and the "complete now for x pts". default blank. completing while it's blank just makes it "failed" (0 pts) but that's probably a  mistake but that's undoable  so idc. 
+— Yesterday at 06:04
+hmmm for UI, yeah actually a toggle on the Set block where it changes to Set for custom task... which is really just ... plain multiline text field. can't include pts reward at the start actually. wait. that's literally just regular Set block but remove the requirements for the deadline and leniency??? :0 ok yeah way simpler. ok ok.
+the button is on the row with  WL/HL, but maybe uhhh CL or smth. for custom leniency. yeah add that to the comment somewhere in the code we added as a legend... 
+anyway. CL button added. when that one is selected, the task will be created as a custom task (able to use the "complete now for x pts"). a date can actually still be selected  BUT it's only used to determine the ordering in the list. yeah that's way easier than pinning. ok yeah forget the pinning
+— Yesterday at 17:18
+---
+HEX GAME.
+NO NO NO.
+WE NEED TO CHANGE THE UNDO THING.
+regular undo cannot cost a heart!!! the hearts were for the jostle !!!! only undoing over a jostle should cost a heart!! regular undo shouldn't cost anything!!!!!! and shouldn't be blocked by the lack of hearts either!!!! but it should be disabled if no hearts and last "move" was a jostle!!
+
+also idk if I put it yet but make sure the 32 swipes thing is canceled and the latest should be the thing with adding a 1 instead. so jostles add a 1 but you can repeatedly jostle. 
+— Yesterday at 17:58
+oh man yeah ur right actually. we can't just make the mode a toggle TwT it's gonna have to be a dropdown. 
+
+Normal
+Jiggly
+Challenge v1
+Continuous (maybe; might rename)
+Challenge v2 (jostles add a 1 tile; hearts are only for undoing jostles and don't block regular undo)
+Challenge Ultra (no hearts no undo; jostles add a random tile either a 2 or 1 (50/50 chance). 
+hrrmm yeah I kinda want a different name for the "each swipe just keeps swiping in that direction"... sticky? it's like sticky keys or smth lol 
+— Yesterday at 19:07
+oh my gods. a sticky mode would be funny.
+
+every swipe, a random tile is "sticky". or maybe every few swipes, a tile is sticky for a few swipes. like maybe every 6 swipes (heh) a tile is sticky until the next 6th swipe then a different tile is chosen. btw the next sticky tile is indicated ofc. 
+...man we really need to put our hexagon files in a folder maybe TwT
+ehh whatever we'll name them all hex- smth and then it'll be fiiiine just sort alphaaaa :3
+
+— Yesterday at 19:16
+---
+Aulists: complete tear down and redesign.
+
+we can keep list 0 actually.
+
+and then, replacing EVERYTHING about the current Aulists - recurrence, list 2 to 1, all of that. 
+instead, new items are always added to list 0. after 1 week, they drop to list 1. each week (exactly from the time of adding, refreshed on page load), it will drop down a list. so this is more of a "going going gone" than a to-do list... kinda. 
+but, it should actually keep the swipe up - just no swipe down. so if I remember a task I wanna do but it dropped down, I can swipe it back up. 
+
+honestly this feels more like it deserves an entire rebranding. I loved the name Aulists but Falsedge has become the real star of the show and this new version of lists feels more like "falling" which shares the fal- with falsedge. Fallists ....no wait that reminds me of fallacies or facists for some reason. yeugh. 
+ok idk what to rename it so unfortunately it's still Aulists for now lol. I mean... there's still some auto stuff happening; it's not just plain Todo list or anything so... still au? ig? lol 
+---
+
+— Yesterday at 19:24
+=_= I just realized there's like no spacing between the "by time on date" and "WL/HL - Hambugu" rows.
+also there's plenty of space on the WL/HL and hambugu row! enough for two more icons - chevron up and chevron down. then I can manually sort the activate - others templates!!!
+oh ALSO btw that category should at least sort the blue ones (active tasks) to one place. whether at the bottom or the top, that idk yet. maybe top...? and sorting by due date (so same sort as they are in the active tasks list).
+(just to clarify - since active tasks are linked, use the active deadline, not the one in the templates, to sort, but like in the templates display, y'know????)
+
+and then the not active templates below that. manually sorted. 
+
+Yesterday at 19:46
+---
+oh yeah btw didn't we have some ideas to revive Colourcaln??!?! 
+but like, not a per day thing.
+
+you can check in at any time and... it was more of a vibes checker. are the vibes positive or negative? they automatically trend back toward neutral over maybe a few hours idk. 
+
+oh and I wanted tracking for different kinds of vibes: creativity, general mood, anxiety, etc ...
+
+then I can know when I'm sometimes feeling blah (creativity slump), inspired (higher creativity), bad mood for no reason, super anxious, etc 

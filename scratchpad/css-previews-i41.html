@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>i41 &mdash; Go to Hex 2^ cooldown bar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#12141c;
+    --panel:#1a1d27;
+    --panel-2:#20242f;
+    --line:#2b3140;
+    --line-soft:#242938;
+    --text:#e9ebf2;
+    --muted:#878da2;
+    --faint:#5a6072;
+    --c-sky:#3cc3e2;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 70% -10%, rgba(60,195,226,.06), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:"Inter",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:22px 16px 90px;
+    max-width:760px;
+    margin:0 auto;
+    line-height:1.5;
+  }
+  h1.page{font-family:"Bricolage Grotesque","Inter",sans-serif;font-size:22px;font-weight:800;margin:0 0 8px;letter-spacing:-.01em;}
+  .note{color:var(--muted);font-size:12.5px;margin:0 0 32px;}
+  .note code{color:var(--c-sky);font-size:12px;}
+
+  .variant{margin-bottom:34px;}
+  .vlabel{
+    font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--c-sky);margin:0 0 2px 2px;
+  }
+  .vdesc{font-size:12px;color:var(--faint);margin:0 0 10px 2px;line-height:1.6;}
+
+  /* the real header, from style-colourful.css */
+  .hdr{
+    position:relative;
+    display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    flex-wrap:wrap;
+    background:var(--panel);
+    border:1px solid var(--line-soft);
+    border-radius:14px;
+    padding:14px 16px 16px;
+  }
+  .hdr h1{
+    font-family:"Bricolage Grotesque","Inter",sans-serif;
+    font-size:30px;font-weight:800;margin:0;letter-spacing:-.01em;
+  }
+
+  /* .btn verbatim from style-colourful.css, minus hover/cursor */
+  .btn{
+    position:relative;
+    overflow:hidden;
+    font-family:"Inter",sans-serif;font-size:13px;font-weight:500;
+    color:var(--text);background:var(--panel-2);border:1px solid var(--line);
+    padding:9px 14px;border-radius:10px;
+    text-decoration:none;
+    display:inline-block;
+  }
+  .btn .lbl{position:relative;z-index:1;}
+
+  /* the sweep, on B C D E F G I */
+  .vb .btn::before,
+  .vc .btn::before,
+  .vd .btn::before,
+  .ve .btn::before,
+  .vf .btn::before,
+  .vg .btn::before,
+  .vi .btn::before{
+    content:"";position:absolute;left:0;top:0;bottom:0;
+    width:0;z-index:0;
+    background:color-mix(in srgb, var(--c-sky) 26%, transparent);
+    border-right:1px solid var(--c-sky);
+    animation:fill 10s linear forwards;
+  }
+
+  /* A: 3px line under the button, filling */
+  .va .btn::after{
+    content:"";position:absolute;left:0;bottom:0;
+    height:3px;width:0;z-index:2;
+    background:var(--c-sky);
+    animation:fill 10s linear forwards;
+  }
+
+  /* B: sweep only */
+
+  /* C: sweep + 1px bottom line filling in step */
+  .vc .btn::after{
+    content:"";position:absolute;left:0;bottom:0;
+    height:1px;width:0;z-index:2;
+    background:var(--c-sky);
+    animation:fill 10s linear forwards;
+  }
+
+  /* E: bottom line full width from the start */
+  .ve .btn::after{
+    content:"";position:absolute;left:0;bottom:0;
+    height:1px;width:100%;z-index:2;
+    background:var(--c-sky);
+  }
+
+  /* the perimeter stroke, D F G H I */
+  .ring{
+    position:absolute;inset:0;
+    width:100%;height:100%;
+    z-index:2;fill:none;pointer-events:none;
+    overflow:visible;
+  }
+  .ring path,
+  .ring rect{
+    stroke:var(--c-sky);
+    stroke-width:1;
+    stroke-dasharray:100;
+    stroke-dashoffset:100;
+    vector-effect:non-scaling-stroke;
+    animation:trace 10s linear forwards;
+  }
+  .vi .ring path{stroke-width:2;}
+
+  /* J: four plain edges. Top and bottom run the same fill keyframe as the
+     sweep, so their leading edge is always the sweep's leading edge. */
+  .vj .btn::before{
+    content:"";position:absolute;left:0;top:0;bottom:0;
+    width:0;z-index:0;
+    background:color-mix(in srgb, var(--c-sky) 26%, transparent);
+    animation:fill 10s linear forwards;
+  }
+  .vj .btn .edge{position:absolute;background:var(--c-sky);z-index:2;}
+  .vj .btn .edge-l{left:0;top:0;bottom:0;width:1px;}
+  .vj .btn .edge-t{left:0;top:0;height:1px;width:0;animation:fill 10s linear forwards;}
+  .vj .btn .edge-b{left:0;bottom:0;height:1px;width:0;animation:fill 10s linear forwards;}
+  .vj .btn .edge-f{left:0;top:0;bottom:0;width:1px;transform:translateX(0);animation:fillx 10s linear forwards;}
+  .vj .btn .edge-r{right:0;top:0;bottom:0;width:1px;opacity:0;animation:atEnd 10s step-end forwards;}
+
+  @keyframes fillx{from{left:0;}to{left:calc(100% - 1px);}}
+
+  /* K: a real rounded border, uncovered left to right by clip-path, so the
+     corners are drawn as corners instead of being clipped off. */
+  .vk .btn::before{
+    content:"";position:absolute;left:0;top:0;bottom:0;
+    width:0;z-index:0;
+    background:color-mix(in srgb, var(--c-sky) 26%, transparent);
+    animation:fill 10s linear forwards;
+  }
+  .vk .btn .ringbox{
+    position:absolute;inset:0;
+    border:1px solid var(--c-sky);
+    border-radius:9px;
+    z-index:2;
+    pointer-events:none;
+    clip-path:inset(0 100% 0 0);
+    animation:reveal 10s linear forwards;
+  }
+  .vk .btn .edge-f{
+    position:absolute;left:0;top:0;bottom:0;width:1px;
+    background:var(--c-sky);z-index:2;
+    animation:fillx 10s linear forwards;
+  }
+
+  @keyframes reveal{from{clip-path:inset(0 100% 0 0);}to{clip-path:inset(0 0 0 0);}}
+
+  /* L M N O P: K with no fill. Border only, and the button sits dimmed
+     until the border closes. */
+  .vl .btn .ringbox,
+  .vm .btn .ringbox,
+  .vn .btn .ringbox,
+  .vo .btn .ringbox,
+  .vp .btn .ringbox{
+    position:absolute;inset:0;
+    border:2px solid var(--c-sky);
+    border-radius:9px;
+    z-index:2;
+    pointer-events:none;
+    clip-path:inset(0 100% 0 0);
+    animation:reveal 10s linear forwards;
+  }
+  .vm .btn .ringbox{border-width:1px;}
+
+  .vl .btn .lbl{opacity:.38;animation:undim 10s step-end forwards;}
+  .vm .btn .lbl{opacity:.38;animation:undim 10s step-end forwards;}
+  .vn .btn{opacity:.38;animation:undim 10s step-end forwards;}
+  .vo .btn .lbl{opacity:.38;animation:undim 10s linear forwards;}
+  .vp .btn .lbl{opacity:.6;animation:undim6 10s step-end forwards;}
+
+  @keyframes undim{from{opacity:.38;}to{opacity:1;}}
+  @keyframes undim6{from{opacity:.6;}to{opacity:1;}}
+
+  /* Q: L with J's travelling vertical line put back. */
+  .vq .btn .ringbox{
+    position:absolute;inset:0;
+    border:2px solid var(--c-sky);
+    border-radius:9px;
+    z-index:2;
+    pointer-events:none;
+    clip-path:inset(0 100% 0 0);
+    animation:reveal 10s linear forwards;
+  }
+  .vq .btn .lbl{opacity:.38;animation:undim 10s step-end forwards;}
+  .vq .btn .edge-f{
+    position:absolute;left:0;top:0;bottom:0;width:2px;
+    background:var(--c-sky);z-index:2;
+    animation:fillx2 10s linear forwards;
+  }
+
+  @keyframes fillx2{from{left:0;}to{left:calc(100% - 2px);}}
+
+  @keyframes atEnd{from{opacity:0;}to{opacity:1;}}
+
+  @keyframes fill{from{width:0;}to{width:100%;}}
+  @keyframes trace{from{stroke-dashoffset:100;}to{stroke-dashoffset:0;}}
+</style>
+</head>
+<body>
+
+<h1 class="page">i41 &mdash; cooldown on the Go to Hex 2^ button</h1>
+<p class="note">
+  Real palette, real <code>.btn</code> rules, real header layout. Everything is
+  <code>#3cc3e2</code>, over 10 seconds. Reload to watch again.
+</p>
+
+<div class="variant va">
+  <div class="vlabel">A &mdash; 3px line, filling</div>
+  <p class="vdesc">Line along the button's bottom edge, filling left to right. No sweep.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#"><span class="lbl">&rarr; Go to Hex 2^ &rarr;</span></a>
+  </div>
+</div>
+
+<div class="variant vb">
+  <div class="vlabel">B &mdash; sweep only</div>
+  <p class="vdesc">Background fills left to right behind the text. No line.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#"><span class="lbl">&rarr; Go to Hex 2^ &rarr;</span></a>
+  </div>
+</div>
+
+<div class="variant vc">
+  <div class="vlabel">C &mdash; sweep + 1px bottom line, filling together</div>
+  <p class="vdesc">B, plus A at 1px. Both advance in step.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#"><span class="lbl">&rarr; Go to Hex 2^ &rarr;</span></a>
+  </div>
+</div>
+
+<div class="variant vd">
+  <div class="vlabel">D &mdash; sweep + stroke from the top-left corner</div>
+  <p class="vdesc">Traces all four sides, starting at the corner rather than the left edge.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#">
+      <svg class="ring" viewBox="0 0 158 38" preserveAspectRatio="none" aria-hidden="true">
+        <rect x="0.5" y="0.5" width="157" height="37" rx="10" ry="10" pathLength="100"/>
+      </svg>
+      <span class="lbl">&rarr; Go to Hex 2^ &rarr;</span>
+    </a>
+  </div>
+</div>
+
+<div class="variant ve">
+  <div class="vlabel">E &mdash; full-width line immediately, sweep fills under it</div>
+  <p class="vdesc">The 1px bottom line is there at full width straight away; only the sweep moves.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#"><span class="lbl">&rarr; Go to Hex 2^ &rarr;</span></a>
+  </div>
+</div>
+
+<div class="variant vf">
+  <div class="vlabel">F &mdash; sweep + one stroke, clockwise from the left edge</div>
+  <p class="vdesc">Starts mid-left, up and over the top, down the right, back along the bottom, closing where it began.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#">
+      <svg class="ring" viewBox="0 0 158 38" preserveAspectRatio="none" aria-hidden="true">
+        <path pathLength="100" d="M 0.5,19 L 0.5,10.5 A 10,10 0 0 1 10.5,0.5 L 147.5,0.5 A 10,10 0 0 1 157.5,10.5 L 157.5,27.5 A 10,10 0 0 1 147.5,37.5 L 10.5,37.5 A 10,10 0 0 1 0.5,27.5 Z"/>
+      </svg>
+      <span class="lbl">&rarr; Go to Hex 2^ &rarr;</span>
+    </a>
+  </div>
+</div>
+
+<div class="variant vg">
+  <div class="vlabel">G &mdash; sweep + split, meeting at the right edge</div>
+  <p class="vdesc">Two strokes leave the left edge together, one over the top and one under the bottom, closing mid-right. Out of sync with the sweep &mdash; see J.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#">
+      <svg class="ring" viewBox="0 0 158 38" preserveAspectRatio="none" aria-hidden="true">
+        <path pathLength="100" d="M 0.5,19 L 0.5,10.5 A 10,10 0 0 1 10.5,0.5 L 147.5,0.5 A 10,10 0 0 1 157.5,10.5 L 157.5,19"/>
+        <path pathLength="100" d="M 0.5,19 L 0.5,27.5 A 10,10 0 0 0 10.5,37.5 L 147.5,37.5 A 10,10 0 0 0 157.5,27.5 L 157.5,19"/>
+      </svg>
+      <span class="lbl">&rarr; Go to Hex 2^ &rarr;</span>
+    </a>
+  </div>
+</div>
+
+<div class="variant vh">
+  <div class="vlabel">H &mdash; split, no sweep</div>
+  <p class="vdesc">G's border on its own, background left alone.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#">
+      <svg class="ring" viewBox="0 0 158 38" preserveAspectRatio="none" aria-hidden="true">
+        <path pathLength="100" d="M 0.5,19 L 0.5,10.5 A 10,10 0 0 1 10.5,0.5 L 147.5,0.5 A 10,10 0 0 1 157.5,10.5 L 157.5,19"/>
+        <path pathLength="100" d="M 0.5,19 L 0.5,27.5 A 10,10 0 0 0 10.5,37.5 L 147.5,37.5 A 10,10 0 0 0 157.5,27.5 L 157.5,19"/>
+      </svg>
+      <span class="lbl">&rarr; Go to Hex 2^ &rarr;</span>
+    </a>
+  </div>
+</div>
+
+<div class="variant vi">
+  <div class="vlabel">I &mdash; G at 2px</div>
+  <p class="vdesc">Same as G, thicker stroke, in case 1px reads too faint on a phone.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#">
+      <svg class="ring" viewBox="0 0 158 38" preserveAspectRatio="none" aria-hidden="true">
+        <path pathLength="100" d="M 0.5,19 L 0.5,10.5 A 10,10 0 0 1 10.5,0.5 L 147.5,0.5 A 10,10 0 0 1 157.5,10.5 L 157.5,19"/>
+        <path pathLength="100" d="M 0.5,19 L 0.5,27.5 A 10,10 0 0 0 10.5,37.5 L 147.5,37.5 A 10,10 0 0 0 157.5,27.5 L 157.5,19"/>
+      </svg>
+      <span class="lbl">&rarr; Go to Hex 2^ &rarr;</span>
+    </a>
+  </div>
+</div>
+
+<div class="variant vj">
+  <div class="vlabel">J &mdash; G, in sync</div>
+  <p class="vdesc">Left edge lit from the start. Top and bottom grow left to right on the same keyframe as the sweep, so all the leading edges are one vertical line the whole way. Right edge lights when they arrive. Nothing travels vertically.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#">
+      <span class="edge edge-l"></span>
+      <span class="edge edge-t"></span>
+      <span class="edge edge-b"></span>
+      <span class="edge edge-f"></span>
+      <span class="edge edge-r"></span>
+      <span class="lbl">&rarr; Go to Hex 2^ &rarr;</span>
+    </a>
+  </div>
+</div>
+
+<div class="variant vk">
+  <div class="vlabel">K &mdash; J with the corners</div>
+  <p class="vdesc">A real 1px rounded border on the button, uncovered left to right in step with the sweep. The corners curve properly instead of being cut off, and the border is closed by the time it unlocks.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#">
+      <span class="ringbox"></span>
+      <span class="edge-f"></span>
+      <span class="lbl">&rarr; Go to Hex 2^ &rarr;</span>
+    </a>
+  </div>
+</div>
+
+<div class="variant vl">
+  <div class="vlabel">L &mdash; 2px border, no fill, text dimmed</div>
+  <p class="vdesc">K's border at 2px with the background left alone. The label sits at 38% and snaps to full the moment the border closes.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#">
+      <span class="ringbox"></span>
+      <span class="lbl">&rarr; Go to Hex 2^ &rarr;</span>
+    </a>
+  </div>
+</div>
+
+<div class="variant vm">
+  <div class="vlabel">M &mdash; L at 1px</div>
+  <p class="vdesc">Identical to L, thinner border.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#">
+      <span class="ringbox"></span>
+      <span class="lbl">&rarr; Go to Hex 2^ &rarr;</span>
+    </a>
+  </div>
+</div>
+
+<div class="variant vn">
+  <div class="vlabel">N &mdash; 2px border, whole button dimmed</div>
+  <p class="vdesc">The dim covers everything including the border, so the line itself is faint while it draws and brightens when it closes.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#">
+      <span class="ringbox"></span>
+      <span class="lbl">&rarr; Go to Hex 2^ &rarr;</span>
+    </a>
+  </div>
+</div>
+
+<div class="variant vo">
+  <div class="vlabel">O &mdash; 2px border, dim lifting gradually</div>
+  <p class="vdesc">The label brightens continuously as the border draws rather than snapping at the end.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#">
+      <span class="ringbox"></span>
+      <span class="lbl">&rarr; Go to Hex 2^ &rarr;</span>
+    </a>
+  </div>
+</div>
+
+<div class="variant vp">
+  <div class="vlabel">P &mdash; L with a gentler dim</div>
+  <p class="vdesc">Same as L but the label sits at 60% instead of 38%, in case 38% reads as broken rather than waiting.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#">
+      <span class="ringbox"></span>
+      <span class="lbl">&rarr; Go to Hex 2^ &rarr;</span>
+    </a>
+  </div>
+</div>
+
+<div class="variant vq">
+  <div class="vlabel">Q &mdash; L with the travelling line</div>
+  <p class="vdesc">L, plus J's vertical line riding along at the border's leading edge.</p>
+  <div class="hdr">
+    <h1>Falsedge</h1>
+    <a class="btn" href="#">
+      <span class="ringbox"></span>
+      <span class="edge-f"></span>
+      <span class="lbl">&rarr; Go to Hex 2^ &rarr;</span>
+    </a>
+  </div>
+</div>
+
+</body>
+</html>

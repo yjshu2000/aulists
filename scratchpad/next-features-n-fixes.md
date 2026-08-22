@@ -1,19 +1,58 @@
+- [Next features \& fixes](#next-features--fixes)
+  - [Doc rules](#doc-rules)
+  - [Falsedge](#falsedge)
+    - [\[i5\] DOLI (Double Or Lose It) mechanism ⬜ 🟢](#i5-doli-double-or-lose-it-mechanism--)
+    - [\[i13\] Swap homepage to Falsedge ⚪ 🟡 🆗](#i13-swap-homepage-to-falsedge---)
+    - [\[i14\] Complex tasks ⬜](#i14-complex-tasks-)
+      - [\[i14.1\] Multipliers and bonuses (exploratory) ⬜ 🟢](#i141-multipliers-and-bonuses-exploratory--)
+      - [\[i14.2\] Event-anchored deadlines ⬜ 🟡](#i142-event-anchored-deadlines--)
+    - [\[i16\] Micro tasks (NL) ⬜ 🟠](#i16-micro-tasks-nl--)
+    - [\[i19\] Delete individual ledger entries ⚪ 🟡](#i19-delete-individual-ledger-entries--)
+    - [\[i21\] Daily score chart ⬜ 🟡](#i21-daily-score-chart--)
+    - [\[i26\] Export all app data ⚪ 🔴](#i26-export-all-app-data--)
+    - [\[i33\] Kill the failed path ⚪](#i33-kill-the-failed-path-)
+    - [\[i34\] Streak break condition ⬜](#i34-streak-break-condition-)
+    - [\[i35\] Custom tasks (CL) ⬜](#i35-custom-tasks-cl-)
+    - [\[i36\] Template row spacing and manual sort ⚪](#i36-template-row-spacing-and-manual-sort-)
+  - [Aulists](#aulists)
+    - [\[i15\] Tear down and rebuild Aulists ⬜ 🟡](#i15-tear-down-and-rebuild-aulists--)
+  - [Hex 2^](#hex-2)
+    - [\[i24\] Challenge mode v1 ⬜ 🟢 🆗](#i24-challenge-mode-v1---)
+      - [\[i24.1\] Challenge v2 ⚪](#i241-challenge-v2-)
+      - [\[i24.2\] Challenge Ultra ⚪](#i242-challenge-ultra-)
+    - [\[i31\] Mobile landscape-orientation compatibility 🟢](#i31-mobile-landscape-orientation-compatibility-)
+    - [\[i32\] Hold to peek behind the lockout ▫️ 🔴 🆗](#i32-hold-to-peek-behind-the-lockout-️--)
+    - [\[i37\] Careening mode ⬜](#i37-careening-mode-)
+    - [\[i38\] Sticky mode ⬜ 🟢](#i38-sticky-mode--)
+    - [\[i39\] Mode select becomes a dropdown ⚪](#i39-mode-select-becomes-a-dropdown-)
+    - [\[i40\] Fake ad timer freezes on return from Falsedge ⚪ 🐞](#i40-fake-ad-timer-freezes-on-return-from-falsedge--)
+  - [Multi-page items](#multi-page-items)
+    - [\[i30\] A Falsedge action clears the ad ⬜](#i30-a-falsedge-action-clears-the-ad-)
+    - [\[i41\] Cooldown on the Go to Hex 2^ button ⚪](#i41-cooldown-on-the-go-to-hex-2-button-)
+    - [\[i27\] (low priority/far future) - Server side ⬜⬜⬜ 🔵](#i27-low-priorityfar-future---server-side--)
+  - [Colourcaln?](#colourcaln)
+    - [\[i42\] Revive Colourcaln as a vibes tracker ⬜](#i42-revive-colourcaln-as-a-vibes-tracker-)
+
 # Next features & fixes
 
 ## Doc rules
 
 **D1. This is the living backlog.** It is the single place pending work is tracked. It gets edited in place as things change — not appended to, not superseded by a newer doc. No Q&A format, no discussion history, no rejected options.
 
-**D2. Shipped items get deleted, not ticked off.** When something lands in the code, its entry is removed from this doc entirely. There is no "done" section. The changelog in `about.html` is the record of what shipped; this doc is only what hasn't.
+**D2. Shipped items get deleted once committed, not ticked off.** When something lands in the code, its entry is removed from this doc entirely — but only after the entry itself is in a commit, since git history is what makes it findable again. There is no "done" section. The changelog in `about.html` is the record of what shipped; this doc is only what hasn't.
 *This also applies to rejected options.*
 
-**D3. Three supersections, one per app page.** Falsedge, Aulists, Hex 2^. Each item is a `###` heading under its page's `##`. An item that spans two pages will go in the "multi-page items" section.
+**D3. One supersection per app page.** Falsedge, Aulists, Hex 2^, possibly more as more are added. Each item is a `###` heading under its page's `##`. An item that spans two pages will go in the "multi-page items" section.
 
 **D4. Items are written as decisions, not questions.** If something is genuinely undecided, it says so explicitly in the item rather than being left vague. Exploratory ideas are marked exploratory.
 
 **D5. Source lineage.** Continuously distilled from `scratchpad/sad-todos-babble.md`. New babbles are distinguished from old ones with a `^ all items above are added to doc ^` line. 
 
 **D6. The bracketed `iN` labels are IDs and nothing else.** Not priority, not chronological, not an ordering — nothing carries any of that, much less the ID. An ID is assigned once and never changes: items keep theirs when reordered or moved between sections, and a deleted item's ID is retired rather than reused. Gaps in the sequence are normal and expected. Sub-items are `iN.1`, `iN.2`, … numbered from `.1`, as `####` headings under their parent, and follow the same rules.
+```
+LAST USED ID: i42
+(update this with every new item)
+```
 
 **D7. No backward compatibility for old data, ever.** No migration code, no accounting for old data shapes, in this phase or any future one. If data has to survive a breaking change, it gets exported, updated, and re-imported by hand.
 
@@ -22,15 +61,21 @@
 **D9. 🆗 means buildable as-is, right now.** It is Claude's assertion about the item's completeness — not a priority, and not the user's approval to start. It says the item can be built start to finish with no further questions asked and no assumption made that could turn out wrong: every question that *could* be asked about it has already been asked and answered. It goes last in the heading, after the priority. Its absence says nothing about importance — only that at least one detail would still have to be guessed at. A lack of an `**Undecided:**` block is *not* enough on its own to earn it, since an item can list no open questions and still leave something unwritten. Claude adds it; anything that raises a new question about the item strips it again.
 
 **D10. Every item also carries a priority, between the size tag and 🆗.** Legend listed below. Priority is the user's call, not Claude's — Claude assigns 🆗, the user assigns the colour. It says nothing about size or readiness: a 🔴 can be ⬜ and unspecced, a 🔵 can be ▫️ and 🆗. So a full heading reads `### [iN] Title ⬜ 🔴 🆗`.
+
+```
 🔴 critical
 🟠 high/medium
 🟡 low but should
 🟢 extra/bonus
 🔵 far future
+```
+
+**D11. No history of this doc or the babbles.** An item is a buildable spec, not a changelog. Never reference an earlier version of an item, a superseded decision, a rejected option, or anything said in `sad-todos-babble.md`. No "previously", no "this replaces", no "an earlier note said". State the final decision as though it had always been the decision.
+**Describing the current code is not history and is encouraged.** What the code does today, what a function is named, what breaks — an item should say all of it, since that is the gap the work has to close.
 
 ## Falsedge
 
-### [i5] DOLI (Double Or Lose It) mechanism ⬜ 🔴
+### [i5] DOLI (Double Or Lose It) mechanism ⬜ 🟢
 
 Ships complete: state schema, scoring curve, limits, and the promotion control itself.
 
@@ -43,6 +88,8 @@ HL  minutes past deadline:  0    5   15   30    60    >60
 ```
 
 (0 means completed on time / within deadline.) The key difference from a normal task: instead of just becoming 0, there's only a 1-hour window at 0 before it drops straight to -6.
+
+**Early bonus.** A DOLI task completed early awards **+1** per whole 24h ahead of its deadline, against a normal task's +2. The base 12 is high enough that the normal rate compounds too fast on top of it.
 
 **Visual.** A promoted task shows a 64px Aventurine chibi in its own block, in the empty space to the right of the `by X for X pts` lines, vertically centred against that whole group of rows. Four images, one picked at random per page load and stable through re-renders until an actual reload: `assets/aven-play-cards.png`, `assets/aven-cool.png`, `assets/aven-cheers.png`, `assets/aven-throw-money.png`.
 
@@ -57,18 +104,19 @@ Promotion is irreversible. Undo is the only way back, and otherwise the only exi
 
 A promoted task is frozen. Neither edit overlay is attached to it: not `edit time?` on `.tier-rows`, which also carries the date row, and not the text editor on `.task-text-row`. Text, clock time, date and WL/HL are all fixed at the moment of promotion. Without that, a promoted task could have its deadline pushed out and collect 12 points for nothing.
 
-**Limits.** Promoting costs nothing — there is no cooldown on *setting* a DOLI task. Two limiters instead:
+**Limits.** Promoting costs nothing at the moment of promotion. Two limiters instead:
 
+- **One per calendar day.** At most one task may be promoted per calendar day. What becomes of it afterwards does not matter — completing, cancelling or failing it does not buy the day back.
 - **Concurrent cap.** At most `floor(doliLimit)` DOLI tasks may be active at once. `doliLimit` starts at `1`, floors at `1`, and has no ceiling. A completed DOLI adds `+0.2`; a cancelled or failed one subtracts `-0.5`.
-- **Cancel cooldown.** Cancelling/failing a DOLI task starts a **6 hour** cooldown during which nothing can be promoted. Completing a DOLI task immediately clears a running cooldown.
 
-A DOLI task cancelled from a dated `others` row takes **both** penalties: the existing 36h `COOLDOWN_MS` lock on that row, and the 6h DOLI cooldown. They are different scopes — the row lock stops re-activating that row, the DOLI cooldown stops promoting anything at all.
+A DOLI task cancelled from a dated `others` row still takes the existing 36h `COOLDOWN_MS` lock on that row. Different scope — the row lock stops re-activating that row, the daily limit stops promoting anything at all.
 
-The square is inert while a cooldown is running or the concurrent cap is already met, so at rest it sits permanently fully lit — a closed ring is the normal state, not a special one.
+The square is inert once the day's promotion is spent or the concurrent cap is met.
 
 **Undecided:** the tier system only has four rungs. `tierList()` zips `WL_OFFSETS`/`HL_OFFSETS` against `TIER_POINTS`, all length four, and `liveTierIndex()` returns `-1` past the last one, which every caller reads as "failed, award 0". DOLI's table needs six rungs and a `-6`, so both functions need a second shape and `-1` stops meaning what it means today.
 
 Negative awards have never run through `resolveTask()`. `taskEntryText()` branches on `award > 0 && ptsDelta === 0` and has no case for a negative, so the ledger line for a `-6` is unwritten.
+
 
 ### [i13] Swap homepage to Falsedge ⚪ 🟡 🆗
 
@@ -100,14 +148,6 @@ A second, smaller class of task. `NL` (no leniency) *is* the micro-task marker �
 - Cancelling works at either granularity: one micro task on its own, or the whole set at once.
 - DOLI does not apply to micro tasks — a +1 task is not worth a gamble slot.
 
-### [i17] Time since last active task ⚪ 🟠
-
-A readout of how long there has been nothing active at all. It counts from the last task's *deadline*, not from when that task was resolved: a task due at 0:00 that went uncancelled until 8:00 shows `8h` the moment it clears, not `0h`.
-
-Computed at render and refreshed only by a page refresh. Deliberately allowed to go stale in between — no `setInterval`, no live ticking.
-
-**Undecided:** where on the page it sits, and its exact wording.
-
 ### [i19] Delete individual ledger entries ⚪ 🟡
 
 An entry can be deleted on its own. Today the only way anything leaves `state.ledger` is `splice(0, batch.count)` after a copy-export, so a wrong entry is stuck the moment undo can no longer reach back to it.
@@ -128,25 +168,79 @@ A full Falsedge state export — templates, ledger, points, scores, the lot — 
 
 Aulists already has exactly this and is the model to copy: `exportJSON()` (`JSON.stringify(state, null, 2)`), an export-to-textarea button, an export-to-file button, `importFromText()` behind a confirm that replaces state wholesale, and a `lastExported` stamp with a "last exported" note. Falsedge gets the same set, running through its own `normalise()` on import for the same reason Aulists does.
 
+### [i33] Kill the failed path ⚪
+
+"Failed" stops existing. A task that runs out of road is cancelled — same state, same wording, same accounting. There is no separate outcome for *did not finish in time*.
+
+Everything branching on failed-versus-cancelled collapses to the cancel path. `lastDone` does not need that precision.
+
+**Undecided:** whether the ledger keeps any trace that a cancellation happened at a deadline rather than by hand.
+
+### [i34] Streak break condition ⬜
+
+**The condition.** The streak breaks when 48 hours pass with nothing completed. Measured against the completion time *recorded on the task*, so a backdated "completed before" counts at its stated time, not at the moment the button was pressed. Exact 48h granularity, never calendar days: if the last completion was Monday 08:00, a task backdated to Wednesday 10:00 does not save it.
+
+**It stays tentative until resolved.** Because tasks can be backdated, a lapsed window is only provisionally broken. While tasks still exist that could cover the gap, the UI shows `streak broke?` in red — slightly muted, not actually faint. Two ways out:
+
+- Completing or backdating any of those tasks into the window clears it and the marker disappears.
+- Cancelling all of them confirms it: `streak broke` in red at the centre of the screen — not the existing toast, its own treatment — and the score drops to zero immediately.
+
+Undoing the cancellation undoes all of it, score included.
+
+The manual streak-broke button stays. This adds the automatic path beside it, which means active further tasks can now coexist with a broken streak — previously impossible.
+
+**Vacation.** Time can be booked off, but only ahead of time, never retroactively. A vacation is date-only with no time granularity: `from` and `to` through the calendar picker, `to` defaulting to the same day, so one day is the minimum. The 48h clock restarts at 00:00 on the day after the vacation ends.
+
+**Undecided:** where the `streak broke?` marker sits on the page, and where vacations are booked from.
+
+### [i35] Custom tasks (CL) ⬜
+
+A third leniency setting beside WL and HL, on the same row: **CL**, custom leniency. Choosing it creates a *custom task*, which structurally is just the existing Set block with the deadline and leniency requirements dropped.
+
+- The body is a single multiline free-text field. Nothing else is required.
+- While active, `complete now` reads **`complete now for X pts`**. X is a suggest field — typed or picked — offering `1 2 3 4 5 6 8 10 12`.
+- X defaults to blank. Completing with it blank awards 0. That is almost always a mistake, and undo covers it.
+- Cancel behaves normally.
+- A date may still be set, but it is **ordering only**: it places the task among the active tasks and drives nothing else. No deadline, no tiers, no scoring. This replaces the earlier pin-to-top / pin-to-bottom idea, which is dropped as strictly more work for the same result.
+- `CL` joins the leniency legend comment in `falsedge.js` beside WL, HL, NL and ML.
+
+**Undecided:** CL strictly dominates DOLI. DOLI's 12 points cost a deadline and a -6 downside; CL's 12 points cost typing `12`. More broadly it is an unbounded self-award available on any task, so it undercuts the whole scoring economy rather than just DOLI. No limiter has been chosen.
+
+### [i36] Template row spacing and manual sort ⚪
+
+**Spacing.** There is no gap at all between the `by TIME on DATE` row and the `WL/HL — hamburger` row under it. They need separating.
+
+**Manual sort.** The WL/HL row has room for two more icons — chevron up and chevron down — moving a template within its group.
+
+Sorting is two-tier. Templates whose task is currently active group together and sort by that task's **active** deadline — the same order the active tasks list uses, not the deadline stored on the template. Everything else sits in the other group, in manual order.
+
+**Undecided:** whether the active group goes above the rest or below, leaning above.
+
 
 ## Aulists
 
-### [i15] Strip down Aulists ⬜ 🟡
+### [i15] Tear down and rebuild Aulists ⬜ 🟡
 
-- Lists become `["1", "2", "3", "4"]`. List 0 and list 2.5 are removed; the current chain is `["0", "1", "2", "2.5", "3", "4"]`, so dropping them leaves a sequence that is already in order.
-- No migration code, ever (D7). Whatever sits in list 0 or list 2.5 at upgrade time simply stops being read or written by anything.
-- `applyAutoReturn()` and all auto-move / auto-reprioritize between lists is removed entirely.
-- List 2's randomizer stays, but pools from List 2 alone. It currently also draws from List 2.5, which no longer exists.
-- The boundary mechanism `applyAutoReturn()` used to call — `pushBoundary`, `isBoundary`, `pendingBoundary`, the boundary-confirm UI — **stays**, even though nothing calls it any more, in case something needs it later.
-- The pencil/edit icon leaves the main view. An "Edit" entry is added to the hamburger dropdown, calling the same `startEdit(li, item)` the pencil calls today.
-- Every `buildPencil()` call site — main list rows, Completed-list rows, and any other row type it appears on — gets a copy button in that same visual slot instead, copying the item's text to the clipboard. It uses Falsedge's existing `COPY_ICON` SVG (the two-overlapping-rectangles glyph already used by the ledger and high-scores copy buttons) and toasts success/failure the way Falsedge's copy actions already do. `buildPencil()` gets renamed to `buildCopyBtn()` rather than left with a misleading name.
-- `buildTrashBtn()` — defined but never called anywhere, dead code from an earlier abandoned refactor — gets deleted while this area is being touched.
-- Swipe-between-lists navigation stays.
+Replaces this item's previous contents wholesale rather than extending them. Recurrence, the list 2 → 1 promotion, `applyAutoReturn()` and all auto-move / auto-reprioritize, and the randomizer are all removed. **List 0 stays** — the earlier plan deleted it.
+
+**The new model is decay, not a to-do list.** Every item enters at list 0. One week after it was added it drops to list 1, and one list further every week after that. The clock is per item, measured from its own add time, and evaluated on page load — no timer, no scheduler.
+
+Swipe up stays: an item that has fallen can be pulled back by hand when it is remembered. Swipe down is removed. Nothing descends except by aging.
+
+"Going going gone" rather than a task list.
+
+Swipe-between-lists navigation stays. So does the boundary mechanism (`pushBoundary`, `isBoundary`, `pendingBoundary`, the boundary-confirm UI), unused, in case it is wanted later.
+
+**Undecided:** the name. This is arguably not Aulists any more, and "falling" shares a stem with Falsedge, but `Fallists` reads as fallacies or worse. It stays Aulists for now on the grounds that something automatic is still happening, so `au-` half-earns itself.
+
+Also undecided: the previous version of this item carried several UI changes that the teardown does not mention either way — the pencil leaving the main view for an "Edit" entry in the hamburger, every `buildPencil()` call site becoming a copy button using Falsedge's `COPY_ICON`, and deleting the dead `buildTrashBtn()`. They were decided, then written over. Unclear whether they survive the rebuild.
 
 
 ## Hex 2^
 
-### [i24] Challenge mode ⬜ 🟢 🆗
+### [i24] Challenge mode v1 ⬜ 🟢 🆗
+
+**Shipped.** Deliberately not deleted per D2 — it is kept as the parent for i24.1 and i24.2, which are defined as changes against it. Everything below is the record of what is live, not pending work.
 
 A third mode alongside normal and jiggly, in a new `hex2-challenge.js`. Branches off normal in the code sense — it copies `hex2-base.js`'s slide-then-pop animation model, not jiggly's continuous wobble. Own save key (`hex2.challenge.save`, matching the naming the rename settles on rather than the `hexadecimal.*` keys it replaces), shares the high score table with the other modes.
 
@@ -193,8 +287,80 @@ The white flash covers the canvas only, not the whole viewport.
 
 **This is not only a new file — `hex2-core.js` needs three changes.** `snapshot()` is not on the `Hex2` export list and has to be, or a jostle cannot push an undo entry. `updateUndo()` is `undoBtn.disabled = history.length === 0` and has to consult `mode.canUndo` too, or at zero hearts the button looks live and silently does nothing. `save()` and `load()` write a fixed field list and need a way to carry hearts. `mode.onUndo` and `mode.onReset` already exist and fire where hearts need to change.
 
+#### [i24.1] Challenge v2 ⚪
+
+v1 with two changes, standing as its own mode rather than an edit to v1. v1 keeps its current behaviour exactly.
+
+**Jostles spawn a `1`.** Every jostle drops a literal `1` tile onto the board — 1 + 1 = 2, so it feeds the normal progression from below instead of sitting outside it. Jostling now costs something, so it no longer needs rate-limiting: repeated jostles are allowed, and the 32-swipe jostle cooldown idea is dropped.
+
+**Hearts pay for jostles only.** A regular undo is free and is never blocked, at any heart count. A heart is spent only when the undo steps back *across* a jostle. The undo button is disabled only when hearts are 0 **and** the last move was a jostle. This is the correction to v1, where every undo costs a heart and zero hearts greys the button outright.
+
+**Undecided:** whether v1's no-two-jostles-in-a-row rule survives, given repeated jostling is now the point of the mode. Also what the spawned `1` does when the board is full.
+
+#### [i24.2] Challenge Ultra ⚪
+
+v2 with the safety net removed. No hearts and no undo at all. Every jostle spawns a random tile, `1` or `2`, at even odds.
+
 ### [i31] Mobile landscape-orientation compatibility 🟢
 game is broken in landscape right now but like whateverrr i dont play in landscape so who caaaares
+
+### [i32] Hold to peek behind the lockout ▫️ 🔴 🆗
+
+The lockout hides the board completely — `rgba(18, 20, 26, 0.94)` plus `backdrop-filter: blur(3px)`, both on one full-viewport layer (`.lockout`). Pressing and holding fades that layer down so the board can be looked at during the wait.
+
+**Peek surface.** Anywhere on `.lockout` *except* its three controls — the `.fake-ad` circle and the two `.lockout-card` links. Those are carved out and always behave as buttons; a hold on one starts no peek.
+
+**What changes while held.** The dim drops to `rgba(18, 20, 26, 0.15)`, the blur goes to `none`, and the three controls to `opacity: 0.25`. Values snap — no transition, no fade. Nothing is removed and nothing stops taking taps; the controls stay live throughout, only faded. A single `.lockout.peek` class carries all of it.
+
+**The countdown keeps running.** Peeking is free and costs no time; the ad's ring keeps filling behind the fade, and the × becomes available on schedule even mid-peek.
+
+**A peek never reaches the game.** The hold, and any finger movement during it, stay on `.lockout` and are never seen by the canvas's swipe handler.
+
+`pointerdown` starts the peek; `pointerup`, `pointercancel`, and the pointer leaving the element all end it, so a finger dragged off-screen cannot leave the board stuck visible.
+
+### [i37] Careening mode ⬜
+
+A swipe repeats in the same direction until nothing moves and nothing merges — one gesture drives the board to a fixpoint instead of taking a single step.
+
+Faster to play. Whether it is also *easier* is unsettled: it was first described as neither harder nor easier, only quicker, and later as plainly easier.
+
+The name is settled. "Continuous" was rejected — the motion is not continuous, it is the same discrete move re-applied until it stops changing anything.
+
+**Undecided:** whether a tile spawns once at the end or after each internal step, whether the intermediate positions animate or only the final one is drawn, and whether it composes with the challenge tiers at all.
+
+### [i38] Sticky mode ⬜ 🟢
+
+One tile is stuck: it does not move, does not merge, and the rest of the board slides around it.
+
+Rough shape — every 6 swipes a new tile is chosen and holds until the next changeover. The upcoming sticky tile is indicated ahead of the swap.
+
+Deliberately silly.
+
+**Undecided:** whether the interval is really 6, what the indicator looks like, what happens when the stuck tile is the only thing that could have moved, and whether it stacks with any challenge tier.
+
+### [i39] Mode select becomes a dropdown ⚪
+
+The cycle button does not scale past three modes. It becomes a dropdown listing all of them:
+
+```
+Normal
+Jiggly
+Careening
+Sticky
+Challenge v1
+Challenge v2
+Challenge Ultra
+```
+
+Switching still reloads the page. Each mode is a self-booting script and only one may be present per load, so that constraint is unchanged.
+
+**Undecided:** the ordering above is provisional, and whether unbuilt modes appear greyed out or are simply absent.
+
+### [i40] Fake ad timer freezes on return from Falsedge ⚪ 🐞
+
+Coming back to Hex 2^ from Falsedge leaves the fake ad's countdown stopped — the ring stops filling and the × never arrives, so the lockout has no exit.
+
+**Undecided:** the cause is not diagnosed. Two candidates: the `visibilitychange` handler early-returns on `fakeAdReady || !lockout.classList.contains("show")`, and the countdown rides a `requestAnimationFrame` chain, which a backgrounded page suspends and does not necessarily resume. A plausible fix is driving it from a `setInterval` that recomputes against the stored end time, so a missed tick self-heals — but that is a guess ahead of actually reproducing it.
 
 ## Multi-page items
 
@@ -222,6 +388,26 @@ It only ever dismisses a lockout that already existed when you left. It is not c
 
 **Undecided:** the wait-it-out timer's length, and whether that path survives at all now that a single action is enough. Also open: whether a redo should count, since it moves the pointer forward too.
 
+### [i41] Cooldown on the Go to Hex 2^ button ⚪
+
+Falsedge's "Go to Hex 2^" button is inert for **10 seconds** after the page loads. Long enough to force a pause, far shorter than the minimums for staying inside the game.
+
+Shown as a filling bar, never as numbers. Ticking once a second is acceptable; a smooth fill is preferred only if it costs nothing structurally — this is one small bar, not a reason to restructure how the page draws.
+
+The clock runs from page load, so it applies once per visit and cannot be banked.
+
+(this overrides i30)
+
 ### [i27] (low priority/far future) - Server side ⬜⬜⬜ 🔵
 
 Storing data in server instead of locally. Would need to buy/rent server space or something... idk
+
+## Colourcaln?
+
+### [i42] Revive Colourcaln as a vibes tracker ⬜
+
+Not the per-day thing it was. Check in at any time, as often as wanted, and log where the vibes sit — positive or negative. Readings drift back toward neutral on their own over a few hours, so what is on screen always reflects something recent rather than a stale entry.
+
+Several independent axes rather than one score: creativity, general mood, anxiety, and others not yet listed.
+
+**Undecided:** essentially all of it — the decay rate and curve, the input control, the full axis list, whether this is a fourth page or lives inside an existing one, and whether the name survives (hence the question mark on the section).
