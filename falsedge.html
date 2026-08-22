@@ -17,7 +17,7 @@
 
 <header>
   <h1>Falsedge</h1>
-  <a class="btn" id="hexLink" href="hex2.html">&rarr; Go to Hex 2^ &rarr;</a>
+  <a class="btn" id="hexLink" href="hex2.html"><span class="lbl">&rarr; Go to Hex 2^ &rarr;</span></a>
 </header>
 
 <main id="app"></main>
@@ -31,6 +31,16 @@ document.getElementById("hexLink").addEventListener("click", function () {
     // storage blocked; the break just runs untimed
   }
 });
+
+// 10s initial block on the button on page loads
+// Must match the 10s keyframes in style-falsedge.css.
+(function () {
+  var link = document.getElementById("hexLink");
+  link.classList.add("cooling");
+  setTimeout(function () {
+    link.classList.remove("cooling");
+  }, 10000);
+})();
 </script>
 
 <div class="page-nav-bottom">

@@ -25,6 +25,60 @@
   .btn:disabled, .btn.off {
     opacity: .38;
   }
+
+  /* --------------------------- hex link cooldown ------------------------- */
+  /* The link is dead for the first 10s of every visit. A 2px border draws
+     itself left to right with a line riding its leading edge, and the label
+     is dimmed until it closes. All CSS - the only JS is one setTimeout, so
+     keep its 10000 matching the 10s here. */
+  #hexLink {
+    position: relative;
+  }
+  #hexLink .lbl {
+    position: relative;
+    z-index: 1;
+  }
+  #hexLink.cooling {
+    pointer-events: none;
+  }
+  #hexLink.cooling .lbl {
+    opacity: .38;
+    animation: hexUndim 10s step-end forwards;
+  }
+  #hexLink.cooling::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--c-sky);
+    border-radius: 9px;
+    z-index: 2;
+    pointer-events: none;
+    clip-path: inset(0 100% 0 0);
+    animation: hexReveal 10s linear forwards;
+  }
+  #hexLink.cooling::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    z-index: 2;
+    background: var(--c-sky);
+    animation: hexLead 10s linear forwards;
+  }
+  @keyframes hexReveal {
+    from { clip-path: inset(0 100% 0 0); }
+    to   { clip-path: inset(0 0 0 0); }
+  }
+  @keyframes hexLead {
+    from { left: 0; }
+    to   { left: calc(100% - 2px); }
+  }
+  @keyframes hexUndim {
+    from { opacity: .38; }
+    to   { opacity: 1; }
+  }
   input, select, textarea {
     background: var(--panel-2);
     border: 1px solid var(--line);
