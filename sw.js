@@ -2,7 +2,7 @@ const CACHE_DO_NOT_BUMP = 'aulists-networkfirst-DO-NOT-BUMP';
 const SHELL = [
   './',
   './index.html',
-  './falsedge.html',
+  './aulists.html',
   './hex2.html',
   './about.html',
   './style-minim.css',
@@ -15,6 +15,7 @@ const SHELL = [
   './hex2-core.js',
   './hex2-base.js',
   './hex2-jiggly.js',
+  './hex2-challenge.js',
   './manifest.json',
   './assets/icon.svg',
   './assets/icon-hex2.svg'

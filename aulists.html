@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AutoReList</title>
+<link rel="stylesheet" href="style-minim.css">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4a6f8a">
+<script>
+(function(){var p=localStorage.getItem("aulists.theme")||"system";var d=p==="dark"||(p==="system"&&matchMedia("(prefers-color-scheme:dark)").matches);document.documentElement.setAttribute("data-theme",d?"dark":"light");if(d)document.querySelector('meta[name=theme-color]').content="#2c2c2c"})();
+</script>
+</head>
+<body>
+  <a class="page-nav-top" href="index.html">&uarr; Go to Falsedge &uarr;</a>
+
+  <header class="app">
+    <h1>Aulists</h1>
+  </header>
+
+  <input type="file" id="fileInput" accept="application/json,.json" hidden>
+
+  <main id="app"></main>
+
+  <section class="panel">
+    <h2>List 2 &rarr; List 1 return</h2>
+    <div class="sched-row">
+      <label for="every">Every</label>
+      <input type="number" id="every" min="1" step="1" value="1">
+      <span>day(s) at</span>
+      <input type="number" id="atHour" min="0" max="23" step="1" value="0" aria-label="Hour (0-23)">
+      <span class="colon">:</span>
+      <input type="number" id="atMin" min="0" max="59" step="1" value="00" aria-label="Minute (0-59)">
+      <span class="hint">24h</span>
+    </div>
+    <div class="next-note" id="nextNote"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Backup</h2>
+    <div class="io-rows">
+      <div class="io-row">
+        <button id="exportCopyBtn">Export - Copy</button>
+        <button id="importPasteBtn">Import - Paste</button>
+      </div>
+      <div class="io-row">
+        <button id="exportFileBtn">Export - File</button>
+        <button id="exportShareBtn">Export - Share</button>
+        <button id="importFileBtn">Import - File</button>
+      </div>
+    </div>
+    <div class="last-exported" id="lastExported"></div>
+  </section>
+
+  <div class="theme-switcher" id="themeSwitcher">
+    <button data-theme="light">Light</button>
+    <button data-theme="dark">Dark</button>
+    <button data-theme="system">System</button>
+  </div>
+
+  <nav class="app-links">
+    <a href="about.html">About</a>
+  </nav>
+
+  <section id="debugDatePanel">
+    <p>DEBUG: override "now"</p>
+    <input type="date" id="debugNowDate">
+    <input type="number" id="debugNowHour" min="0" max="23" step="1" value="0" aria-label="Hour (0-23)">
+    <span>24h</span>
+    <button id="debugNowSetBtn">Set</button>
+    <button id="debugNowClearBtn">Use real time</button>
+    <p id="debugNowStatus"></p>
+  </section>
+
+  <div class="undo-redo-pill" id="undoRedoPill">
+    <div class="boundary-confirm" id="boundaryConfirm"></div>
+    <button id="undoBtn" class="ur-btn" aria-label="Undo" disabled>&#8630;</button>
+    <button id="redoBtn" class="ur-btn" aria-label="Redo" disabled>&#8631;</button>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="autorelists.js"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
+</script>
+</body>
+</html>

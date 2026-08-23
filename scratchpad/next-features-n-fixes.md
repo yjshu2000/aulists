@@ -2,8 +2,7 @@
   - [Doc rules](#doc-rules)
   - [Falsedge](#falsedge)
     - [\[i5\] DOLI (Double Or Lose It) mechanism ⬜ 🟢](#i5-doli-double-or-lose-it-mechanism--)
-    - [\[i13\] Swap homepage to Falsedge ⚪ 🟡 🆗](#i13-swap-homepage-to-falsedge---)
-    - [\[i14\] Complex tasks ⬜](#i14-complex-tasks-)
+      - [\[i14\] Complex tasks ⬜](#i14-complex-tasks-)
       - [\[i14.1\] Multipliers and bonuses (exploratory) ⬜ 🟢](#i141-multipliers-and-bonuses-exploratory--)
       - [\[i14.2\] Event-anchored deadlines ⬜ 🟡](#i142-event-anchored-deadlines--)
     - [\[i16\] Micro tasks (NL) ⬜ 🟠](#i16-micro-tasks-nl--)
@@ -117,12 +116,6 @@ The square is inert once the day's promotion is spent or the concurrent cap is m
 
 Negative awards have never run through `resolveTask()`. `taskEntryText()` branches on `award > 0 && ptsDelta === 0` and has no case for a negative, so the ledger line for a `-6` is unwritten.
 
-
-### [i13] Swap homepage to Falsedge ⚪ 🟡 🆗
-
-Done as a file rename. The current `index.html` (Aulists) becomes `aulists.html`, and `falsedge.html` becomes `index.html`. Cross-links, `manifest.json`'s `start_url`, and `sw.js`'s `SHELL` list all get updated to match the new filenames.
-
-`manifest.json`'s `name` and `short_name` stay `"Aulists"` — it remains the overall umbrella app name, unchanged by which page is the entry point.
 
 ### [i14] Complex tasks ⬜
 

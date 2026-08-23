@@ -16,7 +16,7 @@
 <body>
 
 <header>
-  <a class="back-link" href="index.html">&larr; back to lists</a>
+  <a class="back-link" href="aulists.html">&larr; back to lists</a>
 </header>
 
 <div class="card about-card">
@@ -26,6 +26,14 @@
 
 <div class="card about-card">
   <h2>Change logs</h2>
+
+  <div class="changelog-entry">
+    <h3>v2.11 <span class="changelog-date">2026-08-23 16H</span></h3>
+    <ul>
+      <li><b>Falsedge is the homepage now.</b> Opening the app lands on Falsedge instead of Aulists, and the installed PWA does too. Aulists moved to <code>aulists.html</code> and is still one tap away from the bottom of the page.</li>
+      <li>Fixed: challenge mode's script was never in the service worker's cache list, so a first offline load in that mode had nothing to boot from.</li>
+    </ul>
+  </div>
 
   <div class="changelog-entry">
     <h3>v2.10 <span class="changelog-date">2026-08-22 16H</span></h3>

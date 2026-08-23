@@ -136,7 +136,7 @@
 
   // TEMP debug override for "now", for testing date-dependent behaviour
   // without waiting real days. getNow() stays permanently. Comment out this
-  // block, #debugDatePanel in index.html, and its wiring near the bottom of
+  // block, #debugDatePanel in aulists.html, and its wiring near the bottom of
   // this file when not actively testing.
   var DEBUG_NOW_KEY = "aulists.debugNow";
   var debugNowOverride = null;
@@ -3592,7 +3592,7 @@
 
   // TEMP debug panel wiring - comment out along with the override block near
   // the top of this
-  // file and #debugDatePanel in index.html when not actively testing.
+  // file and #debugDatePanel in aulists.html when not actively testing.
   /**
    * Fills the debug-panel date and hour inputs from a Date.
    * @param {Element} dateEl - the date `<input>`.
