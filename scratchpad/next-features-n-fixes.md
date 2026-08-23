@@ -27,7 +27,6 @@
     - [\[i39\] Mode select becomes a dropdown ⚪](#i39-mode-select-becomes-a-dropdown-)
     - [\[i40\] Fake ad timer freezes on return from Falsedge ⚪ 🐞](#i40-fake-ad-timer-freezes-on-return-from-falsedge--)
   - [Multi-page items](#multi-page-items)
-    - [\[i30\] A Falsedge action clears the ad ⬜](#i30-a-falsedge-action-clears-the-ad-)
     - [\[i41\] Cooldown on the Go to Hex 2^ button ⚪](#i41-cooldown-on-the-go-to-hex-2-button-)
     - [\[i27\] (low priority/far future) - Server side ⬜⬜⬜ 🔵](#i27-low-priorityfar-future---server-side--)
   - [Colourcaln?](#colourcaln)
@@ -58,9 +57,9 @@ LAST USED ID: i42
 
 **D8. Every item's heading ends with a tag.** ⬜ big task, ⚪ medium task, ▫️ minor or trivial to implement. 🐞 marks a bug fix rather than new work, and sits alongside a size tag rather than replacing it. Sub-items are tagged on their own merits, independently of their parent.
 
-**D9. 🆗 means buildable as-is, right now.** It is Claude's assertion about the item's completeness — not a priority, and not the user's approval to start. It says the item can be built start to finish with no further questions asked and no assumption made that could turn out wrong: every question that *could* be asked about it has already been asked and answered. It goes last in the heading, after the priority. Its absence says nothing about importance — only that at least one detail would still have to be guessed at. A lack of an `**Undecided:**` block is *not* enough on its own to earn it, since an item can list no open questions and still leave something unwritten. Claude adds it; anything that raises a new question about the item strips it again.
+**D9. 🆗 means buildable as-is, right now.** It is an assertion about the item's completeness — not a priority, and not the user's approval to start. It says the item can be built start to finish with no further questions asked and no assumption made that could turn out wrong: every question that *could* be asked about it has already been asked and answered. It goes last in the heading, after the priority. Its absence says nothing about importance — only that at least one detail would still have to be guessed at. A lack of an `**Undecided:**` block is *not* enough on its own to earn it, since an item can list no open questions and still leave something unwritten. Claude should suggest it if an item looks complete — then the user will demand rechecks until it comes back clean with no questions, before it can be stamped with 🆗.
 
-**D10. Every item also carries a priority, between the size tag and 🆗.** Legend listed below. Priority is the user's call, not Claude's — Claude assigns 🆗, the user assigns the colour. It says nothing about size or readiness: a 🔴 can be ⬜ and unspecced, a 🔵 can be ▫️ and 🆗. So a full heading reads `### [iN] Title ⬜ 🔴 🆗`.
+**D10. Every item also carries a priority, between the size tag and 🆗.** Legend listed below. Priority is the user's call, not Claude's. So is 🆗, which Claude can only ask for (D9). It says nothing about size or readiness: a 🔴 can be ⬜ and unspecced, a 🔵 can be ▫️ and 🆗. So a full heading reads `### [iN] Title ⬜ 🔴 🆗`.
 
 ```
 🔴 critical
@@ -71,7 +70,8 @@ LAST USED ID: i42
 ```
 
 **D11. No history of this doc or the babbles.** An item is a buildable spec, not a changelog. Never reference an earlier version of an item, a superseded decision, a rejected option, or anything said in `sad-todos-babble.md`. No "previously", no "this replaces", no "an earlier note said". State the final decision as though it had always been the decision.
-**Describing the current code is not history and is encouraged.** What the code does today, what a function is named, what breaks — an item should say all of it, since that is the gap the work has to close.
+
+**D11.1. Describing the current code is not history and is encouraged.** What the code does today, what a function is named, what breaks — an item should say all of it, since that is the gap the work has to close.
 
 ## Falsedge
 
@@ -291,11 +291,11 @@ The white flash covers the canvas only, not the whole viewport.
 
 v1 with two changes, standing as its own mode rather than an edit to v1. v1 keeps its current behaviour exactly.
 
-**Jostles spawn a `1`.** Every jostle drops a literal `1` tile onto the board — 1 + 1 = 2, so it feeds the normal progression from below instead of sitting outside it. Jostling now costs something, so it no longer needs rate-limiting: repeated jostles are allowed, and the 32-swipe jostle cooldown idea is dropped.
+**Jostles spawn a `1`.** Every jostle drops a literal `1` tile onto the board — 1 + 1 = 2, so it feeds the normal progression from below instead of sitting outside it. Jostling now costs something, so it no longer needs rate-limiting: the 32-swipe jostle cooldown idea is dropped. v1's no-two-jostles-in-a-row rule still stands — a live swipe is what re-arms the jostle.
 
 **Hearts pay for jostles only.** A regular undo is free and is never blocked, at any heart count. A heart is spent only when the undo steps back *across* a jostle. The undo button is disabled only when hearts are 0 **and** the last move was a jostle. This is the correction to v1, where every undo costs a heart and zero hearts greys the button outright.
 
-**Undecided:** whether v1's no-two-jostles-in-a-row rule survives, given repeated jostling is now the point of the mode. Also what the spawned `1` does when the board is full.
+**Undecided:** what the spawned `1` does when the board is full.
 
 #### [i24.2] Challenge Ultra ⚪
 
@@ -324,9 +324,7 @@ A swipe repeats in the same direction until nothing moves and nothing merges —
 
 Faster to play. Whether it is also *easier* is unsettled: it was first described as neither harder nor easier, only quicker, and later as plainly easier.
 
-The name is settled. "Continuous" was rejected — the motion is not continuous, it is the same discrete move re-applied until it stops changing anything.
-
-**Undecided:** whether a tile spawns once at the end or after each internal step, whether the intermediate positions animate or only the final one is drawn, and whether it composes with the challenge tiers at all.
+Built over normal mode. Each internal step behaves as its own swipe: it animates individually and spawns a tile as usual, so one gesture reads as several swipes happening in sequence.
 
 ### [i38] Sticky mode ⬜ 🟢
 
@@ -364,30 +362,6 @@ Coming back to Hex 2^ from Falsedge leaves the fake ad's countdown stopped — t
 
 ## Multi-page items
 
-### [i30] A Falsedge action clears the ad ⬜
-
-**The link is never locked.** "Go to Hex 2^" always works and is never greyed. No counter on it, no currency, no stacks, no spending.
-
-**The rule.** Falsedge snapshots `undoPointer` on page load and compares it when the Hex 2^ button is tapped. If it changed, an existing lockout is cleared. If it did not, nothing happens.
-
-```
-mid-play, no lockout -> Falsedge -> back: fresh 30s, nothing carried
-lockout already up   -> Falsedge -> back: still locked, ad restarted (unless it's been >10 mins)
-lockout already up   -> Falsedge -> did something -> back: cleared
-```
-
-It only ever dismisses a lockout that already existed when you left. It is not credit against a future one, and leaving mid-play still costs nothing — the break resets exactly as it does today.
-
-`undoPointer` is the counter because `pushUndo` increments it and `undo` decrements it, so an action that gets undone nets zero. It never wraps — only the slot index does, via `n % UNDO_RING_SIZE`.
-
-**Closing the navaway loophole.** Today `.navaway` sets `BREAK_KEY` to `"0"`, which clears a live lockout outright, so walking out of one and straight back in grants a clean 30s. That stops working: a lockout that was up when you left is still up when you return, with its ad restarted. Walking out of a lockout is no longer an escape from it. Walking out mid-play is unaffected.
-
-**Or wait it out.** Staying in Falsedge until a timer expires also clears the ad. The timer restarts from scratch on every page load, so it only rewards one continuous sitting. It is deliberately **not** displayed in Falsedge — no countdown, no ring, no animation. Falsedge stays quiet.
-
-**The 10-minute mercy.** If the app was hidden for 10 minutes or more, the fake ad is skipped entirely: the lockout still appears, but with the × available immediately. Flat rate, measured from the moment the page was hidden, and it applies no matter what state things were in — whether an ad was already on screen when you left, or the break only expired while you were gone. Under 10 minutes the current behaviour stands, and the same roll restarts from the top.
-
-**Undecided:** the wait-it-out timer's length, and whether that path survives at all now that a single action is enough. Also open: whether a redo should count, since it moves the pointer forward too.
-
 ### [i41] Cooldown on the Go to Hex 2^ button ⚪
 
 Falsedge's "Go to Hex 2^" button is inert for **10 seconds** after the page loads. Long enough to force a pause, far shorter than the minimums for staying inside the game.
@@ -395,8 +369,6 @@ Falsedge's "Go to Hex 2^" button is inert for **10 seconds** after the page load
 Shown as a filling bar, never as numbers. Ticking once a second is acceptable; a smooth fill is preferred only if it costs nothing structurally — this is one small bar, not a reason to restructure how the page draws.
 
 The clock runs from page load, so it applies once per visit and cannot be banked.
-
-(this overrides i30)
 
 ### [i27] (low priority/far future) - Server side ⬜⬜⬜ 🔵
 
