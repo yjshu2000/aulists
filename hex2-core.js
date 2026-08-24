@@ -954,6 +954,18 @@ window.Hex2 = (function () {
     startBreakTimer();
   }
 
+  // peekable
+  function startPeek(e) {
+    if (e.target.closest(".fake-ad, .lockout-card .hexbtn")) {
+      return;
+    }
+    lockout.classList.add("peek");
+  }
+
+  function endPeek() {
+    lockout.classList.remove("peek");
+  }
+
   function startBreakTimer() {
     const started = parseInt(store.get(BREAK_KEY) || "0", 10);
     if (!started) {
@@ -1086,6 +1098,14 @@ window.Hex2 = (function () {
       link.addEventListener("click", function () {
         store.set(BREAK_KEY, "0");
       });
+    }
+
+    if (lockout) {
+      lockout.addEventListener("pointerdown", startPeek);
+      lockout.addEventListener("pointerup", endPeek);
+      lockout.addEventListener("pointercancel", endPeek);
+      // a finger dragged off-screen would otherwise leave the board visible
+      lockout.addEventListener("pointerleave", endPeek);
     }
 
     if (fakeAd) {

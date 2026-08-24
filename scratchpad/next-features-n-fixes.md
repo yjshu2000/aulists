@@ -20,7 +20,6 @@
       - [\[i24.1\] Challenge v2 ⚪](#i241-challenge-v2-)
       - [\[i24.2\] Challenge Ultra ⚪](#i242-challenge-ultra-)
     - [\[i31\] Mobile landscape-orientation compatibility 🟢](#i31-mobile-landscape-orientation-compatibility-)
-    - [\[i32\] Hold to peek behind the lockout ▫️ 🔴 🆗](#i32-hold-to-peek-behind-the-lockout-️--)
     - [\[i37\] Careening mode ⬜](#i37-careening-mode-)
     - [\[i38\] Sticky mode ⬜ 🟢](#i38-sticky-mode--)
     - [\[i39\] Mode select becomes a dropdown ⚪](#i39-mode-select-becomes-a-dropdown-)
@@ -296,20 +295,6 @@ v2 with the safety net removed. No hearts and no undo at all. Every jostle spawn
 
 ### [i31] Mobile landscape-orientation compatibility 🟢
 game is broken in landscape right now but like whateverrr i dont play in landscape so who caaaares
-
-### [i32] Hold to peek behind the lockout ▫️ 🔴 🆗
-
-The lockout hides the board completely — `rgba(18, 20, 26, 0.94)` plus `backdrop-filter: blur(3px)`, both on one full-viewport layer (`.lockout`). Pressing and holding fades that layer down so the board can be looked at during the wait.
-
-**Peek surface.** Anywhere on `.lockout` *except* its three controls — the `.fake-ad` circle and the two `.lockout-card` links. Those are carved out and always behave as buttons; a hold on one starts no peek.
-
-**What changes while held.** The dim drops to `rgba(18, 20, 26, 0.15)`, the blur goes to `none`, and the three controls to `opacity: 0.25`. Values snap — no transition, no fade. Nothing is removed and nothing stops taking taps; the controls stay live throughout, only faded. A single `.lockout.peek` class carries all of it.
-
-**The countdown keeps running.** Peeking is free and costs no time; the ad's ring keeps filling behind the fade, and the × becomes available on schedule even mid-peek.
-
-**A peek never reaches the game.** The hold, and any finger movement during it, stay on `.lockout` and are never seen by the canvas's swipe handler.
-
-`pointerdown` starts the peek; `pointerup`, `pointercancel`, and the pointer leaving the element all end it, so a finger dragged off-screen cannot leave the board stuck visible.
 
 ### [i37] Careening mode ⬜
 

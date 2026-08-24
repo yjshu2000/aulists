@@ -274,6 +274,17 @@
   .lockout.show {
     display: flex;
   }
+  /* Press and hold anywhere but the three controls to look at the board
+     behind. The values snap rather than transition, and nothing is removed -
+     the controls stay live throughout, only faded. */
+  .lockout.peek {
+    background: rgba(18, 20, 26, 0.15);
+    backdrop-filter: none;
+  }
+  .lockout.peek .fake-ad,
+  .lockout.peek .lockout-card .hexbtn {
+    opacity: 0.25;
+  }
   .lockout-card {
     display: flex;
     flex-direction: column;
