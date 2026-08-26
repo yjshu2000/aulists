@@ -2,10 +2,11 @@
   - [Doc rules](#doc-rules)
   - [Falsedge](#falsedge)
     - [\[i5\] DOLI (Double Or Lose It) mechanism ⬜ 🟢](#i5-doli-double-or-lose-it-mechanism--)
-      - [\[i14\] Complex tasks ⬜](#i14-complex-tasks-)
+    - [\[i14\] Complex tasks ⬜](#i14-complex-tasks-)
       - [\[i14.1\] Multipliers and bonuses (exploratory) ⬜ 🟢](#i141-multipliers-and-bonuses-exploratory--)
       - [\[i14.2\] Event-anchored deadlines ⬜ 🟡](#i142-event-anchored-deadlines--)
-    - [\[i16\] Micro tasks (NL) ⬜ 🟠](#i16-micro-tasks-nl--)
+      - [\[i14.3\] Micro tasks (NL) ⬜ 🟠](#i143-micro-tasks-nl--)
+      - [\[i14.4\] Tasks with secondary/minor (name/vocab uncertain) tasks ⬜](#i144-tasks-with-secondaryminor-namevocab-uncertain-tasks-)
     - [\[i19\] Delete individual ledger entries ⚪ 🟡](#i19-delete-individual-ledger-entries--)
     - [\[i21\] Daily score chart ⬜ 🟡](#i21-daily-score-chart--)
     - [\[i26\] Export all app data ⚪ 🔴](#i26-export-all-app-data--)
@@ -53,7 +54,7 @@ LAST USED ID: i42
 
 **D7. No backward compatibility for old data, ever.** No migration code, no accounting for old data shapes, in this phase or any future one. If data has to survive a breaking change, it gets exported, updated, and re-imported by hand.
 
-**D8. Every item's heading ends with a tag.** ⬜ big task, ⚪ medium task, ▫️ minor or trivial to implement. 🐞 marks a bug fix rather than new work, and sits alongside a size tag rather than replacing it. Sub-items are tagged on their own merits, independently of their parent.
+**D8. Every item's heading ends with a tag.** ⬜ big task, ⚪ medium task, ▫️ minor or trivial to implement. 🐞 marks a bug fix rather than new work, and sits alongside a size tag rather than replacing it. Sub-items are tagged on their own merits, independently of their parent. CLAUDE DECIDES THIS TAG. I DON'T KNOW WHAT'S BIG OR SMALL THAT'S THE ENTIRE FVCKING POINT OF THE TAG HELLO????
 
 **D9. 🆗 means buildable as-is, right now.** It is an assertion about the item's completeness — not a priority, and not the user's approval to start. It says the item can be built start to finish with no further questions asked and no assumption made that could turn out wrong: every question that *could* be asked about it has already been asked and answered. It goes last in the heading, after the priority. Its absence says nothing about importance — only that at least one detail would still have to be guessed at. A lack of an `**Undecided:**` block is *not* enough on its own to earn it, since an item can list no open questions and still leave something unwritten. Claude should suggest it if an item looks complete — then the user will demand rechecks until it comes back clean with no questions, before it can be stamped with 🆗.
 
@@ -128,7 +129,7 @@ A task can be set whose deadline isn't known at set time, because it hangs off a
 
 **Undecided:** nearly all of it. The `19:37` → `20:40` example is +1h and then rounded up to the next 10-minute mark, which matches the app's existing 10-minute offset granularity, but that rounding rule was never stated outright. Also open: where the anchor phrase is authored, what the task displays before its event time is entered, whether the offset is fixed at 1h or configurable per task, whether scoring runs from the resolved deadline exactly as a normal task's does, and what happens if the event time is never entered at all.
 
-### [i16] Micro tasks (NL) ⬜ 🟠
+#### [i14.3] Micro tasks (NL) ⬜ 🟠
 
 A second, smaller class of task. `NL` (no leniency) *is* the micro-task marker — tagging an item NL hands it the whole package rather than only switching leniency off, so there is no separate "micro" toggle to set.
 
@@ -139,6 +140,33 @@ A second, smaller class of task. `NL` (no leniency) *is* the micro-task marker �
 - Can be attached to another item. Swiping that item into an active task activates its whole micro-task set alongside it — and that is the *only* link between them. Cancelling or editing the parent afterwards does nothing to the set; the attachment is a swiping convenience, not a dependency.
 - Cancelling works at either granularity: one micro task on its own, or the whole set at once.
 - DOLI does not apply to micro tasks — a +1 task is not worth a gamble slot.
+
+#### [i14.4] Tasks with secondary/minor (name/vocab uncertain) tasks ⬜
+
+Completing the second task of a main task within the deadline awards 4pts. does not stack with completing the main task. the second task must always be a subset of the main task: eg, if the main task is "vacuum and mop the floors" the 2nd task would be "vacuumed floor" or smth. I don't know if "second" makes sense as a name though.
+
+2nd task completion has no leniency. The main task still has regular leniency, whatever was selected (WL, HL, etc). eg, just vacuumed floor but later than deadline -> no pts. vacuumed and mopped later than deadline but within leniency -> some pts. only vacuumed floor but before deadline and then ALSO didn't mop (or forfeiting/giving up on that) before the final leniency time -> 4pts.
+
+**Undecided: the scoring does not hold together yet.** `TIER_POINTS` is `[6, 3, 2, 1]`, so a flat 4 for the second task sits above three of the four tiers. Once the 4 is banked, finishing the main task late pays *less* than not finishing it at all — vacuum on time, mop ten minutes late, and 4 points becomes 3. The rule that has to hold is that **every main-task tier must be worth more than the second task's award**, and no arrangement of "which one you get" can deliver that while the numbers stay as they are. Either the award comes down or the ladder goes up.
+
+Two families of fix, neither chosen:
+
+**Additive.** The second task's award stacks on top of whatever the main task scores, and `TIER_POINTS` is left alone. Finishing then always adds the tier, so doing more is always worth more at every point on the clock. This drops the "does not stack" rule above, which is the price of the pull it buys.
+
+```
+                    +2   +3   +4
+second task only     2    3    4
+full, on time        8    9   10
+full, +10           5    6    7
+full, +30           4    5    6
+full, +60           3    4    5
+```
+
+**A dedicated ladder.** Two-objective tasks get their own `TIER_POINTS` whose lowest rung clears the second task's award — `[10, 8, 6, 5]` against an award of 4, for instance. "Does not stack" survives, and the higher pay justifies itself on the grounds that a two-objective task is more work. The difficulty is shape rather than arithmetic: `[6, 3, 2, 1]` halves and then crawls, so any scalar multiple of it inherits that cliff, and candidates like `[8, 4, 3, 2]` or `[9, 6, 4, 3]` scale unevenly rung to rung.
+
+**This collides with [i5].** A promoted DOLI task is worth 12 on time. An additive `+4` puts a two-objective task at 10 with no gamble and no downside, which leaves DOLI very little room; `+2` tops out at 8 and does not.
+
+**Also undecided:** when the 4 is actually awarded, given nothing in Falsedge resolves on its own — whether `cancel task` pays it out once the second task is ticked, or a separate forfeit control is needed. How the second task is ticked off and whether that tick is timestamped, since "before the deadline" has to be judged later and a task resolved at 23:00 cannot otherwise prove the vacuuming happened at 19:00. Whether a second task can be authored on dailies and `others` rows or only in SET. Whether there can be more than one. And the name: **sub-task**, **partial**, **minimum**, **fallback** and **milestone** are all candidates, with "minimum" reading closest to the mechanic.
 
 ### [i19] Delete individual ledger entries ⚪ 🟡
 

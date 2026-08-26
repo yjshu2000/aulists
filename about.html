@@ -28,6 +28,13 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v2.12.1 <span class="changelog-date">2026-08-26 07H</span></h3>
+    <ul>
+      <li>Fixed: a daily couldn't be set during the 20 minutes before its own time. Today's slot hadn't passed, so it never rolled to tomorrow, but it was already inside the 20-minute minimum, so today was refused too &mdash; leaving the task unsettable in both directions. A bare time now rolls to tomorrow as soon as today's is too close to make.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v2.12 <span class="changelog-date">2026-08-23 19H</span></h3>
     <ul>
       <li>Press and hold the ad lockout to peek at the board behind it &mdash; the dim lifts and the blur drops for as long as you hold. The countdown keeps running underneath, so peeking costs you nothing, and the &times; and both links stay tappable the whole time.</li>

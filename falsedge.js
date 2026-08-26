@@ -164,8 +164,8 @@
   }
 
   /**
-   * Resolves a bare "HH:MM" clock time to its next occurrence at or after a
-   * reference moment - today's if it hasn't passed, tomorrow's if it has.
+   * Resolves a bare "HH:MM" clock time to its next settable occurrence -
+   * today's if it still clears the 20-minute lead, tomorrow's otherwise.
    * @param {string} t - a clock time, "HH:MM".
    * @param {Date} now - the reference moment.
    * @returns {Date} the resolved absolute instant.
@@ -174,7 +174,7 @@
     var parts = String(t).split(":");
     var d = new Date(now.getTime());
     d.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
-    if (d.getTime() < now.getTime()) {
+    if (d.getTime() < now.getTime() + MIN_LEAD_MS) {
       d.setDate(d.getDate() + 1);
     }
     return d;

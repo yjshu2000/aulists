@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tile palette</title>
+<style>
+  :root{
+    --hex-bg:#12141a;
+    --hex-panel:#1b1e27;
+    --hex-panel-2:#232734;
+    --hex-line:#2c313f;
+    --hex-ink:#e8ebf2;
+    --hex-ink-dim:#8b93a7;
+    --hex-accent:#3cc3e2;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--hex-bg);
+    color:var(--hex-ink);
+    font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
+    padding:20px 14px 90px;
+    -webkit-user-select:none;
+    user-select:none;
+  }
+  .col{max-width:1020px;margin:0 auto;}
+  h1.page{font-size:20px;font-weight:800;letter-spacing:.04em;margin:0 0 6px;}
+  .note{color:var(--hex-ink-dim);font-size:12.5px;line-height:1.6;margin:0 0 24px;}
+  .note code{color:var(--hex-accent);}
+  .note b{color:var(--hex-ink);}
+
+  .vhead{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 4px;}
+  .vlabel{
+    font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--hex-accent);
+  }
+  .resetbtn{
+    font:inherit;font-size:10px;font-weight:700;letter-spacing:.06em;
+    background:var(--hex-panel-2);color:var(--hex-ink-dim);
+    border:1px solid var(--hex-line);border-radius:7px;
+    padding:3px 7px;min-height:0;
+  }
+  .resetbtn[hidden]{display:none;}
+  .variant{display:flex;flex-direction:column;align-items:center;}
+  svg{display:block;touch-action:none;}
+  .tile{cursor:grab;}
+  .tile.lifted{opacity:.25;}
+
+  .solo{margin-bottom:34px;}
+
+  .cross{
+    display:grid;
+    grid-template-columns:repeat(3, max-content);
+    gap:18px;
+    justify-content:center;
+    align-items:start;
+  }
+  .slot-e{grid-column:1;grid-row:1;}
+  .slot-c{grid-column:2;grid-row:1;}
+  .slot-b{grid-column:3;grid-row:1;}
+  .slot-d{grid-column:1;grid-row:2;}
+  .slot-x{grid-column:2;grid-row:2;}
+  .slot-f{grid-column:3;grid-row:2;}
+
+  /* the finished palettes, below the working boards */
+  .final{
+    display:flex;justify-content:center;gap:30px;flex-wrap:wrap;
+    margin-top:34px;padding-top:28px;
+    border-top:1px solid var(--hex-line);
+  }
+
+  #ghost{
+    position:fixed;left:0;top:0;z-index:99;pointer-events:none;
+    display:none;filter:drop-shadow(0 6px 14px rgba(0,0,0,.55));
+  }
+
+  /* ---- per-tile fine tuning, H only ---- */
+  #tuner{
+    position:fixed;z-index:120;display:none;
+    width:250px;padding:12px;
+    background:var(--hex-panel);
+    border:1px solid var(--hex-accent);
+    border-radius:12px;
+    box-shadow:0 10px 30px rgba(0,0,0,.6);
+  }
+  #tuner.show{display:block;}
+  .tune-head{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:10px;
+  }
+  .tune-title{font-size:13px;font-weight:800;letter-spacing:.04em;}
+  .tune-swatch{
+    width:26px;height:26px;border-radius:6px;border:1px solid var(--hex-line);
+  }
+  .tune-row{display:flex;align-items:center;gap:6px;margin-bottom:7px;}
+  .tune-row .k{
+    width:14px;font-size:11px;font-weight:800;color:var(--hex-accent);
+  }
+  .tune-row input[type=range]{
+    flex:1;min-width:0;height:20px;accent-color:var(--hex-accent);
+  }
+  .tune-row .v{
+    width:34px;text-align:right;font-size:11px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    color:var(--hex-ink-dim);
+  }
+  .arrow{
+    width:22px;height:22px;padding:0;flex:0 0 auto;
+    font:inherit;font-size:12px;font-weight:800;line-height:1;
+    background:var(--hex-panel-2);color:var(--hex-ink);
+    border:1px solid var(--hex-line);border-radius:6px;
+  }
+  .arrow:active{background:var(--hex-accent);color:var(--hex-bg);}
+  .tune-foot{display:flex;gap:8px;margin-top:10px;}
+  .tune-foot button{
+    flex:1;font:inherit;font-size:11px;font-weight:700;
+    background:var(--hex-panel-2);color:var(--hex-ink-dim);
+    border:1px solid var(--hex-line);border-radius:8px;padding:6px 0;
+  }
+  .tune-hex{
+    margin-top:8px;text-align:center;font-size:11px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    color:var(--hex-ink-dim);
+    -webkit-user-select:text;user-select:text;
+  }
+
+  .readout{
+    margin-top:34px;background:var(--hex-panel);border:1px solid var(--hex-line);
+    border-radius:12px;padding:14px 16px;
+  }
+  .readout h2{
+    font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--hex-accent);margin:0 0 8px;
+  }
+  /* the page is user-select:none so dragging never selects text, but the
+     readout is the one thing here you actually want to copy out */
+  .readout pre{
+    margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:11.5px;line-height:1.7;color:var(--hex-ink-dim);
+    white-space:pre-wrap;
+    -webkit-user-select:text;
+    user-select:text;
+    cursor:text;
+  }
+</style>
+</head>
+<body>
+<div class="col">
+
+<h1 class="page">Tile palette</h1>
+<p class="note">
+  All nineteen tiles, <code>1</code> through <code>262144</code>, filling the real 19-cell board,
+  snaking along the <b>&quot;/&quot; diagonals</b> so every value touches the one before and after it.
+  Font sizing is <code>tileFontSize()</code> exactly as it ships.
+  <br><br>
+  <b>Drag any tile onto any other and their colours trade.</b> Numbers never move. Works within a
+  board and across boards. Each board has its own <b>reset</b>, which appears once you have changed
+  something. <b>X</b> is the grey workbench; <b>A</b> keeps today's ramp and is not draggable.
+  <br><br>
+  <b>G</b> is the palette as dragged together on X. <b>H</b> is that palette after being tuned tile
+  by tile, and is the real one &mdash; hand-picked hues, saturation varying per tile, the even
+  spacing gone. The two are different palettes, not two views of one. H is also the only board you
+  can fine-tune: <b>tap a tile</b> for hue, saturation and lightness sliders, arrows for single
+  steps, and a per-tile reset. Dragging still swaps on H, so a tap is a tap and a drag is a drag.
+</p>
+
+<div id="solo"></div>
+<div class="cross" id="cross"></div>
+<div class="final" id="final"></div>
+
+<div class="readout">
+  <h2>Current assignment</h2>
+  <pre id="readout"></pre>
+</div>
+
+</div>
+
+<svg id="ghost"></svg>
+
+<div id="tuner">
+  <div class="tune-head">
+    <span class="tune-title" id="tuneTitle">tile</span>
+    <span class="tune-swatch" id="tuneSwatch"></span>
+  </div>
+  <div class="tune-row">
+    <span class="k">H</span>
+    <button class="arrow" data-ch="h" data-d="-1">&minus;</button>
+    <input type="range" id="tuneH" min="0" max="360" step="1">
+    <button class="arrow" data-ch="h" data-d="1">+</button>
+    <span class="v" id="tuneHV"></span>
+  </div>
+  <div class="tune-row">
+    <span class="k">S</span>
+    <button class="arrow" data-ch="s" data-d="-1">&minus;</button>
+    <input type="range" id="tuneS" min="0" max="100" step="1">
+    <button class="arrow" data-ch="s" data-d="1">+</button>
+    <span class="v" id="tuneSV"></span>
+  </div>
+  <div class="tune-row">
+    <span class="k">L</span>
+    <button class="arrow" data-ch="l" data-d="-1">&minus;</button>
+    <input type="range" id="tuneL" min="0" max="100" step="1">
+    <button class="arrow" data-ch="l" data-d="1">+</button>
+    <span class="v" id="tuneLV"></span>
+  </div>
+  <div class="tune-hex" id="tuneHex"></div>
+  <div class="tune-foot">
+    <button id="tuneReset">reset tile</button>
+    <button id="tuneClose">close</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- the game's own constants, copied from hex2-core.js ----
+  var R = 2;
+  var WIN_EXP = 14;          // 16384, the win tile
+  var MAX_EXP = 18;          // 262144, the top of the ramp
+  var OLD_MAX_HUE = 300;     // what ships: red(0) -> magenta(300)
+  var TILE_COUNT = MAX_EXP + 1;
+  var SQRT3 = Math.sqrt(3);
+  var RADIUS_FRAC = 0.9;
+  var STROKE_FRAC = 0.03;
+  var STROKE_COLOUR = "rgba(0,0,0,0.18)";
+  var TEXT_NUDGE = 0.04;
+  var SAT = 0.66;
+  var SIZE = 36;
+  var TAP_SLOP = 6;          // px of travel below which a drag is a tap
+  var NS = "http://www.w3.org/2000/svg";
+
+  // ---- board cells, exactly as hex2-core.js builds them ----
+  var cells = [];
+  for (var x = -R; x <= R; x++) {
+    var yLo = Math.max(-R, -x - R);
+    var yHi = Math.min(R, -x + R);
+    for (var y = yLo; y <= yHi; y++) {
+      cells.push({ x: x, y: y, z: -x - y });
+    }
+  }
+
+  function unitPos(c) {
+    return { px: 1.5 * c.x, py: SQRT3 * (c.z + c.x / 2) };
+  }
+
+  // The snake runs along the "/" diagonals: cells sharing a y form one line,
+  // and rising x carries you right and up it. Lines alternate direction, and
+  // each turn lands on a real neighbour, so consecutive values always touch.
+  function snakeOrder() {
+    var out = [];
+    for (var y = -R; y <= R; y++) {
+      var line = cells.filter(function (c) {
+        return c.y === y;
+      });
+      line.sort(function (a, b) {
+        return a.x - b.x;
+      });
+      if ((y + R) % 2 === 1) {
+        line.reverse();
+      }
+      out = out.concat(line);
+    }
+    return out;
+  }
+
+  var ORDER = snakeOrder();
+  var VALUES = ORDER.map(function (c, i) {
+    return Math.pow(2, i);
+  });
+
+  // ---- tileFontSize(), verbatim from hex2-core.js ----
+  function tileFontSize(value, size) {
+    var len = String(value).length;
+    if (len >= 5) return size * 0.40;
+    if (len === 4) return size * 0.48;
+    if (len === 3) return size * 0.56;
+    return size * 0.64;
+  }
+
+  // ---- colour maths ----
+  function clamp255(v) {
+    return Math.max(0, Math.min(255, Math.round(v * 255)));
+  }
+
+  function hslToRgb(hDeg, s, l) {
+    var hh = ((hDeg % 360) + 360) % 360 / 360;
+    var a = s * Math.min(l, 1 - l);
+    function channel(n) {
+      var k = (n + hh * 12) % 12;
+      return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    }
+    return [
+      clamp255(channel(0)),
+      clamp255(channel(8)),
+      clamp255(channel(4))
+    ];
+  }
+
+  function rgbStr(rgb) {
+    return "rgb(" + rgb[0] + ", " + rgb[1] + ", " + rgb[2] + ")";
+  }
+
+  function hexStr(rgb) {
+    function two(n) {
+      var s = n.toString(16);
+      if (s.length < 2) return "0" + s;
+      return s;
+    }
+    return "#" + two(rgb[0]) + two(rgb[1]) + two(rgb[2]);
+  }
+
+  // the game's own rule: relative luminance off the fill, flipping at 0.6
+  function textFor(rgb) {
+    var lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+    if (lum > 0.6) return "#171a1f";
+    return "#ffffff";
+  }
+
+  // Nineteen evenly spaced hues around the full circle.
+  function hueOf(value) {
+    return Math.log2(value) * 360 / TILE_COUNT;
+  }
+
+  // As it ships: floor at exponent 1 so a `1` tile clamps onto `2`'s red, and
+  // the ceiling clamps at WIN_EXP so everything above 16384 is one magenta.
+  function todayRgb(value) {
+    var e = Math.log2(value);
+    var f = Math.min(1, Math.max(0, (e - 1) / (WIN_EXP - 1)));
+    return hslToRgb(f * OLD_MAX_HUE, SAT, 0.52);
+  }
+
+  // ---- state ----
+  // A slot carries h/s/l outright rather than deriving them, so a hand-picked
+  // colour is storable, draggable and tunable like any other. `label` is only
+  // for the readout.
+  var BOARDS = [
+    { key: "E", L: 0.76, slot: "slot-e" },
+    { key: "C", L: 0.64, slot: "slot-c" },
+    { key: "B", L: 0.52, slot: "slot-b" },
+    { key: "D", L: 0.40, slot: "slot-d" },
+    { key: "X", L: 0.50, slot: "slot-x" },
+    { key: "F", L: 0.28, slot: "slot-f" }
+  ];
+
+  // What G starts from: the palette as dragged together on X, every entry
+  // naming the board it was pulled from. The 8 is the one hand-picked hue,
+  // sitting halfway between the 2 and 4 steps.
+  var EIGHT_HUE = (hueOf(2) + hueOf(4)) / 2;      // 28.42 degrees
+  var G_SEED = [
+    { hue: hueOf(1), S: SAT, L: 0.76, label: "E's 1" },
+    { hue: hueOf(1), S: SAT, L: 0.64, label: "C's 1" },
+    { hue: hueOf(1), S: SAT, L: 0.52, label: "B's 1" },
+    { hue: EIGHT_HUE, S: SAT, L: 0.52, label: "hand-picked 28.4deg" },
+    { hue: hueOf(8), S: SAT, L: 0.64, label: "C's 8" },
+    { hue: hueOf(64), S: SAT, L: 0.52, label: "B's 64" },
+    { hue: hueOf(64), S: SAT, L: 0.28, label: "F's 64" },
+    { hue: hueOf(128), S: SAT, L: 0.40, label: "D's 128" },
+    { hue: hueOf(256), S: SAT, L: 0.52, label: "B's 256" },
+    { hue: hueOf(512), S: SAT, L: 0.40, label: "D's 512" },
+    { hue: hueOf(1024), S: SAT, L: 0.64, label: "C's 1024" },
+    { hue: hueOf(2048), S: SAT, L: 0.52, label: "B's 2048" },
+    { hue: hueOf(4096), S: SAT, L: 0.28, label: "F's 4096" },
+    { hue: hueOf(8192), S: SAT, L: 0.52, label: "B's 8192" },
+    { hue: hueOf(16384), S: SAT, L: 0.52, label: "B's 16384" },
+    { hue: hueOf(32768), S: SAT, L: 0.64, label: "C's 32768" },
+    { hue: hueOf(65536), S: SAT, L: 0.52, label: "B's 65536" },
+    { hue: hueOf(131072), S: SAT, L: 0.40, label: "D's 131072" },
+    { hue: hueOf(262144), S: SAT, L: 0.52, label: "B's 262144" }
+  ];
+
+  // What H starts from: the palette after it was tuned tile by tile. These
+  // are hand-picked values, not derived from anything - the even hue spacing
+  // is gone, saturation varies per tile, and the 8 sits at 20 rather than
+  // G_SEED's 28.4. This is the real palette.
+  var H_SEED = [
+    { hue: 0, S: 0.66, L: 0.84, label: "tuned" },
+    { hue: 0, S: 0.66, L: 0.66, label: "tuned" },
+    { hue: 0, S: 0.69, L: 0.55, label: "tuned" },
+    { hue: 20, S: 0.66, L: 0.52, label: "tuned" },
+    { hue: 36, S: 0.93, L: 0.49, label: "tuned" },
+    { hue: 50, S: 0.91, L: 0.61, label: "tuned" },
+    { hue: 75, S: 0.78, L: 0.52, label: "tuned" },
+    { hue: 97, S: 0.88, L: 0.43, label: "tuned" },
+    { hue: 152, S: 0.66, L: 0.60, label: "tuned" },
+    { hue: 189, S: 0.66, L: 0.59, label: "tuned" },
+    { hue: 215, S: 0.59, L: 0.54, label: "tuned" },
+    { hue: 224, S: 0.79, L: 0.51, label: "tuned" },
+    { hue: 228, S: 0.92, L: 0.35, label: "tuned" },
+    { hue: 246, S: 0.66, L: 0.58, label: "tuned" },
+    { hue: 269, S: 0.66, L: 0.60, label: "tuned" },
+    { hue: 286, S: 0.68, L: 0.70, label: "tuned" },
+    { hue: 305, S: 0.66, L: 0.54, label: "tuned" },
+    { hue: 328, S: 0.81, L: 0.50, label: "tuned" },
+    { hue: 348, S: 0.55, L: 0.48, label: "tuned" }
+  ];
+
+  // What J starts from: H tuned further. Only the warm run moved - the 8, 16
+  // and 32 all pushed warmer, and the 8 markedly more saturated.
+  var J_SEED = [
+    { hue: 0, S: 0.66, L: 0.84, label: "tuned" },
+    { hue: 0, S: 0.66, L: 0.66, label: "tuned" },
+    { hue: 0, S: 0.69, L: 0.55, label: "tuned" },
+    { hue: 23, S: 0.78, L: 0.52, label: "tuned" },
+    { hue: 41, S: 0.92, L: 0.49, label: "tuned" },
+    { hue: 56, S: 0.88, L: 0.56, label: "tuned" },
+    { hue: 75, S: 0.78, L: 0.52, label: "tuned" },
+    { hue: 97, S: 0.88, L: 0.43, label: "tuned" },
+    { hue: 152, S: 0.66, L: 0.60, label: "tuned" },
+    { hue: 189, S: 0.66, L: 0.59, label: "tuned" },
+    { hue: 215, S: 0.59, L: 0.54, label: "tuned" },
+    { hue: 224, S: 0.79, L: 0.51, label: "tuned" },
+    { hue: 228, S: 0.92, L: 0.35, label: "tuned" },
+    { hue: 246, S: 0.66, L: 0.58, label: "tuned" },
+    { hue: 269, S: 0.66, L: 0.60, label: "tuned" },
+    { hue: 286, S: 0.68, L: 0.70, label: "tuned" },
+    { hue: 305, S: 0.66, L: 0.54, label: "tuned" },
+    { hue: 328, S: 0.81, L: 0.50, label: "tuned" },
+    { hue: 348, S: 0.55, L: 0.48, label: "tuned" }
+  ];
+
+  var SEEDS = { G: G_SEED, H: H_SEED };
+
+  // J is display-only, like A and I: no state, no dragging, no tuner. It just
+  // draws J_SEED, so it cannot drift from the values it records.
+  var ALL = BOARDS.concat([
+    { key: "G", L: null, slot: null },
+    { key: "H", L: null, slot: null }
+  ]);
+
+  var state = {};
+
+  function defaultSlots(board) {
+    if (SEEDS[board.key]) {
+      return SEEDS[board.key].map(function (f) {
+        return { hue: f.hue, S: f.S, L: f.L, label: f.label, grey: false };
+      });
+    }
+    return VALUES.map(function (v) {
+      return {
+        hue: hueOf(v),
+        S: SAT,
+        L: board.L,
+        label: board.key + "'s " + v,
+        grey: board.key === "X"
+      };
+    });
+  }
+
+  ALL.forEach(function (b) {
+    state[b.key] = defaultSlots(b);
+  });
+
+  function slotRgb(slot) {
+    if (slot.grey) return [128, 128, 128];
+    return hslToRgb(slot.hue, slot.S, slot.L);
+  }
+
+  function sameSlot(a, b) {
+    return a.label === b.label && a.grey === b.grey &&
+      Math.abs(a.hue - b.hue) < 0.05 &&
+      Math.abs(a.S - b.S) < 0.005 &&
+      Math.abs(a.L - b.L) < 0.005;
+  }
+
+  function isDefault(board) {
+    var def = defaultSlots(board);
+    return state[board.key].every(function (s, i) {
+      return sameSlot(s, def[i]);
+    });
+  }
+
+  // ---- drawing ----
+  function hexPoints(size) {
+    var pts = [];
+    for (var i = 0; i < 6; i++) {
+      var a = Math.PI / 180 * (60 * i);   // 0deg = flat-top
+      pts.push((size * Math.cos(a)).toFixed(2) + "," +
+        (size * Math.sin(a)).toFixed(2));
+    }
+    return pts.join(" ");
+  }
+
+  function tileGroup(value, rgb, size, textOverride) {
+    var g = document.createElementNS(NS, "g");
+    var poly = document.createElementNS(NS, "polygon");
+    poly.setAttribute("points", hexPoints(size * RADIUS_FRAC));
+    poly.setAttribute("fill", rgbStr(rgb));
+    poly.setAttribute("stroke", STROKE_COLOUR);
+    poly.setAttribute("stroke-width", Math.max(1, size * STROKE_FRAC));
+    g.appendChild(poly);
+
+    var ink = textOverride;
+    if (!ink) {
+      ink = textFor(rgb);
+    }
+    var fs = tileFontSize(value, size);
+    var t = document.createElementNS(NS, "text");
+    t.setAttribute("x", 0);
+    t.setAttribute("y", fs * TEXT_NUDGE);
+    t.setAttribute("text-anchor", "middle");
+    t.setAttribute("dominant-baseline", "middle");
+    t.setAttribute("font-size", fs);
+    t.setAttribute("font-weight", "800");
+    t.setAttribute("font-family", "ui-sans-serif, system-ui, sans-serif");
+    t.setAttribute("fill", ink);
+    t.textContent = String(value);
+    g.appendChild(t);
+    return g;
+  }
+
+  function newSvg() {
+    var w = 8 * SIZE;
+    var h = 5 * SQRT3 * SIZE;
+    var svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("width", w);
+    svg.setAttribute("height", h);
+    svg.setAttribute("viewBox",
+      (-w / 2) + " " + (-h / 2) + " " + w + " " + h);
+    return svg;
+  }
+
+  function paintBoard(svg, getRgb, draggableKey) {
+    while (svg.firstChild) {
+      svg.removeChild(svg.firstChild);
+    }
+    ORDER.forEach(function (c, i) {
+      var value = VALUES[i];
+      var p = unitPos(c);
+      var g = tileGroup(value, getRgb(i), SIZE);
+      g.setAttribute("transform",
+        "translate(" + (p.px * SIZE) + "," + (p.py * SIZE) + ")");
+      if (draggableKey) {
+        g.setAttribute("class", "tile");
+        g.dataset.board = draggableKey;
+        g.dataset.index = i;
+      }
+      svg.appendChild(g);
+    });
+  }
+
+  // ---- build the page ----
+  var svgs = {};
+  var resets = {};
+
+  // `key` names the board's svg. `hasReset` is false for the two display-only
+  // boards, A and I, which have no editable state to reset.
+  function variantBox(key, label, cls, hasReset) {
+    var box = document.createElement("div");
+    box.className = "variant";
+    if (cls) box.className += " " + cls;
+
+    var head = document.createElement("div");
+    head.className = "vhead";
+    var l = document.createElement("div");
+    l.className = "vlabel";
+    l.innerHTML = label;
+    head.appendChild(l);
+    if (hasReset) {
+      var btn = document.createElement("button");
+      btn.className = "resetbtn";
+      btn.textContent = "reset";
+      btn.hidden = true;
+      btn.addEventListener("click", function () {
+        var board = ALL.filter(function (b) {
+          return b.key === key;
+        })[0];
+        state[key] = defaultSlots(board);
+        closeTuner();
+        refresh();
+      });
+      resets[key] = btn;
+      head.appendChild(btn);
+    }
+    box.appendChild(head);
+
+    var svg = newSvg();
+    svgs[key] = svg;
+    box.appendChild(svg);
+    return box;
+  }
+
+  document.getElementById("solo").appendChild(
+    variantBox("A", "A &mdash; what ships today", "solo", false));
+  paintBoard(svgs.A, function (i) {
+    return todayRgb(VALUES[i]);
+  }, null);
+
+  var cross = document.getElementById("cross");
+  BOARDS.forEach(function (b) {
+    var pct = Math.round(b.L * 100);
+    cross.appendChild(
+      variantBox(b.key, b.key + " &mdash; " + pct + "%", b.slot, true));
+  });
+
+  var finalRow = document.getElementById("final");
+  finalRow.appendChild(variantBox("G", "G &mdash; assembled", null, true));
+  finalRow.appendChild(variantBox("H", "H &mdash; tuned", null, true));
+  finalRow.appendChild(variantBox("J", "J &mdash; tuned further", null, false));
+  paintBoard(svgs.J, function (i) {
+    return slotRgb(J_SEED[i]);
+  }, null);
+  finalRow.appendChild(variantBox("I", "I &mdash; 4 to 1048576", null, false));
+
+  // ---- K: J's colours, with the number's colour picked by hand ----
+  // Every other board derives the number's colour from the fill's luminance,
+  // flipping at 0.6. Here a tap overrides that for one tile; reset returns it
+  // to whatever the rule chose.
+  var K_INK = new Array(19).fill(null);
+
+  function kAuto(i) {
+    return textFor(slotRgb(J_SEED[i]));
+  }
+
+  function kInk(i) {
+    if (K_INK[i]) {
+      return K_INK[i];
+    }
+    return kAuto(i);
+  }
+
+  function kTouched() {
+    return K_INK.some(function (v) {
+      return v !== null;
+    });
+  }
+
+  var kBox = document.createElement("div");
+  kBox.className = "variant";
+  var kHead = document.createElement("div");
+  kHead.className = "vhead";
+  var kLabel = document.createElement("div");
+  kLabel.className = "vlabel";
+  kLabel.innerHTML = "K &mdash; number colour";
+  kHead.appendChild(kLabel);
+  var kReset = document.createElement("button");
+  kReset.className = "resetbtn";
+  kReset.textContent = "reset";
+  kReset.hidden = true;
+  kHead.appendChild(kReset);
+  kBox.appendChild(kHead);
+  var kSvg = newSvg();
+  kBox.appendChild(kSvg);
+  finalRow.appendChild(kBox);
+
+  function paintK() {
+    while (kSvg.firstChild) {
+      kSvg.removeChild(kSvg.firstChild);
+    }
+    ORDER.forEach(function (c, i) {
+      var p = unitPos(c);
+      var g = tileGroup(VALUES[i], slotRgb(J_SEED[i]), SIZE, kInk(i));
+      g.setAttribute("transform",
+        "translate(" + (p.px * SIZE) + "," + (p.py * SIZE) + ")");
+      g.setAttribute("class", "ktile");
+      g.dataset.index = i;
+      kSvg.appendChild(g);
+    });
+    kReset.hidden = !kTouched();
+  }
+
+  kSvg.addEventListener("click", function (e) {
+    var g = e.target.closest(".ktile");
+    if (!g) return;
+    var i = parseInt(g.dataset.index, 10);
+    // first tap flips away from whatever the rule chose, then it alternates
+    var now = kInk(i);
+    if (now === "#ffffff") {
+      K_INK[i] = "#171a1f";
+    } else {
+      K_INK[i] = "#ffffff";
+    }
+    paintK();
+    writeReadout();
+  });
+
+  kReset.addEventListener("click", function () {
+    K_INK = new Array(19).fill(null);
+    paintK();
+    writeReadout();
+  });
+
+  function refresh() {
+    ALL.forEach(function (b) {
+      paintBoard(svgs[b.key], function (i) {
+        return slotRgb(state[b.key][i]);
+      }, b.key);
+      resets[b.key].hidden = isDefault(b);
+    });
+    paintTopEnd();
+    paintK();
+    writeReadout();
+  }
+
+  // ---- board I: the top end, 4 through 1048576 ----
+  // 2^(N+1) is the most a board of N cells can ever hold, and 4-spawns are
+  // what put the last rung within reach: 19 cells -> 1048576. Nineteen values
+  // from 4 up, so it fills the board exactly, with the two specials on the end.
+  var TOP_VALUES = [];
+  for (var te = 2; te <= 20; te++) {
+    TOP_VALUES.push(Math.pow(2, te));
+  }
+
+  // A gradient cannot be expressed as one h/s/l triple, so these two tiles sit
+  // outside the swap system entirely and board I is display-only.
+  // Blobs, not bands. Each entry is a pool of colour fading to nothing, and
+  // they are laid over each other so the hues bleed together with no straight
+  // edge anywhere. Every blob sits in the same narrow lightness band: a
+  // gradient between a dark colour and a light one passes through mud in the
+  // middle, and keeping them all bright is what stops that happening.
+  var RAINBOW_BLOBS = [
+    { hue: 0, cx: 0.30, cy: 0.20, r: 0.58 },
+    { hue: 52, cx: 0.72, cy: 0.18, r: 0.54 },
+    { hue: 116, cx: 0.86, cy: 0.60, r: 0.56 },
+    { hue: 178, cx: 0.56, cy: 0.88, r: 0.58 },
+    { hue: 238, cx: 0.16, cy: 0.72, r: 0.54 },
+    { hue: 300, cx: 0.12, cy: 0.36, r: 0.52 }
+  ];
+
+  // Sitting on the baseline tiles' own lightness. Overlapping translucent
+  // blobs average toward each other, which lifts and desaturates, so starting
+  // above the palette's lightness is what washed an earlier attempt out.
+  var BLOB_S = 0.72;
+  var BLOB_L = 0.52;
+
+
+  // the fill's luminance varies across the tile, so the usual white/dark flip
+  // cannot pick a winner - outline the glyph instead
+  function outlinedNumber(value, size, invert) {
+    var fill = "#ffffff";
+    var stroke = "rgba(0,0,0,0.65)";
+    if (invert) {
+      fill = "#171a1f";
+      stroke = "rgba(255,255,255,0.85)";
+    }
+    var fs = tileFontSize(value, size);
+    var t = document.createElementNS(NS, "text");
+    t.setAttribute("x", 0);
+    t.setAttribute("y", fs * TEXT_NUDGE);
+    t.setAttribute("text-anchor", "middle");
+    t.setAttribute("dominant-baseline", "middle");
+    t.setAttribute("font-size", fs);
+    t.setAttribute("font-weight", "800");
+    t.setAttribute("font-family", "ui-sans-serif, system-ui, sans-serif");
+    t.setAttribute("fill", fill);
+    t.setAttribute("stroke", stroke);
+    t.setAttribute("stroke-width", Math.max(1, size * 0.05));
+    t.setAttribute("paint-order", "stroke");
+    t.textContent = String(value);
+    return t;
+  }
+
+  // ---- 1048576 candidates ----
+  // Eighteen takes on the top tile. a-j vary the colour: which arc of the
+  // wheel, how tightly it cycles. k-s leave the colour alone and vary the
+  // shine instead.
+  //
+  // Shine is luminance contrast, and the colour layer cannot supply it: every
+  // blob sits at one lightness precisely so overlapping hues cannot go muddy.
+  // So the shine layers are NEUTRAL - black to darken, white to highlight -
+  // laid over the colour. Neutral shading never shifts a hue, so it cannot
+  // muddy anything however hard it is pushed. That is what buys the contrast.
+  //
+  // The other half of looking shiny is a HARD edge. Every soft gradient reads
+  // as matte; foil and glass have one crisp transition, which is what the
+  // band layers are for.
+
+  function ring(hues, S, L, spread) {
+    var r = 0.54;
+    if (spread) r = spread;
+    return hues.map(function (h, i) {
+      var a = Math.PI * 2 * (i / hues.length) - Math.PI / 2;
+      return {
+        hue: h,
+        S: S,
+        L: L,
+        cx: 0.5 + Math.cos(a) * 0.3,
+        cy: 0.5 + Math.sin(a) * 0.3,
+        r: r
+      };
+    });
+  }
+
+
+  // a bright neutral pool: lifts without touching hue
+  function spec(cx, cy, r, op) {
+    return { kind: "rad", L: 1, cx: cx, cy: cy, r: r, op: op };
+  }
+
+  // 1048576. The full-circle blob arc, a broad soft sheen, a four-point glint
+  // and a hot centre inside it. Deliberately no shadow: compositing black
+  // preserves hue but destroys colourfulness, so it browned the warm blobs.
+  // The near-black page supplies all the contrast the shine needs.
+  var MILLION_BLOBS = ring([0, 52, 116, 178, 238, 300], 0.72, 0.52);
+  var MILLION_LAYERS = [
+    spec(0.34, 0.22, 0.62, 0.5),
+    { kind: "star", cx: 0.32, cy: 0.24, r: 0.40, op: 0.95 },
+    spec(0.32, 0.24, 0.10, 1.0)
+  ];
+
+  // one renderer for both gradient tiles
+  function blobbyTile(value, blobs, layers, invert, idSuffix, size) {
+    var g = document.createElementNS(NS, "g");
+    var defs = document.createElementNS(NS, "defs");
+    var pts = hexPoints(size * RADIUS_FRAC);
+
+    // hard-edged layers have to be cut to the tile, or they overhang it
+    var clipId = "clip-" + idSuffix;
+    var clip = document.createElementNS(NS, "clipPath");
+    clip.setAttribute("id", clipId);
+    var clipPoly = document.createElementNS(NS, "polygon");
+    clipPoly.setAttribute("points", pts);
+    clip.appendChild(clipPoly);
+    defs.appendChild(clip);
+    g.appendChild(defs);
+
+    var base = document.createElementNS(NS, "polygon");
+    base.setAttribute("points", pts);
+    base.setAttribute("fill", rgbStr(hslToRgb(blobs[0].hue, blobs[0].S,
+      blobs[0].L)));
+    g.appendChild(base);
+
+    function radial(id, colour, b) {
+      var rg = document.createElementNS(NS, "radialGradient");
+      rg.setAttribute("id", id);
+      rg.setAttribute("gradientUnits", "objectBoundingBox");
+      rg.setAttribute("cx", b.cx);
+      rg.setAttribute("cy", b.cy);
+      rg.setAttribute("r", b.r);
+      var peak = 1;
+      if (b.op !== undefined) {
+        peak = b.op;
+      }
+      [
+        { at: 0, op: peak },
+        { at: 0.45, op: peak * 0.72 },
+        { at: 1, op: 0 }
+      ].forEach(function (s) {
+        var stop = document.createElementNS(NS, "stop");
+        stop.setAttribute("offset", s.at);
+        stop.setAttribute("stop-color", colour);
+        stop.setAttribute("stop-opacity", s.op);
+        rg.appendChild(stop);
+      });
+      defs.appendChild(rg);
+      var poly = document.createElementNS(NS, "polygon");
+      poly.setAttribute("points", pts);
+      poly.setAttribute("fill", "url(#" + id + ")");
+      g.appendChild(poly);
+    }
+
+    blobs.forEach(function (b, i) {
+      radial("bl-" + idSuffix + "-" + i,
+        rgbStr(hslToRgb(b.hue, b.S, b.L)), b);
+    });
+
+    (layers || []).forEach(function (ly, i) {
+      var id = "ly-" + idSuffix + "-" + i;
+      if (ly.kind === "rad") {
+        // neutral unless the layer names a hue, which only the tinted
+        // shadow does
+        var lh = ly.hue || 0;
+        var ls = ly.S || 0;
+        radial(id, rgbStr(hslToRgb(lh, ls, ly.L)), ly);
+        return;
+      }
+      if (ly.kind === "band") {
+        // a sharp-edged streak: no falloff at all, which is the whole point
+        var rect = document.createElementNS(NS, "rect");
+        rect.setAttribute("x", -size * 2);
+        rect.setAttribute("y", ly.off * size - ly.w * size / 2);
+        rect.setAttribute("width", size * 4);
+        rect.setAttribute("height", ly.w * size);
+        rect.setAttribute("fill", rgbStr(hslToRgb(0, 0, ly.L)));
+        rect.setAttribute("fill-opacity", ly.op);
+        rect.setAttribute("transform", "rotate(" + ly.ang + ")");
+        rect.setAttribute("clip-path", "url(#" + clipId + ")");
+        g.appendChild(rect);
+        return;
+      }
+      // a four-point star: thin spikes, the classic glint
+      var cx = (ly.cx - 0.5) * size * 2;
+      var cy = (ly.cy - 0.5) * size * SQRT3;
+      var rr = ly.r * size;
+      var w = rr * 0.14;
+      var star = document.createElementNS(NS, "path");
+      star.setAttribute("d",
+        "M " + cx + " " + (cy - rr) +
+        " Q " + cx + " " + cy + " " + (cx + w) + " " + cy +
+        " Q " + cx + " " + cy + " " + cx + " " + (cy + rr) +
+        " Q " + cx + " " + cy + " " + (cx - w) + " " + cy +
+        " Q " + cx + " " + cy + " " + cx + " " + (cy - rr) + " Z" +
+        "M " + (cx - rr) + " " + cy +
+        " Q " + cx + " " + cy + " " + cx + " " + (cy - w) +
+        " Q " + cx + " " + cy + " " + (cx + rr) + " " + cy +
+        " Q " + cx + " " + cy + " " + cx + " " + (cy + w) +
+        " Q " + cx + " " + cy + " " + (cx - rr) + " " + cy + " Z");
+      star.setAttribute("fill", "#ffffff");
+      star.setAttribute("fill-opacity", ly.op);
+      star.setAttribute("clip-path", "url(#" + clipId + ")");
+      g.appendChild(star);
+    });
+
+    var edge = document.createElementNS(NS, "polygon");
+    edge.setAttribute("points", pts);
+    edge.setAttribute("fill", "none");
+    edge.setAttribute("stroke", STROKE_COLOUR);
+    edge.setAttribute("stroke-width", Math.max(1, size * STROKE_FRAC));
+    g.appendChild(edge);
+
+    g.appendChild(outlinedNumber(value, size, invert));
+    return g;
+  }
+
+  // Board I is the top-tile grid. 524288 keeps the cell it has always had;
+  // every other cell carries a 1048576 candidate, lettered from the top down.
+  function paintTopEnd() {
+    var svg = svgs.I;
+    while (svg.firstChild) {
+      svg.removeChild(svg.firstChild);
+    }
+
+    ORDER.forEach(function (c, i) {
+      var value = TOP_VALUES[i];
+      var p = unitPos(c);
+      var g;
+      if (value === 524288) {
+        g = blobbyTile(value, RAINBOW_BLOBS.map(function (b) {
+          return {
+            hue: b.hue, S: BLOB_S, L: BLOB_L,
+            cx: b.cx, cy: b.cy, r: b.r
+          };
+        }), null, false, "rb", SIZE);
+      } else if (value === 1048576) {
+        // dark glyph on a white outline, the reverse of every other tile
+        g = blobbyTile(value, MILLION_BLOBS, MILLION_LAYERS, true, "mi", SIZE);
+      } else {
+        // H's own colour for this value, so tuning a tile updates it here too
+        g = tileGroup(value, slotRgb(state.H[i + 2]), SIZE);
+      }
+      g.setAttribute("transform",
+        "translate(" + (p.px * SIZE) + "," + (p.py * SIZE) + ")");
+      svg.appendChild(g);
+    });
+  }
+
+  function padLeft(s, n) {
+    var out = String(s);
+    while (out.length < n) {
+      out = " " + out;
+    }
+    return out;
+  }
+
+  function writeReadout() {
+    var lines = [];
+    lines.push("J - tuned further");
+    J_SEED.forEach(function (s, i) {
+      lines.push("  " + padLeft(VALUES[i], 7) + "   " + hexStr(slotRgb(s)) +
+        "   hsl(" + padLeft(s.hue.toFixed(1), 5) + ", " +
+        Math.round(s.S * 100) + "%, " + Math.round(s.L * 100) + "%)" +
+        "   ink " + kInk(i));
+    });
+    lines.push("");
+    if (kTouched()) {
+      lines.push("K - number colour overridden");
+      K_INK.forEach(function (v, i) {
+        if (!v) return;
+        lines.push("  " + padLeft(VALUES[i], 7) + "   " + v +
+          "   (rule said " + kAuto(i) + ")");
+      });
+      lines.push("");
+    }
+    ["G", "H"].forEach(function (key) {
+      var title = key + " - settled";
+      if (key === "H") {
+        title = key + " - fine-tuned";
+      }
+      lines.push(title);
+      state[key].forEach(function (s, i) {
+        lines.push("  " + padLeft(VALUES[i], 7) + "   " + hexStr(slotRgb(s)) +
+          "   hsl(" + padLeft(s.hue.toFixed(1), 5) + ", " +
+          Math.round(s.S * 100) + "%, " + Math.round(s.L * 100) + "%)");
+      });
+      lines.push("");
+    });
+    ALL.forEach(function (b) {
+      if (b.key === "G" || b.key === "H" || isDefault(b)) return;
+      lines.push(b.key + " - edited");
+      state[b.key].forEach(function (s, i) {
+        if (sameSlot(s, defaultSlots(b)[i])) return;
+        lines.push("  " + VALUES[i] + "  <-  " + s.label + "   " +
+          hexStr(slotRgb(s)));
+      });
+      lines.push("");
+    });
+    document.getElementById("readout").textContent =
+      lines.join("\n").replace(/\s+$/, "");
+  }
+
+  // ---- the fine-tuner, H only ----
+  var tuner = document.getElementById("tuner");
+  var tuneH = document.getElementById("tuneH");
+  var tuneS = document.getElementById("tuneS");
+  var tuneL = document.getElementById("tuneL");
+  var tuning = null;                 // index into state.H, or null
+
+  function closeTuner() {
+    tuner.classList.remove("show");
+    tuning = null;
+  }
+
+  function syncTuner() {
+    if (tuning === null) return;
+    var s = state.H[tuning];
+    tuneH.value = Math.round(s.hue);
+    tuneS.value = Math.round(s.S * 100);
+    tuneL.value = Math.round(s.L * 100);
+    document.getElementById("tuneHV").textContent = tuneH.value;
+    document.getElementById("tuneSV").textContent = tuneS.value + "%";
+    document.getElementById("tuneLV").textContent = tuneL.value + "%";
+    var rgb = slotRgb(s);
+    document.getElementById("tuneSwatch").style.background = rgbStr(rgb);
+    document.getElementById("tuneHex").textContent = hexStr(rgb);
+  }
+
+  function applyTuner() {
+    if (tuning === null) return;
+    var s = state.H[tuning];
+    s.hue = parseFloat(tuneH.value);
+    s.S = parseFloat(tuneS.value) / 100;
+    s.L = parseFloat(tuneL.value) / 100;
+    s.label = "tuned";
+    s.grey = false;
+    refresh();
+    syncTuner();
+  }
+
+  function openTuner(index, x, y) {
+    tuning = index;
+    document.getElementById("tuneTitle").textContent = String(VALUES[index]);
+    tuner.classList.add("show");
+    syncTuner();
+    var w = tuner.offsetWidth;
+    var h = tuner.offsetHeight;
+    var left = Math.min(Math.max(8, x - w / 2), window.innerWidth - w - 8);
+    var top = y + SIZE + 10;
+    if (top + h > window.innerHeight - 8) {
+      top = Math.max(8, y - SIZE - 10 - h);
+    }
+    tuner.style.left = left + "px";
+    tuner.style.top = top + "px";
+  }
+
+  [tuneH, tuneS, tuneL].forEach(function (el) {
+    el.addEventListener("input", applyTuner);
+  });
+
+  tuner.querySelectorAll(".arrow").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var map = { h: tuneH, s: tuneS, l: tuneL };
+      var el = map[btn.dataset.ch];
+      var next = parseFloat(el.value) + parseFloat(btn.dataset.d);
+      el.value = Math.max(parseFloat(el.min),
+        Math.min(parseFloat(el.max), next));
+      applyTuner();
+    });
+  });
+
+  document.getElementById("tuneReset").addEventListener("click", function () {
+    if (tuning === null) return;
+    state.H[tuning] = defaultSlots({ key: "H" })[tuning];
+    refresh();
+    syncTuner();
+  });
+
+  document.getElementById("tuneClose").addEventListener("click", closeTuner);
+
+  // ---- dragging: colours trade, numbers never move ----
+  var ghost = document.getElementById("ghost");
+  var drag = null;
+
+  function tileAt(x, y) {
+    var el = document.elementFromPoint(x, y);
+    if (!el) return null;
+    var g = el.closest(".tile");
+    if (!g) return null;
+    return { key: g.dataset.board, index: parseInt(g.dataset.index, 10) };
+  }
+
+  function liftedNode() {
+    if (!drag) return null;
+    return svgs[drag.from.key].querySelector(
+      '.tile[data-index="' + drag.from.index + '"]');
+  }
+
+  document.addEventListener("pointerdown", function (e) {
+    if (e.target.closest("#tuner")) return;
+    var hit = tileAt(e.clientX, e.clientY);
+    if (!hit) {
+      closeTuner();
+      return;
+    }
+    e.preventDefault();
+    drag = { from: hit, x0: e.clientX, y0: e.clientY, moved: false };
+
+    var slot = state[hit.key][hit.index];
+    var d = SIZE * 2;
+    ghost.setAttribute("width", d);
+    ghost.setAttribute("height", d);
+    ghost.setAttribute("viewBox", (-d / 2) + " " + (-d / 2) + " " + d + " " + d);
+    while (ghost.firstChild) {
+      ghost.removeChild(ghost.firstChild);
+    }
+    ghost.appendChild(tileGroup(VALUES[hit.index], slotRgb(slot), SIZE));
+    moveGhost(e.clientX, e.clientY);
+  });
+
+  function moveGhost(x, y) {
+    ghost.style.transform =
+      "translate(" + (x - SIZE) + "px," + (y - SIZE) + "px)";
+  }
+
+  document.addEventListener("pointermove", function (e) {
+    if (!drag) return;
+    e.preventDefault();
+    if (!drag.moved) {
+      var dx = e.clientX - drag.x0;
+      var dy = e.clientY - drag.y0;
+      if (Math.hypot(dx, dy) < TAP_SLOP) return;
+      // past the slop: this is a drag, not a tap
+      drag.moved = true;
+      ghost.style.display = "block";
+      var node = liftedNode();
+      if (node) node.classList.add("lifted");
+    }
+    moveGhost(e.clientX, e.clientY);
+  }, { passive: false });
+
+  document.addEventListener("pointerup", function (e) {
+    if (!drag) return;
+    var node = liftedNode();
+    if (node) node.classList.remove("lifted");
+    ghost.style.display = "none";
+
+    var from = drag.from;
+    var moved = drag.moved;
+    drag = null;
+
+    if (!moved) {
+      // a tap: fine-tune on H, nothing anywhere else
+      if (from.key === "H") {
+        openTuner(from.index, e.clientX, e.clientY);
+      } else {
+        closeTuner();
+      }
+      return;
+    }
+
+    var to = tileAt(e.clientX, e.clientY);
+    if (!to) return;
+    if (to.key === from.key && to.index === from.index) return;
+
+    var a = state[from.key][from.index];
+    var b = state[to.key][to.index];
+    state[from.key][from.index] = b;
+    state[to.key][to.index] = a;
+    refresh();
+    if (tuning !== null) {
+      syncTuner();
+    }
+  });
+
+  document.addEventListener("pointercancel", function () {
+    if (!drag) return;
+    var node = liftedNode();
+    if (node) node.classList.remove("lifted");
+    ghost.style.display = "none";
+    drag = null;
+  });
+
+  refresh();
+})();
+</script>
+
+</body>
+</html>
