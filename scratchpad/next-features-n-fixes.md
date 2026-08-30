@@ -1,11 +1,16 @@
 - [Next features \& fixes](#next-features--fixes)
   - [Doc rules](#doc-rules)
+    - [Block 1: Replace foo.js line 42](#block-1-replace-foojs-line-42)
+    - [Block 2: Remove foo.js lines 55-57](#block-2-remove-foojs-lines-55-57)
+    - [Block 3: Add at foo.js line 88](#block-3-add-at-foojs-line-88)
+    - [Block 4: Replace bar.md line 12](#block-4-replace-barmd-line-12)
   - [Falsedge](#falsedge)
     - [\[i5\] DOLI (Double Or Lose It) mechanism ⬜ 🟢](#i5-doli-double-or-lose-it-mechanism--)
     - [\[i14\] Complex tasks ⬜](#i14-complex-tasks-)
       - [\[i14.1\] Multipliers and bonuses (exploratory) ⬜ 🟢](#i141-multipliers-and-bonuses-exploratory--)
       - [\[i14.2\] Event-anchored deadlines ⬜ 🟡](#i142-event-anchored-deadlines--)
       - [\[i14.3\] Micro tasks (NL) ⬜ 🟠](#i143-micro-tasks-nl--)
+        - [\[i14.3.1\] Micro tasks - beta/simplified version](#i1431-micro-tasks---betasimplified-version)
       - [\[i14.4\] Tasks with secondary/minor (name/vocab uncertain) tasks ⬜](#i144-tasks-with-secondaryminor-namevocab-uncertain-tasks-)
     - [\[i19\] Delete individual ledger entries ⚪ 🟡](#i19-delete-individual-ledger-entries--)
     - [\[i21\] Daily score chart ⬜ 🟡](#i21-daily-score-chart--)
@@ -210,6 +215,14 @@ A second, smaller class of task. `NL` (no leniency) *is* the micro-task marker �
 - Can be attached to another item. Swiping that item into an active task activates its whole micro-task set alongside it — and that is the *only* link between them. Cancelling or editing the parent afterwards does nothing to the set; the attachment is a swiping convenience, not a dependency.
 - Cancelling works at either granularity: one micro task on its own, or the whole set at once.
 - DOLI does not apply to micro tasks — a +1 task is not worth a gamble slot.
+
+##### [i14.3.1] Micro tasks - beta/simplified version
+
+update 26-08-30
+
+Keeping only the "NL" and 1 pt part, the rest of the task looks exactly the same as other tasks. Thus, selecting "NL" (with the buttons being WL | HL | NL) would simply have a task with only 1 deadline (no leniency) and 1 pt score.
+
+...actually no wait now I can't decide if I want this to be "2 pts / 1 pts leniency" but idk what I'd call that... ugh.
 
 #### [i14.4] Tasks with secondary/minor (name/vocab uncertain) tasks ⬜
 last consolidated: 26-08-26
