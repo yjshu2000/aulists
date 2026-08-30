@@ -65,7 +65,7 @@
   }
 
   // sx/sy squash the hex about its own centre; rot adds a gooey twist. The
-  // number is drawn inside the same transform so it squishes too.
+  // whole tile (number, any gradients) will squish together
   function drawTile(cx, cy, size, value, sxIn, syIn, rot) {
     let sx = sxIn;
     let sy = syIn;
@@ -76,26 +76,13 @@
       sy = 1;
     }
     const ctx = Hex2.getCtx();
-    const colours = Hex2.tileColours(value);
     ctx.save();
     ctx.translate(cx, cy);
     if (rot) {
       ctx.rotate(rot);
     }
     ctx.scale(sx, sy);
-    Hex2.hexPath(0, 0, size * Hex2.TILE.radiusFrac);
-    ctx.fillStyle = colours.fill;
-    ctx.fill();
-    ctx.lineWidth = Math.max(1, size * Hex2.TILE.strokeFrac);
-    ctx.strokeStyle = Hex2.TILE.strokeColour;
-    ctx.stroke();
-
-    const fs = Hex2.tileFontSize(value, size);
-    ctx.fillStyle = colours.text;
-    ctx.font = "800 " + fs + "px ui-sans-serif, system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(String(value), 0, fs * Hex2.TILE.textNudgeFrac);
+    Hex2.paintTile(0, 0, size * Hex2.TILE.radiusFrac, size, value);
     ctx.restore();
   }
 

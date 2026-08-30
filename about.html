@@ -28,6 +28,14 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v2.13 <span class="changelog-date">2026-08-30 14H</span></h3>
+    <ul>
+      <li><b>Hex 2^ has a new tile palette.</b> Every value from 1 to 262144 carries its own hand-picked colour now, instead of one hue ramp stretched across all of them &mdash; so 16 through 256 stop looking like the same green, and the top end stops collapsing into a single magenta. Numbers flip to dark ink sooner, at the point they actually get hard to read.</li>
+      <li><b>524288 and 1048576 are gradients.</b> Six pools of colour bleeding into one another, and the million tile takes a broad sheen and a four-point glint on top. Their numbers are outlined rather than flat, since there is no one background colour behind them to pick against.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v2.12.1 <span class="changelog-date">2026-08-26 07H</span></h3>
     <ul>
       <li>Fixed: a daily couldn't be set during the 20 minutes before its own time. Today's slot hadn't passed, so it never rolled to tomorrow, but it was already inside the 20-minute minimum, so today was refused too &mdash; leaving the task unsettable in both directions. A bare time now rolls to tomorrow as soon as today's is too close to make.</li>

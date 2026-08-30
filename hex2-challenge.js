@@ -30,21 +30,7 @@
     if (scale) {
       s = s * scale;
     }
-    const ctx = Hex2.getCtx();
-    const colours = Hex2.tileColours(value);
-    Hex2.hexPath(cx, cy, s);
-    ctx.fillStyle = colours.fill;
-    ctx.fill();
-    ctx.lineWidth = Math.max(1, size * Hex2.TILE.strokeFrac);
-    ctx.strokeStyle = Hex2.TILE.strokeColour;
-    ctx.stroke();
-
-    const fs = Hex2.tileFontSize(value, size);
-    ctx.fillStyle = colours.text;
-    ctx.font = "800 " + fs + "px ui-sans-serif, system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(String(value), cx, cy + fs * Hex2.TILE.textNudgeFrac);
+    Hex2.paintTile(cx, cy, s, size, value);
   }
 
   function animateSlide(movers, then) {
