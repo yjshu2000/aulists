@@ -14,6 +14,7 @@
     - [\[i34\] Streak break condition ⬜ 🟠](#i34-streak-break-condition--)
     - [\[i35\] Custom tasks (CL) ⬜](#i35-custom-tasks-cl-)
     - [\[i36\] Template row spacing and manual sort ⚪](#i36-template-row-spacing-and-manual-sort-)
+    - [\[i45\] Queue ⬜](#i45-queue-)
   - [Aulists](#aulists)
     - [\[i15\] Tear down and rebuild Aulists ⬜ 🟡](#i15-tear-down-and-rebuild-aulists--)
   - [Hex 2^](#hex-2)
@@ -26,6 +27,7 @@
     - [\[i39\] Mode select becomes a dropdown ⚪](#i39-mode-select-becomes-a-dropdown-)
     - [\[i40\] Fake ad timer freezes on return from Falsedge ⚪ 🐞](#i40-fake-ad-timer-freezes-on-return-from-falsedge--)
     - [\[i43\] Challenge mode has bug due to outline ⚪ 🐞 🟢](#i43-challenge-mode-has-bug-due-to-outline---)
+    - [\[i44\] New tile palette ⬜](#i44-new-tile-palette-)
   - [Multi-page items](#multi-page-items)
     - [\[i41\] Cooldown on the Go to Hex 2^ button ⚪](#i41-cooldown-on-the-go-to-hex-2-button-)
     - [\[i27\] (low priority/far future) - Server side ⬜⬜⬜ 🔵](#i27-low-priorityfar-future---server-side--)
@@ -49,7 +51,7 @@
 
 **D6. The bracketed `iN` labels are IDs and nothing else.** Not priority, not chronological, not an ordering — nothing carries any of that, much less the ID. An ID is assigned once and never changes: items keep theirs when reordered or moved between sections, and a deleted item's ID is retired rather than reused. Gaps in the sequence are normal and expected. Sub-items are `iN.1`, `iN.2`, … numbered from `.1`, as `####` headings under their parent, and follow the same rules.
 ```
-LAST USED ID: i42
+LAST USED ID: i45
 (update this with every new item)
 ```
 
@@ -71,15 +73,15 @@ LAST USED ID: i42
 
 **D11. Claude states only the final decision about an item, not how it was reached.** This binds Claude's writing — item bodies, and consolidations. The user's own writing is the user's.
 
-**D12. Code changes are drafted before they are written.** A change is written into `scratchpad/code-draft-i<N>.md` as a list of hunks before any source file is touched. Nothing is applied until the user says to apply it, and then every hunk lands in one turn, so line numbers stay accurate for the draft's whole life. Comments run heavy in a draft; the user cuts them there. The draft file is what gets applied, whoever last edited it. Trivial one-line changes skip this. The file is deleted once the change is committed, on the same rule as D2.
+**D12. Code changes are drafted before they are written.** A change is written into `scratchpad/code-draft-i<N>.md` as a numbered list of blocks before any source file is touched. Nothing is applied until the user says to apply it, and then every block lands in one turn, so line numbers stay accurate for the draft's whole life. Comments run heavy in a draft; the user cuts them there. The draft file is what gets applied, whoever last edited it. Trivial one-line changes skip this. The file is deleted once the change is committed, on the same rule as D2.
 
-Hunks never touch or overlap. Changes on adjacent lines merge into one Replace covering the whole block. Every line quoted as context is a line in the file as it stands now, never one another hunk introduces. A horizontal rule separates each hunk from the next.
+Blocks never touch or overlap. Changes on adjacent lines merge into one Replace covering them all. Every line quoted as context is a line in the file as it stands now, never one another block introduces. A horizontal rule separates each block from the next.
 
-The file and line range are always a markdown link. Source code goes in code blocks; markdown content goes in quote blocks. Three hunk shapes:
+Each block opens with an `###` heading numbering it, so the draft carries an outline to jump through and a block can be named out loud. The file and line range are always a markdown link. Source code goes in code blocks; markdown content goes in quote blocks. Three block shapes:
 
 ---
 
-Replace [foo.js line 42](../foo.js#L42)
+### Block 1: Replace [foo.js line 42](../foo.js#L42)
 
 ```js
   var LIMIT = 10;
@@ -93,7 +95,7 @@ With:
 
 ---
 
-Remove [foo.js lines 55-57](../foo.js#L55-L57)
+### Block 2: Remove [foo.js lines 55-57](../foo.js#L55-L57)
 
 ```js
   if (!widget) {
@@ -103,7 +105,7 @@ Remove [foo.js lines 55-57](../foo.js#L55-L57)
 
 ---
 
-Add at [foo.js line 88](../foo.js#L88)
+### Block 3: Add at [foo.js line 88](../foo.js#L88)
 
 Just prior:
 
@@ -125,11 +127,11 @@ Just after:
 
 ---
 
-A hunk against a markdown file takes quote blocks instead:
+A block against a markdown file takes quote blocks instead:
 
 ---
 
-Replace [bar.md line 12](bar.md#L12)
+### Block 4: Replace [bar.md line 12](bar.md#L12)
 
 > **Old heading.** The sentence as it stands today.
 
@@ -320,6 +322,17 @@ Sorting is two-tier. Templates whose task is currently active group together and
 **Undecided:** whether the active group goes above the rest or below, leaning above.
 
 
+### [i45] Queue ⬜
+last consolidated: none
+
+Update 26-08-30:  
+New section named Queue. It goes after Set. (small caps like the others). colour is red. text only. swipe left (from right to left) to "prefill SET", with only the text, no times or anything else.
+
+Queue is manually ordered using the plan for the manual ordering of Activate (others) section — [i36].
+
+Update 26-08-30:  
+queue must be collapsible
+
 ## Aulists
 
 ### [i15] Tear down and rebuild Aulists ⬜ 🟡
@@ -464,6 +477,44 @@ last consolidated: none
 
 update 26-08-27:  
 sent the game to a friend who reported that the challenge mode is broken; tiles don't show up at all. the board is empty. he said there's no red outline. so evidently the outline is breaking things.
+
+### [i44] New tile palette ⬜
+last consolidated: 26-08-29
+
+Replace Hex 2^'s computed hue ramp with a hand-picked table of twenty-one colours, one per tile value from `1` to `1048576`.
+
+`tileHue()` spreads a single ramp across the exponents and `tileColours()` feeds it a fixed `66%` saturation and `52%` lightness, so neighbouring tiles differ only by hue and 16 through 256 are barely separable. Everything above `WIN_EXP` clamps to one magenta, which flattens the whole top end into a single colour.
+
+Delete `tileHue()` and `MAX_HUE`. The table carries its own hue, saturation and lightness per tile, so the ramp's even spacing goes with them.
+
+The nineteen solid values, `1` through `262144`, as `hue / saturation% / lightness%`:
+
+```
+      1   0 / 66 / 84          512  189 / 66 / 59
+      2   0 / 66 / 66         1024  211 / 80 / 54
+      4   0 / 69 / 55         2048  224 / 79 / 51
+      8  23 / 78 / 52         4096  228 / 92 / 35
+     16  41 / 92 / 49         8192  246 / 66 / 58
+     32  56 / 88 / 56        16384  269 / 66 / 60
+     64  80 / 78 / 52        32768  286 / 68 / 70
+    128 128 / 88 / 43        65536  305 / 66 / 54
+    256 152 / 66 / 60       131072  328 / 81 / 50
+                            262144  348 / 55 / 48
+```
+
+They are also held as `J_SEED` in `scratchpad/css-previews-tile-palette.html`, which is where they were chosen and what they should be copied from.
+
+**The text threshold moves from `0.6` to `0.45`.** `tileColours()` picks white or `#171a1f` off the fill's relative luminance. Against this table `0.45` reproduces every choice made by eye: the brightest tile taking white sits at `0.428` and the darkest taking dark ink at `0.480`, so nothing sits near enough the line to flip.
+
+**Two tiles are gradients rather than flat fills.** `524288` takes a ring of six colour blobs — hues 0, 52, 116, 178, 238 and 300, all at `72%` saturation and `52%` lightness, each a radial pool fading to nothing and overlapping its neighbours so no straight edge appears anywhere. `1048576` takes the same ring plus three neutral shine layers over it: a broad soft highlight, a four-point star glint, and a small hot centre inside the glint. No shadow layer — compositing black preserves hue but destroys colourfulness, which browns the warm blobs.
+
+Neither gradient tile can pick its number's colour off luminance, since the luminance varies across the tile. Both outline the glyph instead: `524288` white on a dark outline, `1048576` dark on a white one.
+
+`1048576` is the ceiling because nineteen cells can hold at most `2^20` once 4-spawns are counted, so no tile above it can exist.
+
+**Undecided:** how the gradient tiles are drawn on canvas. The preview builds them in SVG from `<radialGradient>` and `<clipPath>`; canvas needs `createRadialGradient` with `ctx.clip()`, and the star glint is a hand-built path either way. The exact translation is unwritten.
+
+Also undecided: `drawTile` exists three times, once in each of `hex2-base.js`, `hex2-challenge.js` and `hex2-jiggly.js`, and all three would need the gradient path. Whether to write it three times or move `drawTile` into `hex2-core.js` first is unsettled.
 
 ## Multi-page items
 

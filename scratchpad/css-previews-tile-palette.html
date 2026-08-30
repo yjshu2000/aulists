@@ -158,11 +158,11 @@
   board and across boards. Each board has its own <b>reset</b>, which appears once you have changed
   something. <b>X</b> is the grey workbench; <b>A</b> keeps today's ramp and is not draggable.
   <br><br>
-  <b>G</b> is the palette as dragged together on X. <b>H</b> is that palette after being tuned tile
-  by tile, and is the real one &mdash; hand-picked hues, saturation varying per tile, the even
-  spacing gone. The two are different palettes, not two views of one. H is also the only board you
+  <b>G</b> is the palette as dragged together on X. <b>H</b> is the live one and the only board you
   can fine-tune: <b>tap a tile</b> for hue, saturation and lightness sliders, arrows for single
   steps, and a per-tile reset. Dragging still swaps on H, so a tap is a tap and a drag is a drag.
+  <b>J</b> paints H's baseline &mdash; the values H resets to &mdash; so while you tune H you can
+  still see what it looked like before.
 </p>
 
 <div id="solo"></div>
@@ -311,10 +311,12 @@
     return "#" + two(rgb[0]) + two(rgb[1]) + two(rgb[2]);
   }
 
-  // the game's own rule: relative luminance off the fill, flipping at 0.6
+  // Relative luminance off the fill, flipping at 0.45. What ships still uses
+  // 0.6, which is what [i44] changes: against this palette 0.6 puts white on
+  // the 2, the 8, the 1024 and the 32768, all four of which want dark ink.
   function textFor(rgb) {
     var lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
-    if (lum > 0.6) return "#171a1f";
+    if (lum > 0.45) return "#171a1f";
     return "#ffffff";
   }
 
@@ -370,60 +372,36 @@
     { hue: hueOf(262144), S: SAT, L: 0.52, label: "B's 262144" }
   ];
 
-  // What H starts from: the palette after it was tuned tile by tile. These
-  // are hand-picked values, not derived from anything - the even hue spacing
-  // is gone, saturation varies per tile, and the 8 sits at 20 rather than
-  // G_SEED's 28.4. This is the real palette.
+  // The baseline. Board H starts here and is tuned live; board J paints this
+  // array untouched, so while H is being dragged around J still shows what it
+  // looked like before. Banking a round of tuning means writing the new
+  // values in here, which moves the baseline on purpose.
   var H_SEED = [
-    { hue: 0, S: 0.66, L: 0.84, label: "tuned" },
-    { hue: 0, S: 0.66, L: 0.66, label: "tuned" },
-    { hue: 0, S: 0.69, L: 0.55, label: "tuned" },
-    { hue: 20, S: 0.66, L: 0.52, label: "tuned" },
-    { hue: 36, S: 0.93, L: 0.49, label: "tuned" },
-    { hue: 50, S: 0.91, L: 0.61, label: "tuned" },
-    { hue: 75, S: 0.78, L: 0.52, label: "tuned" },
-    { hue: 97, S: 0.88, L: 0.43, label: "tuned" },
-    { hue: 152, S: 0.66, L: 0.60, label: "tuned" },
-    { hue: 189, S: 0.66, L: 0.59, label: "tuned" },
-    { hue: 215, S: 0.59, L: 0.54, label: "tuned" },
-    { hue: 224, S: 0.79, L: 0.51, label: "tuned" },
-    { hue: 228, S: 0.92, L: 0.35, label: "tuned" },
-    { hue: 246, S: 0.66, L: 0.58, label: "tuned" },
-    { hue: 269, S: 0.66, L: 0.60, label: "tuned" },
-    { hue: 286, S: 0.68, L: 0.70, label: "tuned" },
-    { hue: 305, S: 0.66, L: 0.54, label: "tuned" },
-    { hue: 328, S: 0.81, L: 0.50, label: "tuned" },
-    { hue: 348, S: 0.55, L: 0.48, label: "tuned" }
-  ];
-
-  // What J starts from: H tuned further. Only the warm run moved - the 8, 16
-  // and 32 all pushed warmer, and the 8 markedly more saturated.
-  var J_SEED = [
-    { hue: 0, S: 0.66, L: 0.84, label: "tuned" },
-    { hue: 0, S: 0.66, L: 0.66, label: "tuned" },
-    { hue: 0, S: 0.69, L: 0.55, label: "tuned" },
-    { hue: 23, S: 0.78, L: 0.52, label: "tuned" },
-    { hue: 41, S: 0.92, L: 0.49, label: "tuned" },
-    { hue: 56, S: 0.88, L: 0.56, label: "tuned" },
-    { hue: 75, S: 0.78, L: 0.52, label: "tuned" },
-    { hue: 97, S: 0.88, L: 0.43, label: "tuned" },
-    { hue: 152, S: 0.66, L: 0.60, label: "tuned" },
-    { hue: 189, S: 0.66, L: 0.59, label: "tuned" },
-    { hue: 215, S: 0.59, L: 0.54, label: "tuned" },
-    { hue: 224, S: 0.79, L: 0.51, label: "tuned" },
-    { hue: 228, S: 0.92, L: 0.35, label: "tuned" },
-    { hue: 246, S: 0.66, L: 0.58, label: "tuned" },
-    { hue: 269, S: 0.66, L: 0.60, label: "tuned" },
-    { hue: 286, S: 0.68, L: 0.70, label: "tuned" },
-    { hue: 305, S: 0.66, L: 0.54, label: "tuned" },
-    { hue: 328, S: 0.81, L: 0.50, label: "tuned" },
-    { hue: 348, S: 0.55, L: 0.48, label: "tuned" }
+    { hue: 0, S: 0.66, L: 0.84, label: "baseline" },
+    { hue: 0, S: 0.66, L: 0.66, label: "baseline" },
+    { hue: 0, S: 0.69, L: 0.55, label: "baseline" },
+    { hue: 23, S: 0.78, L: 0.52, label: "baseline" },
+    { hue: 41, S: 0.92, L: 0.49, label: "baseline" },
+    { hue: 56, S: 0.88, L: 0.56, label: "baseline" },
+    { hue: 80, S: 0.78, L: 0.52, label: "baseline" },
+    { hue: 128, S: 0.88, L: 0.43, label: "baseline" },
+    { hue: 152, S: 0.66, L: 0.60, label: "baseline" },
+    { hue: 189, S: 0.66, L: 0.59, label: "baseline" },
+    { hue: 211, S: 0.80, L: 0.54, label: "baseline" },
+    { hue: 224, S: 0.79, L: 0.51, label: "baseline" },
+    { hue: 228, S: 0.92, L: 0.35, label: "baseline" },
+    { hue: 246, S: 0.66, L: 0.58, label: "baseline" },
+    { hue: 269, S: 0.66, L: 0.60, label: "baseline" },
+    { hue: 286, S: 0.68, L: 0.70, label: "baseline" },
+    { hue: 305, S: 0.66, L: 0.54, label: "baseline" },
+    { hue: 328, S: 0.81, L: 0.50, label: "baseline" },
+    { hue: 348, S: 0.55, L: 0.48, label: "baseline" }
   ];
 
   var SEEDS = { G: G_SEED, H: H_SEED };
 
-  // J is display-only, like A and I: no state, no dragging, no tuner. It just
-  // draws J_SEED, so it cannot drift from the values it records.
+  // J is display-only, like A and I: no state, no dragging, no tuner. It
+  // paints H_SEED, so it is always H's own starting point to compare against.
   var ALL = BOARDS.concat([
     { key: "G", L: null, slot: null },
     { key: "H", L: null, slot: null }
@@ -596,10 +574,10 @@
 
   var finalRow = document.getElementById("final");
   finalRow.appendChild(variantBox("G", "G &mdash; assembled", null, true));
-  finalRow.appendChild(variantBox("H", "H &mdash; tuned", null, true));
-  finalRow.appendChild(variantBox("J", "J &mdash; tuned further", null, false));
+  finalRow.appendChild(variantBox("H", "H &mdash; tunable", null, true));
+  finalRow.appendChild(variantBox("J", "J &mdash; H's baseline", null, false));
   paintBoard(svgs.J, function (i) {
-    return slotRgb(J_SEED[i]);
+    return slotRgb(H_SEED[i]);
   }, null);
   finalRow.appendChild(variantBox("I", "I &mdash; 4 to 1048576", null, false));
 
@@ -610,7 +588,7 @@
   var K_INK = new Array(19).fill(null);
 
   function kAuto(i) {
-    return textFor(slotRgb(J_SEED[i]));
+    return textFor(slotRgb(state.H[i]));
   }
 
   function kInk(i) {
@@ -650,7 +628,7 @@
     }
     ORDER.forEach(function (c, i) {
       var p = unitPos(c);
-      var g = tileGroup(VALUES[i], slotRgb(J_SEED[i]), SIZE, kInk(i));
+      var g = tileGroup(VALUES[i], slotRgb(state.H[i]), SIZE, kInk(i));
       g.setAttribute("transform",
         "translate(" + (p.px * SIZE) + "," + (p.py * SIZE) + ")");
       g.setAttribute("class", "ktile");
@@ -955,8 +933,8 @@
 
   function writeReadout() {
     var lines = [];
-    lines.push("J - tuned further");
-    J_SEED.forEach(function (s, i) {
+    lines.push("H - live");
+    state.H.forEach(function (s, i) {
       lines.push("  " + padLeft(VALUES[i], 7) + "   " + hexStr(slotRgb(s)) +
         "   hsl(" + padLeft(s.hue.toFixed(1), 5) + ", " +
         Math.round(s.S * 100) + "%, " + Math.round(s.L * 100) + "%)" +
@@ -972,19 +950,20 @@
       });
       lines.push("");
     }
-    ["G", "H"].forEach(function (key) {
-      var title = key + " - settled";
-      if (key === "H") {
-        title = key + " - fine-tuned";
-      }
-      lines.push(title);
-      state[key].forEach(function (s, i) {
-        lines.push("  " + padLeft(VALUES[i], 7) + "   " + hexStr(slotRgb(s)) +
-          "   hsl(" + padLeft(s.hue.toFixed(1), 5) + ", " +
-          Math.round(s.S * 100) + "%, " + Math.round(s.L * 100) + "%)");
-      });
-      lines.push("");
+    lines.push("J - baseline");
+    H_SEED.forEach(function (s, i) {
+      lines.push("  " + padLeft(VALUES[i], 7) + "   " + hexStr(slotRgb(s)) +
+        "   hsl(" + padLeft(s.hue.toFixed(1), 5) + ", " +
+        Math.round(s.S * 100) + "%, " + Math.round(s.L * 100) + "%)");
     });
+    lines.push("");
+    lines.push("G - assembled");
+    state.G.forEach(function (s, i) {
+      lines.push("  " + padLeft(VALUES[i], 7) + "   " + hexStr(slotRgb(s)) +
+        "   hsl(" + padLeft(s.hue.toFixed(1), 5) + ", " +
+        Math.round(s.S * 100) + "%, " + Math.round(s.L * 100) + "%)");
+    });
+    lines.push("");
     ALL.forEach(function (b) {
       if (b.key === "G" || b.key === "H" || isDefault(b)) return;
       lines.push(b.key + " - edited");
