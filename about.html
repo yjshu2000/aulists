@@ -28,6 +28,15 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v2.14 <span class="changelog-date">2026-08-30 18H</span></h3>
+    <ul>
+      <li><b>The streak ends on its own now.</b> Two streak windows: 24 hours to finish a daily, 48 hours to finish anything else. Either one running out ends the streak &mdash; the button no longer has to be pressed by hand, and it no longer needs an empty task list to notice.</li>
+      <li><b>It waits before deciding.</b> If an unfinished task could still be backdated into the missed window, the score boxes carry <code>streak broke? (24)</code> in red instead. Completing one of those clears it; cancelling the last of them confirms the streak break.</li>
+      <li><b>A confirmed streak break locks the app for 36 hours.</b> No new tasks from SET, from a swipe, or from a row's menu. The score drops to zero and a red message says so in the middle of the screen. Both streak windows then get 12 hours on top of that before they start again, since there was no way to set anything during the lockdown.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v2.13 <span class="changelog-date">2026-08-30 14H</span></h3>
     <ul>
       <li><b>Hex 2^ has a new tile palette.</b> Every value from 1 to 262144 carries its own hand-picked colour now, instead of one hue ramp stretched across all of them &mdash; so 16 through 256 stop looking like the same green, and the top end stops collapsing into a single magenta. Numbers flip to dark ink sooner, at the point that actually makes sense for human eyes.</li>
