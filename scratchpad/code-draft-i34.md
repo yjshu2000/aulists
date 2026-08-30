@@ -28,6 +28,7 @@ Added:
   var DAILY_STREAK_WINDOW_MS = 24 * 60 * 60 * 1000;
   var OTHER_STREAK_WINDOW_MS = 48 * 60 * 60 * 1000;
   var STREAK_LOCKDOWN_MS = 36 * 60 * 60 * 1000;
+  var STREAK_GRACE_MS = 12 * 60 * 60 * 1000;
 ```
 
 Just after:
@@ -38,7 +39,7 @@ Just after:
 
 ---
 
-### Block 2: Replace [falsedge.js line 345](../falsedge.js#L345)
+### Block 2: Replace [falsedge.js line 344](../falsedge.js#L344)
 
 ```js
       ledgerCollapsed: true
@@ -105,7 +106,8 @@ With:
 
 ```js
   // ---------------------------------- streak ---------------------------------
-  // Auto streak breaker. Minimum 1 daily in the last 24h, and min 1 non-daily in the last 48h. Time checks last completion of each or last lockdown end.
+  // Auto streak breaker. Minimum 1 daily in the last 24h, and min 1 non-daily
+  // in the last 48h. Time checks last completion of each or last lockdown end.
 
   // What the indicator text reads. Not saved to undo/storage.
   var streakIndicator = "";
@@ -172,7 +174,7 @@ With:
 
   /**
    * Where one streak window starts: its own last completion, or the end of a
-   * lockdown, whichever is later.
+   * lockdown plus its grace, whichever is later.
    * @param {string} type - "daily" or "other".
    * @returns {number} that moment in ms, or 0 when there is nothing to start
    *   it from at all.
@@ -180,9 +182,9 @@ With:
   function streakWindowStart(type) {
     var from = lastCompletionOf(type);
     if (state.lockdownEnd) {
-      var end = new Date(state.lockdownEnd).getTime();
-      if (!isNaN(end) && end > from) {
-        from = end;
+      var resume = new Date(state.lockdownEnd).getTime() + STREAK_GRACE_MS;
+      if (!isNaN(resume) && resume > from) {
+        from = resume;
       }
     }
     return from;
@@ -264,15 +266,9 @@ With:
   }
 
   /**
-   * Re-evaluates both streak windows. A lapsed one with tasks that could
-   * still cover it only marks the page; one with none confirms the streak
-   * break outright.
-   * Called at boot, on returning to the page, and after any task resolves -
-   * since cancelling the last coverable task is what confirms one.
-   *
-   * Nothing here is undoable. One found at load happens because time passed,
-   * not because anything was done, and one confirmed by a cancel already sits
-   * inside that cancel's own undo entry.
+   * Re-evaluates both streak windows. Runs on every resolve.
+   * No undo OBVIOUSLY because tIME ISN'T UNDOABLE. this line is only here 
+   * bcuz claude is a fCKING IDIOT WHO THINKS UNDO MEANS TIME TRAVELING. 
    */
   function checkStreak() {
     var now = getNow();
@@ -299,14 +295,21 @@ With:
     }
   }
 
+  // its own element and timer, so an ordinary toast cannot overwrite it
+  var redToastEl = document.getElementById("redToast");
+  var redToastTimer = null;
+
   /**
-   * The streak-break announcement: the same toast as everything else, in red
-   * and centred on the screen rather than sitting near the bottom.
+   * The streak-break announcement red toast.
    * @param {string} msg - the message to show.
    */
   function redToast(msg) {
-    toast(msg);
-    toastEl.classList.add("red-toast");
+    redToastEl.textContent = msg;
+    redToastEl.classList.add("show");
+    if (redToastTimer) clearTimeout(redToastTimer);
+    redToastTimer = setTimeout(function () {
+      redToastEl.classList.remove("show");
+    }, 2200);
   }
 
   /**
@@ -365,8 +368,6 @@ Just prior:
 Added:
 
 ```js
-    // cancelling the last task that could have covered a lapsed window is
-    // what confirms a streak break, so this has to run on every resolve
     checkStreak();
 ```
 
@@ -433,8 +434,6 @@ With:
 
 ```js
     } else {
-      // the only thing feeding the 24h streak window. A task typed into SET
-      // has no origin at all and counts as an `other`, same as an `others` row.
       task.daily = true;
     }
 ```
@@ -452,8 +451,6 @@ Just prior:
 Added:
 
 ```js
-    // sits here rather than in ACTIVE TASKS because the score boxes are always
-    // drawn - the manual [streak broke] button is not
     if (streakIndicator) {
       wrap.appendChild(el("div", "streak-indicator", streakIndicator));
     }
@@ -468,26 +465,25 @@ Just after:
 
 ---
 
-### Block 11: Add at [falsedge.js line 2939](../falsedge.js#L2939)
+### Block 11: Add at [index.html line 56](../index.html#L56)
 
 Just prior:
 
-```js
-  function toast(msg) {
-    toastEl.textContent = msg;
+```html
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 ```
 
 Added:
 
-```js
-    // a plain toast always lands plain, whatever the last one was
-    toastEl.classList.remove("red-toast");
+```html
+<div class="red-toast" id="redToast" role="alert" aria-live="assertive"></div>
 ```
 
 Just after:
 
-```js
-    toastEl.classList.add("show");
+```html
+
+<script src="falsedge.js"></script>
 ```
 
 ---
@@ -565,12 +561,25 @@ Added:
   }
 
   /* the streak-break announcement: the toast, red, and centred */
-  .toast.red-toast {
+  .red-toast {
+    position: fixed;
+    left: 50%;
     top: 50%;
-    bottom: auto;
     transform: translate(-50%, -50%);
+    max-width: 90%;
+    padding: 10px 16px;
+    background: var(--panel-2);
+    border: 1px solid color-mix(in srgb, var(--c-red) 55%, var(--line));
+    border-radius: 10px;
     color: var(--c-red);
-    border-color: color-mix(in srgb, var(--c-red) 55%, var(--line));
+    font-size: 13px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+    z-index: 80;
+  }
+  .red-toast.show {
+    opacity: 1;
   }
 ```
 

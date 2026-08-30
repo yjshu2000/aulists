@@ -14,6 +14,11 @@
   var WEEK_MS = 7 * DAY_MS;
   // cancelling a dated `others` activation locks that row out this long
   var COOLDOWN_MS = 36 * 60 * 60 * 1000;
+  // auto streak breakers + lockdown
+  var DAILY_STREAK_WINDOW_MS = 24 * 60 * 60 * 1000;
+  var OTHER_STREAK_WINDOW_MS = 48 * 60 * 60 * 1000;
+  var STREAK_LOCKDOWN_MS = 36 * 60 * 60 * 1000;
+  var STREAK_GRACE_MS = 12 * 60 * 60 * 1000;
   var TIER_POINTS = [6, 3, 2, 1];
   // Leniency: minutes past the deadline that still score, one entry per tier.
   // WL = whole leniency
@@ -341,7 +346,10 @@
       spendDraft: { text: "", cost: null, count: null, date: "" },
       spendCostCounts: {},
       lastCopyAt: null,
-      ledgerCollapsed: true
+      ledgerCollapsed: true,
+      lastDailyAt: null,
+      lastOtherAt: null,
+      lockdownEnd: null
     };
   }
 
@@ -404,6 +412,9 @@
     if (typeof raw.ledgerCollapsed === "boolean") {
       s.ledgerCollapsed = raw.ledgerCollapsed;
     }
+    if (typeof raw.lastDailyAt === "string") s.lastDailyAt = raw.lastDailyAt;
+    if (typeof raw.lastOtherAt === "string") s.lastOtherAt = raw.lastOtherAt;
+    if (typeof raw.lockdownEnd === "string") s.lockdownEnd = raw.lockdownEnd;
     return s;
   }
 
@@ -1072,9 +1083,217 @@
     }
   }
 
+  // ---------------------------------- streak ---------------------------------
+  // Auto streak breaker. Minimum 1 daily in the last 24h, and min 1 non-daily
+  // in the last 48h. Time checks last completion of each or last lockdown end.
+
+  // What the indicator text reads. Not saved to undo/storage.
+  var streakIndicator = "";
+
   /**
-   * Pushes the current run into the high scores and zeroes `scr`. `pts` is
-   * untouched. Refuses at zero, since there'd be nothing to record.
+   * Stamps a completion onto whichever streak window the task belongs to.
+   * @param {Object} task - the task being completed.
+   * @param {Date} when - the effective completion time, which for a backdated
+   *   "completed before" is that tier's clock time rather than now.
+   */
+  function recordCompletion(task, when) {
+    var key = "lastOtherAt";
+    if (task.daily) {
+      key = "lastDailyAt";
+    }
+    var held = new Date(state[key] || 0).getTime();
+    if (isNaN(held) || when.getTime() > held) {
+      state[key] = when.toISOString();
+    }
+  }
+
+  /**
+   * When one type was last completed.
+   * @param {string} type - "daily" or "other".
+   * @returns {number} its time in ms, or 0 if there has never been one.
+   */
+  function lastCompletionOf(type) {
+    var raw = state.lastOtherAt;
+    if (type === "daily") {
+      raw = state.lastDailyAt;
+    }
+    if (!raw) return 0;
+    var t = new Date(raw).getTime();
+    if (isNaN(t)) return 0;
+    return t;
+  }
+
+  /**
+   * Milliseconds left on the lockdown a streak break started.
+   * @param {Date} now - the reference moment.
+   * @returns {number} the remainder, or 0 if no lockdown is running.
+   */
+  function lockdownLeft(now) {
+    if (!state.lockdownEnd) return 0;
+    var until = new Date(state.lockdownEnd).getTime();
+    if (isNaN(until)) return 0;
+    return Math.max(0, until - now.getTime());
+  }
+
+  /**
+   * Refuses task creation while a lockdown is running. Every route that makes
+   * an active task calls this first.
+   * @param {Date} now - the reference moment.
+   * @returns {boolean} true if a task may be created right now.
+   */
+  function lockdownClear(now) {
+    var left = lockdownLeft(now);
+    if (left > 0) {
+      toast("streak broke lockdown - " + fmtLeft(left) + " left");
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Where one streak window starts: its own last completion, or the end of a
+   * lockdown plus its grace, whichever is later.
+   * @param {string} type - "daily" or "other".
+   * @returns {number} that moment in ms, or 0 when there is nothing to start
+   *   it from at all.
+   */
+  function streakWindowStart(type) {
+    var from = lastCompletionOf(type);
+    if (state.lockdownEnd) {
+      var resume = new Date(state.lockdownEnd).getTime() + STREAK_GRACE_MS;
+      if (!isNaN(resume) && resume > from) {
+        from = resume;
+      }
+    }
+    return from;
+  }
+
+  /**
+   * A streak window as two absolute times, which is what decides whether a
+   * backdated completion could still land inside it.
+   * @param {string} type - "daily" or "other".
+   * @returns {{from: number, to: number}|null} the window, or null when there
+   *   is nothing to start it from.
+   */
+  function streakWindow(type) {
+    var from = streakWindowStart(type);
+    if (!from) return null;
+    var len = OTHER_STREAK_WINDOW_MS;
+    if (type === "daily") {
+      len = DAILY_STREAK_WINDOW_MS;
+    }
+    return { from: from, to: from + len };
+  }
+
+  /**
+   * Whether an unresolved task could still be backdated into a lapsed window:
+   * matching type, deadline inside the window.
+   * @param {string} type - "daily" or "other".
+   * @param {{from: number, to: number}} win - the lapsed window.
+   * @returns {boolean} true while the streak break is only provisional.
+   */
+  function windowCoverable(type, win) {
+    return state.activeTasks.some(function (t) {
+      var tType = "other";
+      if (t.daily) {
+        tType = "daily";
+      }
+      if (tType !== type) return false;
+      var at = new Date(t.deadline).getTime();
+      return at >= win.from && at <= win.to;
+    });
+  }
+
+  /**
+   * Which streak windows have run out, named by their length in hours.
+   * @param {Date} now - the reference moment.
+   * @returns {number[]} the lapsed windows, shortest first.
+   */
+  function lapsedStreakWindows(now) {
+    var out = [];
+    [["daily", 24], ["other", 48]].forEach(function (pair) {
+      var win = streakWindow(pair[0]);
+      if (!win) return;
+      if (now.getTime() > win.to) {
+        out.push(pair[1]);
+      }
+    });
+    return out;
+  }
+
+  /**
+   * Confirms a streak break: banks the run, zeroes `scr`, and starts the
+   * lockdown. Pushes no undo entry because that'd be stupid.
+   * @param {Date} now - the moment it is confirmed.
+   * @param {number[]} hours - the windows that ran out, for the announcement.
+   */
+  function confirmStreakBreak(now, hours) {
+    if (state.scr > 0) {
+      insertHighScore(state.scr, dayKey(now));
+    }
+    state.scr = 0;
+    state.lockdownEnd =
+      new Date(now.getTime() + STREAK_LOCKDOWN_MS).toISOString();
+    streakIndicator = "";
+    save();
+    var msg = "streak broke";
+    if (hours.length) {
+      msg = "streak broke (" + hours.join(", ") + ")";
+    }
+    redToast(msg);
+  }
+
+  /**
+   * Re-evaluates both streak windows. Runs on every resolve.
+   * No undo OBVIOUSLY because tIME ISN'T UNDOABLE. this line is only here 
+   * bcuz claude is a fCKING IDIOT WHO THINKS UNDO MEANS TIME TRAVELING. 
+   */
+  function checkStreak() {
+    var now = getNow();
+    var confirmed = [];
+    var tentative = [];
+    lapsedStreakWindows(now).forEach(function (hours) {
+      var type = "other";
+      if (hours === 24) {
+        type = "daily";
+      }
+      if (windowCoverable(type, streakWindow(type))) {
+        tentative.push(hours);
+      } else {
+        confirmed.push(hours);
+      }
+    });
+    if (confirmed.length) {
+      confirmStreakBreak(now, confirmed);
+      return;
+    }
+    streakIndicator = "";
+    if (tentative.length) {
+      streakIndicator = "streak broke? (" + tentative.join(", ") + ")";
+    }
+  }
+
+  // its own element and timer, so an ordinary toast cannot overwrite it
+  var redToastEl = document.getElementById("redToast");
+  var redToastTimer = null;
+
+  /**
+   * The streak-break announcement red toast.
+   * @param {string} msg - the message to show.
+   */
+  function redToast(msg) {
+    redToastEl.textContent = msg;
+    redToastEl.classList.add("show");
+    if (redToastTimer) clearTimeout(redToastTimer);
+    redToastTimer = setTimeout(function () {
+      redToastEl.classList.remove("show");
+    }, 2200);
+  }
+
+  /**
+   * The manual streak break. Banks the run, zeroes `scr` and starts the same
+   * lockdown the automatic path does. Refuses at zero, since there'd be
+   * nothing to record.
    */
   function streakBroke() {
     if (state.scr <= 0) {
@@ -1082,9 +1301,7 @@
       return;
     }
     pushUndo("streak broke");
-    insertHighScore(state.scr, dayKey(getNow()));
-    state.scr = 0;
-    save();
+    confirmStreakBreak(getNow(), []);
     render();
   }
 
@@ -1272,11 +1489,15 @@
       row.cooldownUntil =
         new Date(getNow().getTime() + COOLDOWN_MS).toISOString();
     }
+    if (kind === "complete") {
+      recordCompletion(task, when);
+    }
     var at = indexOfTask(id);
     if (at !== -1) {
       state.activeTasks.splice(at, 1);
     }
     save();
+    checkStreak();
     render();
   }
 
@@ -1534,6 +1755,7 @@
    */
   function submitSet() {
     var now = getNow();
+    if (!lockdownClear(now)) return;
     var textEl = document.getElementById("setText");
     var selectEl = document.getElementById("setSelect");
     if (!textEl || !selectEl) return;
@@ -1692,6 +1914,7 @@
     var row = findRow(kind, id);
     if (!row) return;
     var now = getNow();
+    if (!lockdownClear(now)) return;
     var text = String(row.text).trim();
     if (!text) {
       toast("Task needs text");
@@ -1742,6 +1965,8 @@
       // activation may still land inside 24h and so never look "further"
       task.hadDate = date !== "";
       row.date = "";
+    } else {
+      task.daily = true;
     }
     state.activeTasks.push(task);
     save();
@@ -2129,6 +2354,9 @@
       render();
     });
     wrap.appendChild(scrBox);
+    if (streakIndicator) {
+      wrap.appendChild(el("div", "streak-indicator", streakIndicator));
+    }
     return wrap;
   }
 
@@ -2998,11 +3226,13 @@
     if (document.hidden) {
       return;
     }
+    checkStreak();
     render();
     refreshUndoRedoButtons();
   });
 
   loadUndoRing();
+  checkStreak();
   render();
   refreshUndoRedoButtons();
 })();

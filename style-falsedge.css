@@ -457,6 +457,36 @@
     margin-top: 8px;
     align-self: flex-start;
   }
+  /* the tentative indicator, spanning both columns under the scores */
+  .streak-indicator {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+    color: var(--c-red);
+    font-size: 13px;
+    letter-spacing: .02em;
+  }
+
+  /* the streak-break announcement: the toast, red, and centred */
+  .red-toast {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 90%;
+    padding: 10px 16px;
+    background: var(--panel-2);
+    border: 1px solid color-mix(in srgb, var(--c-red) 55%, var(--line));
+    border-radius: 10px;
+    color: var(--c-red);
+    font-size: 13px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+    z-index: 80;
+  }
+  .red-toast.show {
+    opacity: 1;
+  }
   .inline-edit {
     width: 100%;
   }
