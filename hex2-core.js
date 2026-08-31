@@ -1184,23 +1184,37 @@ window.Hex2 = (function () {
   // --------------------------- mode switch ----------------------------
   // Each mode is a whole self-booting script that grabs the DOM and binds its
   // own listeners, so there is no way to unload one at runtime - switching
-  // reloads the page and lets the bootstrap pick the other file.
+  // reloads the page and lets the bootstrap pick the other file. MODES lists
+  // them in the order they were added, which is the order the dropdown shows:
+  // `label` names the option, `name` is the subtitle under the brand, which
+  // keeps its own lowercase wording. A new mode is one row here plus its own
+  // hex2-<key>.js.
+  const MODES = [
+    { key: "base", label: "Normal", name: "normal mode" },
+    { key: "jiggly", label: "Jiggly", name: "jiggly mode" },
+    { key: "challenge", label: "Challenge", name: "challenge mode" },
+  ];
+
+  function modeSpec(key) {
+    return MODES.find(function (m) {
+      return m.key === key;
+    });
+  }
+
   function currentMode() {
     const m = store.get(MODE_KEY);
-    if (m === "jiggly" || m === "challenge") {
+    if (modeSpec(m)) {
       return m;
     }
     return "base";
   }
 
-  const NEXT_MODE = {
-    base: "challenge",
-    challenge: "jiggly",
-    jiggly: "base",
-  };
-
-  function switchMode() {
-    store.set(MODE_KEY, NEXT_MODE[currentMode()]);
+  // Picking the mode already showing is a no-op rather than a reload.
+  function pickMode(key) {
+    if (key === currentMode()) {
+      return;
+    }
+    store.set(MODE_KEY, key);
     location.reload();
   }
 
@@ -1209,18 +1223,21 @@ window.Hex2 = (function () {
     mode = cfg;
     saveKey = cfg.saveKey;
 
-    const modeBtn = document.getElementById("mode");
+    const modeSel = document.getElementById("mode");
     const modeName = document.getElementById("mode-name");
-    const LABELS = {
-      base: ["Go to Challenge", "normal mode"],
-      challenge: ["Go to Jiggly", "challenge mode"],
-      jiggly: ["Go to Normal", "jiggly mode"],
-    };
     const here = currentMode();
     isChallenge = here === "challenge";
-    modeBtn.textContent = LABELS[here][0];
-    modeName.textContent = LABELS[here][1];
-    modeBtn.addEventListener("click", switchMode);
+    for (const m of MODES) {
+      const opt = document.createElement("option");
+      opt.value = m.key;
+      opt.textContent = m.label;
+      modeSel.appendChild(opt);
+    }
+    modeSel.value = here;
+    modeName.textContent = modeSpec(here).name;
+    modeSel.addEventListener("change", function () {
+      pickMode(modeSel.value);
+    });
 
     if (heartsBox && !isChallenge) {
       heartsBox.remove();
