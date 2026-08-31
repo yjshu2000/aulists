@@ -87,6 +87,7 @@
   // takes precedence over the win, the order settle() uses.
   function finish() {
     busy = false;
+    Hex2.setBoardBusy(false);
     Hex2.save();
     Hex2.drawStatic();
     if (!Hex2.anyMovePossible()) {
@@ -133,6 +134,7 @@
     }
     busy = true;
     won = false;
+    Hex2.setBoardBusy(true);
     pass(dir, true);
   }
 
@@ -146,6 +148,7 @@
     onReset() {
       busy = false;
       won = false;
+      Hex2.setBoardBusy(false);
     },
   });
 })();

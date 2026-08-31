@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cascading &mdash; recede + grey</title>
+<style>
+  :root{
+    --hex-bg:#12141a; --hex-panel:#1b1e27; --hex-panel-2:#232734;
+    --hex-line:#2c313f; --hex-ink:#e8ebf2; --hex-ink-dim:#8b93a7;
+    --hex-accent:#3cc3e2;
+
+    /* driven by the sliders */
+    --dim-scale:0.96;
+    --grey-sat:0.55;
+    --grey-bright:0.60;
+    --veil-op:0.45;
+    --delay:240ms;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--hex-bg); color:var(--hex-ink);
+    font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
+    padding:16px 12px 60px; line-height:1.5;
+  }
+  h1{font-size:19px;font-weight:800;letter-spacing:.04em;margin:0 0 6px;}
+  .note{color:var(--hex-ink-dim);font-size:12.5px;margin:0 0 18px;max-width:680px;}
+  .note b{color:var(--hex-ink);}
+  .note code{color:var(--hex-accent);font-size:12px;}
+
+  /* ------------------------------ controls ------------------------------ */
+  .panel{
+    background:var(--hex-panel); border:1px solid var(--hex-line);
+    border-radius:12px; padding:12px; margin-bottom:16px;
+  }
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .hexbtn{
+    display:inline-flex;align-items:center;justify-content:center;
+    background:var(--hex-panel-2); color:var(--hex-ink);
+    border:1px solid var(--hex-line); border-radius:12px;
+    padding:9px 14px; min-height:40px;
+    font-family:inherit; font-size:13px; font-weight:700; letter-spacing:.06em;
+  }
+  .hexbtn.go{border-color:var(--hex-accent);color:var(--hex-accent);}
+  .hexbtn:disabled{opacity:.38;}
+  .slider{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;}
+  .slider label{flex:0 0 104px;color:var(--hex-ink-dim);letter-spacing:.03em;}
+  .slider input{flex:1;min-width:0;accent-color:var(--hex-accent);}
+  .stepbtn{
+    flex:0 0 auto; width:40px; min-height:40px; padding:0;
+    background:var(--hex-panel-2); color:var(--hex-accent);
+    border:1px solid var(--hex-line); border-radius:9px;
+    font-family:inherit; font-size:18px; font-weight:800; line-height:1;
+  }
+  .stepbtn:active{background:#2b3040;}
+  .slider .val{
+    flex:0 0 58px;text-align:right;color:var(--hex-accent);
+    font-variant-numeric:tabular-nums;font-weight:700;
+  }
+
+  /* ------------------------------- boards ------------------------------- */
+  .boards{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
+  .cell{flex:1 1 300px;max-width:360px;min-width:250px;}
+  /* the controls sit between the two boards: side by side on a wide screen,
+     and sandwiched between A and B once they stack */
+  .boards > .panel{
+    flex:1 1 260px; max-width:360px; min-width:250px;
+    margin-bottom:0; align-self:flex-start;
+  }
+  .lab{
+    font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--hex-accent);margin-bottom:2px;
+  }
+  .sub{font-size:11.5px;color:var(--hex-ink-dim);margin-bottom:8px;min-height:32px;}
+
+  /* the real .stage shape: canvas fills it, pads ride its radius */
+  .stage{
+    position:relative; width:100%; aspect-ratio:1/1;
+    border:1px dashed #333a49; border-radius:12px;
+  }
+  .stage canvas{display:block;width:100%;height:100%;}
+  .veil{
+    position:absolute; inset:0; border-radius:11px;
+    background:#0d0f14; opacity:0; pointer-events:none;
+  }
+
+  /* Entering busy uses a 0s transition with a delay, so it SNAPS on after
+     one pass rather than fading. Leaving falls back to the base rule below,
+     which has no transition at all - so it reverts instantly at rest. */
+  .stage canvas, .stage .veil{transition:none;}
+  .stage.busy canvas{
+    transition:transform 0s linear var(--delay), filter 0s linear var(--delay);
+    transform:scale(var(--dim-scale));
+  }
+  .s-filter.busy canvas{
+    filter:grayscale(var(--grey-sat)) brightness(var(--grey-bright));
+  }
+  .s-veil.busy .veil{
+    transition:opacity 0s linear var(--delay);
+    opacity:var(--veil-op);
+  }
+
+  .pad{
+    position:absolute; left:50%; top:50%;
+    width:var(--pad-len,70px); height:var(--pad-h,26px);
+    padding:0; background:var(--hex-accent); border:0; border-radius:5px;
+    transform-origin:50% 50%;
+  }
+  .pad-up  {transform:translate(-50%,-50%) rotate(0deg)   translateY(calc(-1 * (var(--pad-inner,110px) + var(--pad-h,26px) / 2)));}
+  .pad-ur  {transform:translate(-50%,-50%) rotate(60deg)  translateY(calc(-1 * (var(--pad-inner,110px) + var(--pad-h,26px) / 2)));}
+  .pad-dr  {transform:translate(-50%,-50%) rotate(120deg) translateY(calc(-1 * (var(--pad-inner,110px) + var(--pad-h,26px) / 2)));}
+  .pad-down{transform:translate(-50%,-50%) rotate(180deg) translateY(calc(-1 * (var(--pad-inner,110px) + var(--pad-h,26px) / 2)));}
+  .pad-dl  {transform:translate(-50%,-50%) rotate(240deg) translateY(calc(-1 * (var(--pad-inner,110px) + var(--pad-h,26px) / 2)));}
+  .pad-ul  {transform:translate(-50%,-50%) rotate(300deg) translateY(calc(-1 * (var(--pad-inner,110px) + var(--pad-h,26px) / 2)));}
+
+  /* ------------------------------- readout ------------------------------ */
+  .readout{
+    margin-top:18px; background:#0f1117; border:1px solid var(--hex-line);
+    border-radius:12px; padding:12px;
+    font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+    font-size:11.5px; line-height:1.6; color:var(--hex-ink-dim);
+    white-space:pre; overflow-x:auto;
+  }
+  .readout b{color:var(--hex-accent);font-weight:700;}
+  .status{
+    font-size:12px;color:var(--hex-ink-dim);margin-top:10px;
+    font-variant-numeric:tabular-nums;
+  }
+</style>
+</head>
+<body>
+
+<h1>Cascading &mdash; the board recedes while it plays itself out</h1>
+<p class="note">
+  Both boards run the <b>same</b> state, the same moves and the same timings.
+  Only the greying differs. Both shrink the canvas alone &mdash; the pads
+  hold their positions, so the board pulls back away from its own controls.
+  <br><br>
+  Both run buttons re-seed the same rigged staircase first, so every press
+  starts from an identical board &mdash; press again to replay.
+  <b>Cascade</b> runs uncapped, exactly like the shipped mode: four passes
+  are guaranteed by the seed, and the spawns often add more. The grey should
+  snap in, sharply, as the second pass begins.
+  <br><br>
+  <b>One pass (forced)</b> stops after the first pass. It is artificial
+  &mdash; no board reliably stops after one, since the spawn lands behind the
+  packed tiles and usually moves next go &mdash; but it reproduces the 200ms
+  of an ordinary swipe so you can check nothing flashes. If it does flicker,
+  nudge <code>delay</code> up: one pass is exactly 200ms (110 slide + 90
+  pop), so 200 is a photo finish and 240 is safe.
+</p>
+
+<div class="boards">
+  <div class="cell">
+    <div class="lab">A &mdash; filter on canvas</div>
+    <div class="sub">Only the drawn board greys. The space around it is untouched.</div>
+    <div class="stage s-filter" id="stageA">
+      <canvas id="boardA"></canvas>
+      <div class="pad pad-up"></div><div class="pad pad-ur"></div>
+      <div class="pad pad-dr"></div><div class="pad pad-down"></div>
+      <div class="pad pad-dl"></div><div class="pad pad-ul"></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="btnrow">
+      <button class="hexbtn go" id="one">One pass (forced)</button>
+      <button class="hexbtn go" id="casc">Cascade</button>
+      <button class="hexbtn" id="reset">Random board</button>
+    </div>
+    <div class="slider">
+      <label for="sScale">scale</label>
+      <button class="stepbtn" data-step="sScale" data-dir="-1">&minus;</button>
+      <input type="range" id="sScale" min="80" max="100" step="1" value="96">
+      <button class="stepbtn" data-step="sScale" data-dir="1">+</button>
+      <span class="val" id="vScale">0.96</span>
+    </div>
+    <div class="slider">
+      <label for="sGrey">grey</label>
+      <button class="stepbtn" data-step="sGrey" data-dir="-1">&minus;</button>
+      <input type="range" id="sGrey" min="0" max="100" step="1" value="55">
+      <button class="stepbtn" data-step="sGrey" data-dir="1">+</button>
+      <span class="val" id="vGrey">55%</span>
+    </div>
+    <div class="slider">
+      <label for="sDelay">delay</label>
+      <button class="stepbtn" data-step="sDelay" data-dir="-1">&minus;</button>
+      <input type="range" id="sDelay" min="0" max="600" step="10" value="240">
+      <button class="stepbtn" data-step="sDelay" data-dir="1">+</button>
+      <span class="val" id="vDelay">240ms</span>
+    </div>
+    <div class="status" id="status">idle</div>
+  </div>
+
+  <div class="cell">
+    <div class="lab">B &mdash; veil div</div>
+    <div class="sub">A sheet over the whole stage. Pads paint on top and stay lit.</div>
+    <div class="stage s-veil" id="stageB">
+      <canvas id="boardB"></canvas>
+      <div class="veil"></div>
+      <div class="pad pad-up"></div><div class="pad pad-ur"></div>
+      <div class="pad pad-dr"></div><div class="pad pad-down"></div>
+      <div class="pad pad-dl"></div><div class="pad pad-ul"></div>
+    </div>
+  </div>
+</div>
+
+<div class="readout" id="readout"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ------------------------------- board --------------------------------
+  var SQRT3 = Math.sqrt(3);
+  var R = 2;
+  var SLIDE_MS = 110;
+  var POP_MS = 90;
+  var POP_SWELL = 0.16;
+  var RADIUS_FRAC = 0.9;
+  var STROKE_FRAC = 0.03;
+  var STROKE_COLOUR = "rgba(0,0,0,0.18)";
+  var TEXT_NUDGE = 0.04;
+
+  var TILE_HSL = {
+    1:[0,66,84], 2:[0,66,66], 4:[0,69,55], 8:[23,78,52], 16:[41,92,49],
+    32:[56,88,56], 64:[80,78,52], 128:[128,88,43], 256:[152,66,60],
+    512:[189,66,59], 1024:[211,80,54], 2048:[224,79,51], 4096:[228,92,35],
+    8192:[246,66,58], 16384:[269,66,60], 32768:[286,68,70],
+    65536:[305,66,54], 131072:[328,81,50], 262144:[348,55,48]
+  };
+
+  var cells = [];
+  var cellIndex = {};
+  for (var x = -R; x <= R; x++) {
+    var yLo = Math.max(-R, -x - R);
+    var yHi = Math.min(R, -x + R);
+    for (var y = yLo; y <= yHi; y++) {
+      var z = -x - y;
+      var key = x + "," + y + "," + z;
+      cellIndex[key] = cells.length;
+      cells.push({ x: x, y: y, z: z, key: key });
+    }
+  }
+
+  function unitPos(c) {
+    return { px: 1.5 * c.x, py: SQRT3 * (c.z + c.x / 2) };
+  }
+
+  var DIRS = {
+    up:   { group:"x", sortKey:"y", desc:true },
+    down: { group:"x", sortKey:"y", desc:false },
+    ur:   { group:"y", sortKey:"x", desc:true },
+    dl:   { group:"y", sortKey:"x", desc:false },
+    ul:   { group:"z", sortKey:"x", desc:false },
+    dr:   { group:"z", sortKey:"x", desc:true }
+  };
+
+  var LINES = {};
+  Object.keys(DIRS).forEach(function (dir) {
+    var cfg = DIRS[dir];
+    var groups = {};
+    cells.forEach(function (c) {
+      var g = c[cfg.group];
+      if (!groups[g]) {
+        groups[g] = [];
+      }
+      groups[g].push(c);
+    });
+    var lines = [];
+    Object.keys(groups).forEach(function (g) {
+      var arr = groups[g];
+      arr.sort(function (a, b) {
+        if (cfg.desc) {
+          return b[cfg.sortKey] - a[cfg.sortKey];
+        }
+        return a[cfg.sortKey] - b[cfg.sortKey];
+      });
+      lines.push(arr.map(function (c) { return c.key; }));
+    });
+    LINES[dir] = lines;
+  });
+
+  var board = {};
+  var idc = 1;
+
+  function emptyKeys() {
+    return cells.filter(function (c) { return !board[c.key]; })
+                .map(function (c) { return c.key; });
+  }
+
+  function spawn() {
+    var e = emptyKeys();
+    if (!e.length) {
+      return null;
+    }
+    var k = e[(Math.random() * e.length) | 0];
+    var v = 2;
+    if (Math.random() >= 0.9) {
+      v = 4;
+    }
+    board[k] = { value: v, id: idc++ };
+    return k;
+  }
+
+  function applyMove(dir) {
+    var next = {};
+    var movers = [];
+    var mergedDests = [];
+    var moved = false;
+
+    LINES[dir].forEach(function (line) {
+      var groups = [];
+      var pending = null;
+      line.forEach(function (key) {
+        var t = board[key];
+        if (!t) {
+          return;
+        }
+        if (pending && !pending.merged && pending.value === t.value) {
+          pending.value *= 2;
+          pending.merged = true;
+          pending.sources.push({ key: key, id: t.id, value: t.value });
+          groups.push(pending);
+          pending = null;
+          return;
+        }
+        if (pending) {
+          groups.push(pending);
+        }
+        pending = {
+          value: t.value, merged: false,
+          sources: [{ key: key, id: t.id, value: t.value }]
+        };
+      });
+      if (pending) {
+        groups.push(pending);
+      }
+      for (var j = 0; j < groups.length; j++) {
+        var g = groups[j];
+        var destKey = line[j];
+        next[destKey] = { value: g.value, id: g.sources[0].id };
+        g.sources.forEach(function (s) {
+          if (s.key !== destKey) {
+            moved = true;
+          }
+          movers.push({ id:s.id, value:s.value, fromKey:s.key, toKey:destKey });
+        });
+        if (g.merged) {
+          mergedDests.push(destKey);
+        }
+      }
+    });
+
+    return { moved:moved, movers:movers, mergedDests:mergedDests, next:next };
+  }
+
+  function anyMove() {
+    if (emptyKeys().length) {
+      return true;
+    }
+    return ["up","ur","ul"].some(function (d) { return applyMove(d).moved; });
+  }
+
+  // ------------------------------ painting ------------------------------
+  function hslToRgb(h, s, l) {
+    var hh = h / 360;
+    var a = s * Math.min(l, 1 - l);
+    function ch(n) {
+      var k = (n + hh * 12) % 12;
+      return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    }
+    return [ch(0), ch(8), ch(4)];
+  }
+
+  function tileColours(value) {
+    var hsl = TILE_HSL[value] || TILE_HSL[262144];
+    var rgb = hslToRgb(hsl[0], hsl[1] / 100, hsl[2] / 100);
+    var lum = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+    var text = "#ffffff";
+    if (lum > 0.45) {
+      text = "#171a1f";
+    }
+    return { fill:"hsl(" + hsl[0] + ", " + hsl[1] + "%, " + hsl[2] + "%)", text:text };
+  }
+
+  function tileFontSize(value, size) {
+    var len = String(value).length;
+    if (len >= 5) { return size * 0.40; }
+    if (len === 4) { return size * 0.48; }
+    if (len === 3) { return size * 0.56; }
+    return size * 0.64;
+  }
+
+  var views = [];
+
+  function makeView(canvasId, stageId) {
+    var canvas = document.getElementById(canvasId);
+    return {
+      canvas: canvas,
+      ctx: canvas.getContext("2d"),
+      stage: document.getElementById(stageId),
+      dpr: 1,
+      layout: null
+    };
+  }
+
+  function computeLayout(v) {
+    var rect = v.stage.getBoundingClientRect();
+    var cssW = Math.max(160, rect.width);
+    var cssH = Math.max(160, rect.height);
+    v.dpr = Math.min(window.devicePixelRatio || 1, 3);
+    v.canvas.width = Math.round(cssW * v.dpr);
+    v.canvas.height = Math.round(cssH * v.dpr);
+
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    cells.forEach(function (c) {
+      var p = unitPos(c);
+      minX = Math.min(minX, p.px - 1);
+      maxX = Math.max(maxX, p.px + 1);
+      minY = Math.min(minY, p.py - SQRT3 / 2);
+      maxY = Math.max(maxY, p.py + SQRT3 / 2);
+    });
+
+    var PAD_H = 26, PAD_GAP = 5, PAD_EDGE = 5;
+    var pad = PAD_GAP + PAD_H + PAD_EDGE;
+    var spanX = maxX - minX;
+    var spanY = maxY - minY;
+    var size = Math.min((cssW - 2 * pad) / spanX, (cssH - 2 * pad) / spanY);
+    var offX = (cssW - size * spanX) / 2 - size * minX;
+    var offY = (cssH - size * spanY) / 2 - size * minY;
+
+    var pos = {};
+    cells.forEach(function (c) {
+      var p = unitPos(c);
+      pos[c.key] = { x: offX + size * p.px, y: offY + size * p.py };
+    });
+    v.layout = { size:size, pos:pos, cssW:cssW, cssH:cssH };
+
+    var inner = Math.round(size * SQRT3 * (R + 0.5) + PAD_GAP);
+    v.stage.style.setProperty("--pad-inner", inner + "px");
+    v.stage.style.setProperty("--pad-h", PAD_H + "px");
+    v.stage.style.setProperty("--pad-len", Math.round(size * 3 * SQRT3) + "px");
+  }
+
+  function hexPath(ctx, cx, cy, size) {
+    ctx.beginPath();
+    for (var i = 0; i < 6; i++) {
+      var a = Math.PI / 180 * (60 * i);
+      var px = cx + size * Math.cos(a);
+      var py = cy + size * Math.sin(a);
+      if (i === 0) { ctx.moveTo(px, py); } else { ctx.lineTo(px, py); }
+    }
+    ctx.closePath();
+  }
+
+  function drawEmpty(ctx, cx, cy, size) {
+    hexPath(ctx, cx, cy, size * 0.9);
+    ctx.fillStyle = "#1c2029";
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, size * 0.02);
+    ctx.strokeStyle = "#262b36";
+    ctx.stroke();
+  }
+
+  function drawTile(ctx, cx, cy, size, value, scale) {
+    var s = size * RADIUS_FRAC * (scale || 1);
+    var col = tileColours(value);
+    hexPath(ctx, cx, cy, s);
+    ctx.fillStyle = col.fill;
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, size * STROKE_FRAC);
+    ctx.strokeStyle = STROKE_COLOUR;
+    ctx.stroke();
+    var fs = tileFontSize(value, size);
+    ctx.fillStyle = col.text;
+    ctx.font = "800 " + fs + "px ui-sans-serif, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(value), cx, cy + fs * TEXT_NUDGE);
+  }
+
+  // paint one frame to every view; `body` gets (ctx, layout)
+  function frame(body) {
+    views.forEach(function (v) {
+      var ctx = v.ctx;
+      ctx.save();
+      ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
+      ctx.clearRect(0, 0, v.layout.cssW, v.layout.cssH);
+      cells.forEach(function (c) {
+        var p = v.layout.pos[c.key];
+        drawEmpty(ctx, p.x, p.y, v.layout.size);
+      });
+      body(ctx, v.layout);
+      ctx.restore();
+    });
+  }
+
+  function drawStatic() {
+    frame(function (ctx, layout) {
+      Object.keys(board).forEach(function (k) {
+        var p = layout.pos[k];
+        drawTile(ctx, p.x, p.y, layout.size, board[k].value, 1);
+      });
+    });
+  }
+
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function animateSlide(movers, then) {
+    var start = performance.now();
+    function step(now) {
+      var t = Math.min(1, (now - start) / SLIDE_MS);
+      var e = easeOut(t);
+      frame(function (ctx, layout) {
+        movers.forEach(function (m) {
+          var a = layout.pos[m.fromKey];
+          var b = layout.pos[m.toKey];
+          drawTile(ctx, a.x + (b.x - a.x) * e, a.y + (b.y - a.y) * e,
+                   layout.size, m.value, 1);
+        });
+      });
+      if (t < 1) { requestAnimationFrame(step); return; }
+      then();
+    }
+    requestAnimationFrame(step);
+  }
+
+  function animatePop(popKeys, then) {
+    var start = performance.now();
+    function step(now) {
+      var t = Math.min(1, (now - start) / POP_MS);
+      frame(function (ctx, layout) {
+        Object.keys(board).forEach(function (k) {
+          var p = layout.pos[k];
+          var sc = 1;
+          if (popKeys.indexOf(k) !== -1) {
+            sc = 1 + Math.sin(t * Math.PI) * POP_SWELL;
+          }
+          drawTile(ctx, p.x, p.y, layout.size, board[k].value, sc);
+        });
+      });
+      if (t < 1) { requestAnimationFrame(step); return; }
+      then();
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ------------------------------ the run -------------------------------
+  var busy = false;
+  var statusEl = document.getElementById("status");
+
+  function setBusy(on) {
+    views.forEach(function (v) { v.stage.classList.toggle("busy", on); });
+  }
+
+  function say(s) { statusEl.textContent = s; }
+
+  // `limit` caps the passes so "one pass" can stop after exactly one
+  function run(dir, limit) {
+    if (busy) { return; }
+    if (!applyMove(dir).moved) {
+      say("nothing moves up from here - hit Cascade to re-seed");
+      return;
+    }
+    busy = true;
+    setBusy(true);
+    var n = 0;
+    var t0 = performance.now();
+
+    function pass() {
+      var res = applyMove(dir);
+      if (!res.moved || n >= limit) {
+        busy = false;
+        setBusy(false);
+        drawStatic();
+        say(n + " pass" + (n === 1 ? "" : "es") + " in " +
+            Math.round(performance.now() - t0) + "ms" +
+            (anyMove() ? "" : " - board dead, hit New board"));
+        return;
+      }
+      n++;
+      board = res.next;
+      say("pass " + n + "...");
+      animateSlide(res.movers, function () {
+        var k = spawn();
+        var pops = res.mergedDests.slice();
+        if (k) { pops.push(k); }
+        animatePop(pops, pass);
+      });
+    }
+    pass();
+  }
+
+  // A guaranteed staircase, front-to-back down the two longest "up" lines.
+  // 16 8 4 2 2 collapses exactly one rung per pass: 16 8 4 4, then 16 8 8,
+  // then 16 16, then 32. Four passes before the spawns add any of their own.
+  var FIXED = [
+    ["0,2,-2", 16], ["0,1,-1", 8], ["0,0,0", 4],
+    ["0,-1,1", 2], ["0,-2,2", 2],
+    ["-1,2,-1", 8], ["-1,1,0", 4], ["-1,0,1", 2], ["-1,-1,2", 2]
+  ];
+
+  function seedFixed() {
+    board = {};
+    idc = 1;
+    FIXED.forEach(function (row) {
+      board[row[0]] = { value: row[1], id: idc++ };
+    });
+    busy = false;
+    setBusy(false);
+    drawStatic();
+  }
+
+  function reset() {
+    board = {};
+    idc = 1;
+    // a random mid-game scatter, for comparison with the rigged board
+    var seeds = [2,2,2,2,4,4,8,8,2,2,4,4];
+    var keys = cells.map(function (c) { return c.key; });
+    for (var i = keys.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var s = keys[i]; keys[i] = keys[j]; keys[j] = s;
+    }
+    seeds.forEach(function (v, i) { board[keys[i]] = { value:v, id:idc++ }; });
+    busy = false;
+    setBusy(false);
+    drawStatic();
+    say("idle");
+  }
+
+  // ----------------------------- the sliders ----------------------------
+  var root = document.documentElement;
+  var sScale = document.getElementById("sScale");
+  var sGrey = document.getElementById("sGrey");
+  var sDelay = document.getElementById("sDelay");
+  var readout = document.getElementById("readout");
+
+  function applyVars() {
+    var scale = (sScale.value / 100).toFixed(2);
+    var g = sGrey.value / 100;
+    var sat = (g * 0.9).toFixed(2);
+    var bright = (1 - g * 0.72).toFixed(2);
+    var veil = (g * 0.8).toFixed(2);
+    var delay = sDelay.value + "ms";
+
+    root.style.setProperty("--dim-scale", scale);
+    root.style.setProperty("--grey-sat", sat);
+    root.style.setProperty("--grey-bright", bright);
+    root.style.setProperty("--veil-op", veil);
+    root.style.setProperty("--delay", delay);
+
+    document.getElementById("vScale").textContent = scale;
+    document.getElementById("vGrey").textContent = sGrey.value + "%";
+    document.getElementById("vDelay").textContent = delay;
+
+    readout.innerHTML =
+      "<b>A - filter (paste into style-hex2.css)</b>\n" +
+      ".stage canvas {\n" +
+      "  transition: none;\n" +
+      "}\n" +
+      ".board-busy canvas {\n" +
+      "  transition: transform 0s linear " + delay + ",\n" +
+      "              filter 0s linear " + delay + ";\n" +
+      "  transform: scale(" + scale + ");\n" +
+      "  filter: grayscale(" + sat + ") brightness(" + bright + ");\n" +
+      "}\n\n" +
+      "<b>B - veil (needs a div in hex2.html)</b>\n" +
+      ".board-veil {\n" +
+      "  position: absolute;\n" +
+      "  inset: 0;\n" +
+      "  background: #0d0f14;\n" +
+      "  opacity: 0;\n" +
+      "  pointer-events: none;\n" +
+      "}\n" +
+      ".board-busy .board-veil {\n" +
+      "  transition: opacity 0s linear " + delay + ";\n" +
+      "  opacity: " + veil + ";\n" +
+      "}";
+  }
+
+  [sScale, sGrey, sDelay].forEach(function (el) {
+    el.addEventListener("input", applyVars);
+  });
+
+  // one step per tap, clamped to the input's own min/max
+  Array.prototype.forEach.call(
+    document.querySelectorAll(".stepbtn"),
+    function (b) {
+      b.addEventListener("click", function () {
+        var el = document.getElementById(b.getAttribute("data-step"));
+        var step = parseFloat(el.step) || 1;
+        var dir = parseFloat(b.getAttribute("data-dir"));
+        var v = parseFloat(el.value) + step * dir;
+        v = Math.max(parseFloat(el.min), Math.min(parseFloat(el.max), v));
+        el.value = v;
+        applyVars();
+      });
+    }
+  );
+
+  // ------------------------------- wiring -------------------------------
+  views = [makeView("boardA","stageA"), makeView("boardB","stageB")];
+
+  function relayout() {
+    views.forEach(computeLayout);
+    drawStatic();
+  }
+
+  document.getElementById("one").addEventListener("click", function () {
+    if (busy) { return; }
+    seedFixed();
+    run("up", 1);
+  });
+  document.getElementById("casc").addEventListener("click", function () {
+    if (busy) { return; }
+    seedFixed();
+    run("up", Infinity);
+  });
+  document.getElementById("reset").addEventListener("click", function () {
+    reset();
+  });
+
+  window.addEventListener("resize", relayout);
+  applyVars();
+  views.forEach(computeLayout);
+  seedFixed();
+  say("staircase ready");
+})();
+</script>
+
+</body>
+</html>

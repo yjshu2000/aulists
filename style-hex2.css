@@ -177,6 +177,19 @@
     height: 100%;
     touch-action: none;
   }
+  /* Cascading marks the stage busy while one gesture plays itself out. The
+     delay is one pass long (SLIDE_MS + POP_MS), so an ordinary single swipe
+     is over before any of this shows, and a real cascade snaps into it as
+     the second pass begins - the 0s durations are what make it snap rather
+     than fade. Leaving busy falls back to the rule above, which carries no
+     transition, so the board springs back the instant it comes to rest.
+     Only the canvas moves: the pads hold position, so the board visibly
+     pulls back from its own controls. */
+  .board-busy canvas {
+    transition: transform 0s linear 200ms, filter 0s linear 200ms;
+    transform: scale(0.9);
+    filter: grayscale(0.45) brightness(0.64);
+  }
 
   /* ------------------------------- slide pads --------------------------- */
   /* Six buttons around the board, one per direction: two down each side, one

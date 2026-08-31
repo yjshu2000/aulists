@@ -787,6 +787,12 @@ window.Hex2 = (function () {
     endFrame();
   }
 
+  // A mode whose one gesture runs several passes marks the board busy while it
+  // plays out, so the stylesheet can pull it back and grey it over.
+  function setBoardBusy(on) {
+    canvas.parentElement.classList.toggle("board-busy", on);
+  }
+
   // ---------------------------- undo, 2 deep --------------------------
   function snapshot() {
     const tiles = [];
@@ -1389,6 +1395,7 @@ window.Hex2 = (function () {
     endFrame: endFrame,
     drawBoardBase: drawBoardBase,
     drawStatic: drawStatic,
+    setBoardBusy: setBoardBusy,
     hexPath: hexPath,
     paintTile: paintTile,
     tileFontSize: tileFontSize,
