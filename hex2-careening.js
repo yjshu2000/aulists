@@ -82,10 +82,12 @@
     requestAnimationFrame(frame);
   }
 
-  // The board has come to rest. Game over takes precedence over the win, the
-  // same order settle() uses.
+  // The board has come to rest. This is the only place the careen saves: one
+  // real swipe is one save, matching the one undo entry it pushes. Game over
+  // takes precedence over the win, the order settle() uses.
   function finish() {
     busy = false;
+    Hex2.save();
     Hex2.drawStatic();
     if (!Hex2.anyMovePossible()) {
       Hex2.endGame();
@@ -114,7 +116,6 @@
       if (spawnKey) {
         popKeys.push(spawnKey);
       }
-      Hex2.save();
       animatePop(popKeys, function () {
         pass(dir, false);
       });
