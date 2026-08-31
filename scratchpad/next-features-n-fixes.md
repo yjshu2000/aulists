@@ -27,9 +27,7 @@
       - [\[i24.1\] Challenge v2 ⚪](#i241-challenge-v2-)
       - [\[i24.2\] Challenge Ultra ⚪](#i242-challenge-ultra-)
     - [\[i31\] Mobile landscape-orientation compatibility 🟢](#i31-mobile-landscape-orientation-compatibility-)
-    - [\[i37\] Careening mode ⬜](#i37-careening-mode-)
     - [\[i38\] Sticky mode ⬜ 🟢](#i38-sticky-mode--)
-    - [\[i39\] Mode select becomes a dropdown ⚪](#i39-mode-select-becomes-a-dropdown-)
     - [\[i40\] Fake ad timer freezes on return from Falsedge ⚪ 🐞](#i40-fake-ad-timer-freezes-on-return-from-falsedge--)
     - [\[i43\] Challenge mode has bug due to outline ⚪ 🐞 🟢](#i43-challenge-mode-has-bug-due-to-outline---)
   - [Multi-page items](#multi-page-items)
@@ -438,15 +436,6 @@ last consolidated: none
 
 game is broken in landscape right now but like whateverrr i dont play in landscape so who caaaares
 
-### [i37] Careening mode ⬜
-last consolidated: 26-08-23
-
-A swipe repeats in the same direction until nothing moves and nothing merges — one gesture drives the board to a fixpoint instead of taking a single step.
-
-Faster to play. Whether it is also *easier* is unsettled: it was first described as neither harder nor easier, only quicker, and later as plainly easier.
-
-Built over normal mode. Each internal step behaves as its own swipe: it animates individually and spawns a tile as usual, so one gesture reads as several swipes happening in sequence.
-
 ### [i38] Sticky mode ⬜ 🟢
 last consolidated: 26-08-22
 
@@ -457,25 +446,6 @@ Rough shape — every 6 swipes a new tile is chosen and holds until the next cha
 Deliberately silly.
 
 **Undecided:** whether the interval is really 6, what the indicator looks like, what happens when the stuck tile is the only thing that could have moved, and whether it stacks with any challenge tier.
-
-### [i39] Mode select becomes a dropdown ⚪
-last consolidated: 26-08-22
-
-The cycle button does not scale past three modes. It becomes a dropdown listing all of them:
-
-```
-Normal
-Jiggly
-Careening
-Sticky
-Challenge v1
-Challenge v2
-Challenge Ultra
-```
-
-Switching still reloads the page. Each mode is a self-booting script and only one may be present per load, so that constraint is unchanged.
-
-**Undecided:** the ordering above is provisional, and whether unbuilt modes appear greyed out or are simply absent.
 
 ### [i40] Fake ad timer freezes on return from Falsedge ⚪ 🐞
 last consolidated: 26-08-22

@@ -71,7 +71,8 @@
   var mode = "base";
   try {
     var saved = localStorage.getItem("hex2.mode");
-    if (saved === "jiggly" || saved === "challenge") {
+    if (saved === "jiggly" || saved === "challenge" ||
+        saved === "careening") {
       mode = saved;
     }
   } catch (e) {

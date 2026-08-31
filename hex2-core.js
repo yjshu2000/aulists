@@ -299,9 +299,13 @@ window.Hex2 = (function () {
 
   // Adopt an applyMove result. Spawning and saving deliberately stay with the
   // mode: base spawns once its slide has finished, jiggly spawns immediately so
-  // an interrupting swipe cannot lose the new tile.
-  function commit(res) {
-    snapshot();
+  // an interrupting swipe cannot lose the new tile. `skipSnapshot` is for a
+  // mode whose one gesture runs several passes and wants them to rewind
+  // together as a single undo entry.
+  function commit(res, skipSnapshot) {
+    if (!skipSnapshot) {
+      snapshot();
+    }
     board = res.next;
     score += res.gained;
     if (score > best) {
@@ -879,21 +883,33 @@ window.Hex2 = (function () {
   }
 
   // ------------------------- win / end of game ------------------------
-  function checkWin(mergedDests) {
+  // The predicate on its own, so a mode whose one gesture runs several passes
+  // can watch every pass and hold the announcement until the last.
+  function reachedWin(mergedDests) {
     if (announcedWin) {
-      return;
+      return false;
     }
     for (const key of mergedDests) {
       const t = board.get(key);
       if (t && t.value >= Math.pow(2, WIN_EXP)) {
-        announcedWin = true;
-        showOverlay(
-          "16384",
-          "Reached the top tile. Keep sliding to push further.",
-          "Keep going"
-        );
-        return;
+        return true;
       }
+    }
+    return false;
+  }
+
+  function announceWin() {
+    announcedWin = true;
+    showOverlay(
+      "16384",
+      "Reached the top tile. Keep sliding to push further.",
+      "Keep going"
+    );
+  }
+
+  function checkWin(mergedDests) {
+    if (reachedWin(mergedDests)) {
+      announceWin();
     }
   }
 
@@ -1193,6 +1209,7 @@ window.Hex2 = (function () {
     { key: "base", label: "Normal", name: "normal mode" },
     { key: "jiggly", label: "Jiggly", name: "jiggly mode" },
     { key: "challenge", label: "Challenge", name: "challenge mode" },
+    { key: "careening", label: "Careening", name: "careening mode" },
   ];
 
   function modeSpec(key) {
@@ -1383,6 +1400,8 @@ window.Hex2 = (function () {
     snapshot: snapshot,
     shuffleBoard: shuffleBoard,
     endGame: endGame,
+    reachedWin: reachedWin,
+    announceWin: announceWin,
 
     // painting helpers for a mode's drawTile
     beginFrame: beginFrame,

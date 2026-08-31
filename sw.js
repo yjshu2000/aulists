@@ -16,6 +16,7 @@ const SHELL = [
   './hex2-base.js',
   './hex2-jiggly.js',
   './hex2-challenge.js',
+  './hex2-careening.js',
   './manifest.json',
   './assets/icon.svg',
   './assets/icon-hex2.svg'
