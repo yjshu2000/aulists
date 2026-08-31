@@ -178,9 +178,10 @@
     touch-action: none;
   }
   /* The delay clears one pass, so an ordinary swipe ends before this shows.
-     0s durations snap it on rather than fade. */
+     Instant on the way out - the snap back is what says input is yours. */
   .board-busy canvas {
-    transition: transform 0s linear 220ms, filter 0s linear 220ms;
+    transition: transform 140ms ease-out 210ms,
+                filter 140ms ease-out 210ms;
     transform: scale(0.9);
     filter: grayscale(0.45) brightness(0.64);
   }
