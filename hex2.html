@@ -51,7 +51,6 @@
 
 <footer>
   Swipe up/down, along <b>/</b>, and along <b>\</b> to slide the board.
-  <br>save data migration WIP
 </footer>
 
 <div class="lockout" id="lockout">
@@ -72,7 +71,7 @@
   try {
     var saved = localStorage.getItem("hex2.mode");
     if (saved === "jiggly" || saved === "challenge" ||
-        saved === "careening") {
+        saved === "cascading") {
       mode = saved;
     }
   } catch (e) {

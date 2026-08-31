@@ -64,25 +64,6 @@ window.Hex2 = (function () {
     },
   };
 
-  // Temporary. Copies each old key to its new name when the new one is empty,
-  // and deletes nothing. Remove once the rename is confirmed live.
-  (function migrateHexadecimalKeys() {
-    const pairs = [
-      ["hexadecimal.save.v1", "hex2.base.save"],
-      ["hexadecimal.jiggly.save.v1", "hex2.jiggly.save"],
-      ["hexadecimal.best.v1", BEST_KEY],
-    ];
-    for (const [from, to] of pairs) {
-      if (store.get(to)) {
-        continue;
-      }
-      const raw = store.get(from);
-      if (raw) {
-        store.set(to, raw);
-      }
-    }
-  })();
-
   // ------------- board cells (cube coords, x + y + z = 0) --------------
   const cells = [];
   const cellIndex = new Map();
@@ -1209,7 +1190,7 @@ window.Hex2 = (function () {
     { key: "base", label: "Normal", name: "normal mode" },
     { key: "jiggly", label: "Jiggly", name: "jiggly mode" },
     { key: "challenge", label: "Challenge", name: "challenge mode" },
-    { key: "careening", label: "Careening", name: "careening mode" },
+    { key: "cascading", label: "Cascading", name: "cascading mode" },
   ];
 
   function modeSpec(key) {

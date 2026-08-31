@@ -1,4 +1,4 @@
-// Hex 2^ - careening mode.
+// Hex 2^ - cascading mode.
 //
 // Normal mode's slide-then-pop, repeated in the same direction until a pass
 // moves nothing. Every pass is a whole swipe of its own - it animates and it
@@ -11,12 +11,12 @@
 (function () {
   "use strict";
 
-  const SAVE_KEY = "hex2.careening.save";
+  const SAVE_KEY = "hex2.cascading.save";
   const SLIDE_MS = 110;
   const POP_MS = 90;
   const POP_SWELL = 0.16;
 
-  let busy = false;          // input lock for the whole careen, not one pass
+  let busy = false;          // input lock for the whole cascade, not one pass
   let won = false;           // a pass hit the win tile; announced once at rest
 
   function easeOut(t) {
@@ -82,7 +82,7 @@
     requestAnimationFrame(frame);
   }
 
-  // The board has come to rest. This is the only place the careen saves: one
+  // The board has come to rest. This is the only place the cascade saves: one
   // real swipe is one save, matching the one undo entry it pushes. Game over
   // takes precedence over the win, the order settle() uses.
   function finish() {
@@ -98,7 +98,7 @@
     }
   }
 
-  // One pass of the careen. It recurses from inside the pop callback, so the
+  // One pass of the cascade. It recurses from inside the pop callback, so the
   // chain rides requestAnimationFrame rather than growing the stack.
   function pass(dir, first) {
     const res = Hex2.applyMove(dir);
