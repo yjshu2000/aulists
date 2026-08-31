@@ -180,9 +180,7 @@
   /* The delay clears one pass, so an ordinary swipe ends before this shows.
      Instant on the way out - the snap back is what says input is yours. */
   .board-busy canvas {
-    transition: transform 140ms ease-out 210ms,
-                filter 140ms ease-out 210ms;
-    transform: scale(0.9);
+    transition: filter 140ms ease-out 210ms;
     filter: grayscale(0.45) brightness(0.64);
   }
 
