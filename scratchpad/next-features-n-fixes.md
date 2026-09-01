@@ -20,7 +20,6 @@
     - [\[i35\] Custom tasks (CL) ⬜](#i35-custom-tasks-cl-)
     - [\[i36\] Template row spacing and manual sort ⚪](#i36-template-row-spacing-and-manual-sort-)
     - [\[i45\] Queue ⬜ 🔴](#i45-queue--)
-    - [\[i??\] BUG FIX THE STUPID TIME TOAST SAYS "TOO SOON" FOR EVERYTHING \[BUG EMOJI\] \[RED\]](#i-bug-fix-the-stupid-time-toast-says-too-soon-for-everything-bug-emoji-red)
   - [Aulists](#aulists)
     - [\[i15\] Tear down and rebuild Aulists ⬜ 🟡](#i15-tear-down-and-rebuild-aulists--)
   - [Hex 2^](#hex-2)
@@ -344,11 +343,6 @@ Queue is manually ordered using the plan for the manual ordering of Activate (ot
 
 Update 26-08-30:  
 queue must be collapsible
-
-### [i??] BUG FIX THE STUPID TIME TOAST SAYS "TOO SOON" FOR EVERYTHING [BUG EMOJI] [RED]
-
-UPDATE 26-09-01  
-FIX THIS *NOW*!!! WHY IS THE TIME TOAST ALWAYS "TOO SOON" EVEN FOR TIMES IN THE PAST?! IT SHOULD JUST SAY "INVALID TIME"!!!!
 
 ## Aulists
 
