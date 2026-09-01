@@ -139,6 +139,19 @@
   .hearts + #undo {
     margin-left: 8px;
   }
+  /* takes the slot the hearts box uses in Challenge; lit while the dim is on */
+  #dimtoggle {
+    margin-left: auto;
+    border-color: var(--hex-accent);
+    color: var(--hex-accent);
+  }
+  #dimtoggle + #undo {
+    margin-left: 8px;
+  }
+  #dimtoggle.off {
+    border-color: var(--hex-line);
+    color: var(--hex-ink-dim);
+  }
   /* A native <select>, so it takes the button's look by hand instead of
      wearing .hexbtn - a select does not honour inline-flex. The native
      arrow is left in place as the affordance, and the padding leaves it
@@ -179,7 +192,7 @@
   }
   /* The delay clears one pass, so an ordinary swipe ends before this shows.
      Instant on the way out - the snap back is what says input is yours. */
-  .board-busy canvas {
+  .board-busy.dim canvas {
     transition: filter 140ms ease-out 210ms;
     filter: grayscale(0.45) brightness(0.64);
   }

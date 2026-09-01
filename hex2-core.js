@@ -31,6 +31,7 @@ window.Hex2 = (function () {
   const FAKE_AD_MAX_MS = 120 * 1000;
   const SWIPE_MIN = 22;      // px of travel before a drag counts as a swipe
   const PADS_KEY = "hex2.pads";
+  const DIM_KEY = "hex2.dim";
   const PAD_H = 60;          // slide-pad thickness, all of it grown outward
   const PAD_GAP = 6;         // board edge to a pad's inner edge
   const PAD_EDGE = 6;        // pad ring's outer edge to the stage edge
@@ -1248,6 +1249,14 @@ window.Hex2 = (function () {
       heartsBox = null;
     }
 
+    // the dim only ever happens in Cascading, so its toggle is absent
+    // everywhere else rather than sitting there inert
+    let dimBtn = document.getElementById("dimtoggle");
+    if (dimBtn && here !== "cascading") {
+      dimBtn.remove();
+      dimBtn = null;
+    }
+
     document.getElementById("newgame").addEventListener("click", reset);
     undoBtn.addEventListener("click", undo);
     ovBtn.addEventListener("click", function () {
@@ -1313,6 +1322,34 @@ window.Hex2 = (function () {
       relayout();
     });
     applyPads();
+
+    if (dimBtn) {
+      let dimOn = store.get(DIM_KEY) === "1";
+
+      // the label states what the dim is doing, not what tapping will do
+      const applyDim = function () {
+        if (dimOn) {
+          canvas.parentElement.classList.add("dim");
+          dimBtn.classList.remove("off");
+          dimBtn.textContent = "Dim on";
+          return;
+        }
+        canvas.parentElement.classList.remove("dim");
+        dimBtn.classList.add("off");
+        dimBtn.textContent = "Dim off";
+      };
+
+      dimBtn.addEventListener("click", function () {
+        dimOn = !dimOn;
+        if (dimOn) {
+          store.set(DIM_KEY, "1");
+        } else {
+          store.set(DIM_KEY, "0");
+        }
+        applyDim();
+      });
+      applyDim();
+    }
 
     // Walking out of the page on purpose ends the break; the mode switch
     // reloads without touching the stamp, so it cannot be used to escape.
