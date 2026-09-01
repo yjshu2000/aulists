@@ -313,6 +313,7 @@
     backdrop-filter: none;
   }
   .lockout.peek .fake-ad,
+  .lockout.peek .earn,
   .lockout.peek .lockout-card .hexbtn {
     opacity: 0.25;
   }
@@ -369,6 +370,37 @@
   }
   .fake-ad.ready::before {
     display: none;
+  }
+
+  /* What the wait pays out. It sits beside the x for the whole countdown as
+     a promise, so it costs none of the 30s of game that follow; the tap
+     turns it into the new grass total and pops that instead. */
+  .earn {
+    position: absolute;
+    top: calc(14px + env(safe-area-inset-top));
+    right: 90px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 56px;
+    color: #7ed534;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    transform-origin: center;
+  }
+  .earn img {
+    display: block;
+    width: 36px;
+    height: 36px;
+  }
+  .earn.pop {
+    animation: earnpop .45s cubic-bezier(.2, 1.4, .4, 1);
+  }
+  @keyframes earnpop {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.45); }
+    100% { transform: scale(1); }
   }
 
   /* ---------------------------------- footer ---------------------------- */

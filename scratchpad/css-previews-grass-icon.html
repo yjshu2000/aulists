@@ -116,7 +116,7 @@
   }
   .adwrap{
     position:absolute; top:14px; right:14px;
-    display:flex; align-items:center; gap:10px;
+    display:flex; align-items:center; gap:20px;
   }
   /* "+1" and the icon are one unit, and the whole unit is what pops */
   .earn{
@@ -188,7 +188,7 @@
 <h2>In context &mdash; the lockout corner</h2>
 <div class="lockout">
   <div class="adwrap">
-    <span class="earn" id="earn">+1 <span id="earnIcon"></span></span>
+    <span class="earn" id="earn"><span id="earnNum">+1</span> <span id="earnIcon"></span></span>
     <button class="fake-ad" id="x">&times;</button>
   </div>
   <div class="card-2">
@@ -269,6 +269,7 @@
   var galEl = document.getElementById("gal");
   var earn = document.getElementById("earn");
   var earnIcon = document.getElementById("earnIcon");
+  var earnNum = document.getElementById("earnNum");
   var readout = document.getElementById("readout");
 
   function round(n) {
@@ -530,11 +531,22 @@
     }
   );
 
+  // Stands in for the real thing: the label promises "+1" for the whole
+  // wait, and the tap turns it into the new total and pops that instead.
+  // 11 so the first tap lands on 12.
+  var grass = 11;
+
   document.getElementById("x").addEventListener("click", function () {
+    grass += 1;
+    earnNum.textContent = String(grass);
     earn.classList.remove("pop");
     // reflow, so retapping restarts the animation rather than ignoring it
     void earn.offsetWidth;
     earn.classList.add("pop");
+    // by now the real lockout has closed, so the next one opens on "+1"
+    setTimeout(function () {
+      earnNum.textContent = "+1";
+    }, 900);
   });
 
   renderAll();

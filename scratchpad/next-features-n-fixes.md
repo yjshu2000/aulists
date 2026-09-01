@@ -19,7 +19,7 @@
     - [\[i34\] Streak break condition ⬜ 🟠](#i34-streak-break-condition--)
     - [\[i35\] Custom tasks (CL) ⬜](#i35-custom-tasks-cl-)
     - [\[i36\] Template row spacing and manual sort ⚪](#i36-template-row-spacing-and-manual-sort-)
-    - [\[i45\] Queue ⬜](#i45-queue-)
+    - [\[i45\] Queue ⬜ 🔴](#i45-queue--)
     - [\[i??\] BUG FIX THE STUPID TIME TOAST SAYS "TOO SOON" FOR EVERYTHING \[BUG EMOJI\] \[RED\]](#i-bug-fix-the-stupid-time-toast-says-too-soon-for-everything-bug-emoji-red)
   - [Aulists](#aulists)
     - [\[i15\] Tear down and rebuild Aulists ⬜ 🟡](#i15-tear-down-and-rebuild-aulists--)
@@ -334,7 +334,7 @@ Sorting is two-tier. Templates whose task is currently active group together and
 **Undecided:** whether the active group goes above the rest or below, leaning above.
 
 
-### [i45] Queue ⬜
+### [i45] Queue ⬜ 🔴
 last consolidated: none
 
 Update 26-08-30:  

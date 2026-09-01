@@ -1623,7 +1623,7 @@
     if (!task) return;
     var now = getNow();
     if (date && !dateInRange(date, now)) {
-      toast("date must be within 1 week");
+      toast("invalid date");
       render();
       return;
     }
@@ -1771,7 +1771,7 @@
     }
     var date = state.setDraft.date;
     if (date && !dateInRange(date, now)) {
-      toast("date must be within 1 week");
+      toast("invalid date");
       return;
     }
     var deadline = resolveDeadline(selectEl.value, date, now);
@@ -1941,13 +1941,13 @@
       }
       date = row.date || "";
       if (date && !dateInRange(date, now)) {
-        toast("date must be within 1 week");
+        toast("invalid date");
         return;
       }
     }
     var deadline = resolveDeadline(row.time, date, now);
     if (deadline.getTime() - now.getTime() < MIN_LEAD_MS) {
-      toast("too soon");
+      toast("invalid time");
       return;
     }
     if (!deadlineClear(deadline, now)) return;

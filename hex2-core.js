@@ -19,6 +19,7 @@ window.Hex2 = (function () {
   const BEST_KEY = "hex2.best";
   const MODE_KEY = "hex2.mode";
   const BREAK_KEY = "hex2.break.start";
+  const GRASS_KEY = "grass.count";
   const UNDO_DEPTH = 6;
   const START_HEARTS = 3;
   const MAX_HEARTS = 5;
@@ -27,6 +28,7 @@ window.Hex2 = (function () {
   const OUTLINE_R = 0.1;     // gap off the board, as a share of a cell
   const OUTLINE_W = 0.1;    // stroke width, also as a share of a cell
   const BREAK_MS = 30 * 1000;
+  const EARN_POP_MS = 380;
   const FAKE_AD_MIN_MS = 30 * 1000;
   const FAKE_AD_MAX_MS = 120 * 1000;
   const SWIPE_MIN = 22;      // px of travel before a drag counts as a swipe
@@ -1095,6 +1097,8 @@ window.Hex2 = (function () {
 
   const fakeAd = document.getElementById("fake-ad");
   const fakeAdLabel = document.getElementById("fake-ad-label");
+  const earn = document.getElementById("earn");
+  const earnNum = document.getElementById("earnNum");
   let fakeAdTotal = 0;
   let fakeAdEnd = 0;
   let fakeAdReady = false;
@@ -1104,6 +1108,10 @@ window.Hex2 = (function () {
   function showLockout() {
     if (!lockout) {
       return;
+    }
+    // every wait opens on the promise again, not on the last payout's total
+    if (earnNum) {
+      earnNum.textContent = "+1";
     }
     lockout.classList.add("show");
     startFakeAd();
@@ -1147,6 +1155,23 @@ window.Hex2 = (function () {
     fakeAdRaf = requestAnimationFrame(tickFakeAd);
   }
 
+  // One grass per wait actually sat through - closeFakeAd is already gated on
+  // fakeAdReady, so there is no partial credit. It lives under its own key
+  // rather than inside either app's save blob, so neither can rewind it.
+  function payGrass() {
+    let n = parseInt(store.get(GRASS_KEY) || "0", 10) || 0;
+    n += 1;
+    store.set(GRASS_KEY, String(n));
+    if (!earn) {
+      return;
+    }
+    earnNum.textContent = String(n);
+    earn.classList.remove("pop");
+    // reflow, so a second payout restarts the animation instead of ignoring it
+    void earn.offsetWidth;
+    earn.classList.add("pop");
+  }
+
   function closeFakeAd() {
     if (!fakeAdReady) {
       return;
@@ -1155,9 +1180,16 @@ window.Hex2 = (function () {
       cancelAnimationFrame(fakeAdRaf);
       fakeAdRaf = 0;
     }
-    lockout.classList.remove("show");
-    store.set(BREAK_KEY, String(Date.now()));
-    startBreakTimer();
+    payGrass();
+    // the pop plays over the lockout, so the break's 30s starts after it
+    setTimeout(function () {
+      if (earn) {
+        earn.classList.remove("pop");
+      }
+      lockout.classList.remove("show");
+      store.set(BREAK_KEY, String(Date.now()));
+      startBreakTimer();
+    }, EARN_POP_MS);
   }
 
   // peekable
