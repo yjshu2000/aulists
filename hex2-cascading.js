@@ -17,7 +17,8 @@
   const POP_SWELL = 0.16;
 
   let busy = false;          // input lock for the whole cascade, not one pass
-  let won = false;           // a pass hit the win tile; announced once at rest
+  // the highest tile a pass built; announced once, at rest
+  let wonTile = 0;
 
   function easeOut(t) {
     return 1 - Math.pow(1 - t, 3);
@@ -94,8 +95,8 @@
       Hex2.endGame();
       return;
     }
-    if (won) {
-      Hex2.announceWin();
+    if (wonTile) {
+      Hex2.announceWin(wonTile);
     }
   }
 
@@ -108,8 +109,9 @@
       return;
     }
     Hex2.commit(res, !first);
-    if (Hex2.reachedWin(res.mergedDests)) {
-      won = true;
+    const hit = Hex2.reachedWin(res.mergedDests);
+    if (hit > wonTile) {
+      wonTile = hit;
     }
     animateSlide(res.movers, function () {
       const spawnKey = Hex2.spawn();
@@ -133,7 +135,7 @@
       return;
     }
     busy = true;
-    won = false;
+    wonTile = 0;
     Hex2.setBoardBusy(true);
     pass(dir, true);
   }
@@ -147,7 +149,7 @@
     },
     onReset() {
       busy = false;
-      won = false;
+      wonTile = 0;
       Hex2.setBoardBusy(false);
     },
   });

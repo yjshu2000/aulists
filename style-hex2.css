@@ -264,6 +264,8 @@
     display: flex;
   }
   .overlay .card {
+    position: relative;
+    z-index: 2;
     padding: 22px 26px;
   }
   .overlay .big {
@@ -271,6 +273,7 @@
     font-weight: 800;
     letter-spacing: 0.04em;
     margin-bottom: 6px;
+    transform-origin: center;
   }
   .overlay .sub {
     color: var(--hex-ink-dim);
@@ -287,6 +290,144 @@
     font-family: inherit;
     font-size: 15px;
     font-weight: 800;
+  }
+
+  /* ------------------------------ the win screen ------------------------ */
+  /* One canvas, one compositor layer, one paint - however many pieces are
+     in it. It lives inside .overlay rather than beside it, so the overlay's
+     own display:none takes the confetti away with it, and it draws over the
+     card on purpose. The bare `canvas` rule above would show it, hence the
+     explicit display here. */
+  .confetti {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: none;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  .overlay.win .confetti {
+    display: block;
+  }
+
+  /* YIPPEE: spins in, then hops from one bottom corner to the other. .sp
+     carries the rotation and the sideways travel, .sc the jump and squash,
+     so the two clocks never have to agree. */
+  .bigpop .sp {
+    display: inline-block;
+    animation: bigspin .5s cubic-bezier(.34, 1.3, .5, 1),
+               hoprot 1.04s ease-in-out .5s infinite,
+               hopx 1.04s ease-in-out .5s infinite;
+  }
+  .bigpop .sc {
+    display: inline-block;
+    transform-origin: 50% 100%;
+    animation: bigscale .5s cubic-bezier(.28, 1.5, .45, 1),
+               hop .52s linear .5s infinite;
+  }
+  @keyframes bigspin {
+    from { rotate: 0deg; }
+    to { rotate: 360deg; }
+  }
+  @keyframes bigscale {
+    from { transform: scale(.35); }
+    to { transform: scale(1); }
+  }
+  /* the pivot swaps corners at the top of each hop, which is what makes it
+     read as landing on one leg and pushing off the other */
+  @keyframes hoprot {
+    0% { rotate: 7deg; transform-origin: 100% 100%; }
+    24% { rotate: 0deg; transform-origin: 100% 100%; }
+    25% { rotate: 0deg; transform-origin: 0% 100%; }
+    50% { rotate: -7deg; transform-origin: 0% 100%; }
+    74% { rotate: 0deg; transform-origin: 0% 100%; }
+    75% { rotate: 0deg; transform-origin: 100% 100%; }
+    100% { rotate: 7deg; transform-origin: 100% 100%; }
+  }
+  @keyframes hopx {
+    0% { transform: translateX(.45em); }
+    50% { transform: translateX(-.45em); }
+    100% { transform: translateX(.45em); }
+  }
+  /* a timing function applies between every pair of keyframes, not once
+     across the whole thing, so each leg carries its own curve */
+  @keyframes hop {
+    0% {
+      transform: translateY(0) scale(1.14, .86);
+      animation-timing-function: cubic-bezier(.1, .8, .3, 1);
+    }
+    14% {
+      transform: translateY(-.4em) scale(.93, 1.1);
+      animation-timing-function: cubic-bezier(.3, .5, .55, 1);
+    }
+    50% {
+      transform: translateY(-1em) scale(1, 1);
+      animation-timing-function: cubic-bezier(.5, 0, .85, .4);
+    }
+    86% {
+      transform: translateY(-.36em) scale(.94, 1.08);
+      animation-timing-function: cubic-bezier(.6, 0, .9, .5);
+    }
+    100% { transform: translateY(0) scale(1.14, .86); }
+  }
+
+  /* No gradient, no background-clip, no filter on the clipped element -
+     every one of those can pass @supports, fail to paint, and leave the two
+     words as an empty gap. The rainbow is each letter animating its own
+     `color`, staggered down the line, which is about the most universally
+     supported thing a browser can do. Worst case it holds on one colour. */
+  .wordart {
+    position: relative;
+    display: inline-block;
+    filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .75))
+            drop-shadow(0 0 6px rgba(240, 194, 42, .35));
+  }
+  .wa-text {
+    display: inline-block;
+    font-weight: 800;
+    font-style: italic;
+    letter-spacing: .02em;
+    color: #f0c22a;
+  }
+  /* two clocks on one element: the wave on its own delay, the colour on a
+     larger negative one, so the rainbow starts partway through per letter
+     and reads as travelling across the phrase */
+  .wa-text b {
+    display: inline-block;
+    font-weight: inherit;
+    animation: wave 1.5s ease-in-out infinite,
+               hue 3.4s linear infinite;
+    animation-delay: var(--d), var(--h);
+  }
+  @keyframes hue {
+    0% { color: #f0c22a; }
+    16% { color: #9ed42a; }
+    33% { color: #2ec96a; }
+    50% { color: #3cc3e2; }
+    66% { color: #8a5ae0; }
+    83% { color: #d54ab0; }
+    100% { color: #f0c22a; }
+  }
+  @keyframes wave {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-3px) rotate(-3deg); }
+  }
+  .spark {
+    position: absolute;
+    width: var(--s);
+    height: var(--s);
+    background: #fff;
+    clip-path: polygon(50% 0%, 58% 42%, 100% 50%, 58% 58%,
+                       50% 100%, 42% 58%, 0% 50%, 42% 42%);
+    opacity: 0;
+    animation: twinkle var(--sd) ease-in-out infinite;
+    animation-delay: var(--st);
+    pointer-events: none;
+  }
+  @keyframes twinkle {
+    0%, 72%, 100% { opacity: 0; transform: scale(.3); }
+    82% { opacity: 1; transform: scale(1); }
   }
 
   /* --------------------------------- lockout ---------------------------- */

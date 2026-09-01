@@ -15,6 +15,13 @@ window.Hex2 = (function () {
   // ---------------------------- constants -----------------------------
   const R = 2;               // board radius -> side 3 -> 19 cells
   const WIN_EXP = 14;        // 2^14 = 16384
+  const WIN_TILE = Math.pow(2, WIN_EXP);
+  // the special tiles; these two must stay in step with GRADIENT_TILES
+  const GRADIENT_FIRST = 524288;
+  const GRADIENT_LAST = 1048576;
+  const WORDART_TEXT = "special tiles";
+  const CONFETTI_COUNT = 240;
+  const CONFETTI_REPLAY_MS = 12 * 1000;
   const SQRT3 = Math.sqrt(3);
   const BEST_KEY = "hex2.best";
   const MODE_KEY = "hex2.mode";
@@ -131,7 +138,7 @@ window.Hex2 = (function () {
   let best = parseInt(store.get(BEST_KEY) || "0", 10) || 0;
   let idCounter = 1;
   let over = false;
-  let announcedWin = false;
+  let announcedTile = 0;   // highest tile already celebrated
   let history = [];          // undo snapshots, capped at UNDO_DEPTH
   let mode = null;           // the config object handed to boot()
   let saveKey = "";
@@ -805,7 +812,7 @@ window.Hex2 = (function () {
     history.push({
       tiles: tiles,
       score: score,
-      announcedWin: announcedWin,
+      announcedTile: announcedTile,
       idCounter: idCounter,
       rng: rng.slice(),
     });
@@ -856,7 +863,7 @@ window.Hex2 = (function () {
       board.set(row[0], { value: row[1], id: row[2] });
     }
     score = snap.score;
-    announcedWin = snap.announcedWin;
+    announcedTile = snap.announcedTile || 0;
     // rewinding these is what makes a repeated move replay its spawn
     if (snap.rng) {
       rng = snap.rng.slice();
@@ -873,33 +880,35 @@ window.Hex2 = (function () {
   }
 
   // ------------------------- win / end of game ------------------------
-  // The predicate on its own, so a mode whose one gesture runs several passes
-  // can watch every pass and hold the announcement until the last.
+  // The highest merge at or above the win tile that has not been celebrated
+  // yet, or 0 when there is nothing new to say. A pure predicate, so a mode
+  // whose one gesture runs several passes can watch every pass and hold the
+  // announcement until the last. One gesture announces at most one tile: a
+  // cascade that crosses two thresholds at once shows only the higher. Nothing
+  // above GRADIENT_LAST is reachable, so nothing is said about it.
   function reachedWin(mergedDests) {
-    if (announcedWin) {
-      return false;
-    }
+    let top = 0;
     for (const key of mergedDests) {
       const t = board.get(key);
-      if (t && t.value >= Math.pow(2, WIN_EXP)) {
-        return true;
+      if (t && t.value > top) {
+        top = t.value;
       }
     }
-    return false;
+    if (top < WIN_TILE || top <= announcedTile || top > GRADIENT_LAST) {
+      return 0;
+    }
+    return top;
   }
 
-  function announceWin() {
-    announcedWin = true;
-    showOverlay(
-      "16384",
-      "Reached the top tile. Keep sliding to push further.",
-      "Keep going"
-    );
+  function announceWin(value) {
+    announcedTile = value;
+    showWin(value);
   }
 
   function checkWin(mergedDests) {
-    if (reachedWin(mergedDests)) {
-      announceWin();
+    const value = reachedWin(mergedDests);
+    if (value) {
+      announceWin(value);
     }
   }
 
@@ -927,7 +936,99 @@ window.Hex2 = (function () {
   const ovSub = document.getElementById("ov-sub");
   const ovBtn = document.getElementById("ov-btn");
 
+  // Cosmetics only, and Math.random on purpose: the seeded rng is snapshotted
+  // for undo, so drawing from it here would shift every later spawn.
+  function rand(a, b) {
+    return a + Math.random() * (b - a);
+  }
+
+  // Per-letter `color` animation rather than a clipped gradient. A gradient
+  // parses everywhere and paints nowhere on some phones, and it fails to an
+  // empty gap - the words simply vanish. Each <b> carries two delays: one for
+  // the wave, one negative for the hue, so the rainbow travels along the line.
+  function buildWordart() {
+    const wrap = document.createElement("span");
+    wrap.className = "wordart";
+    const inner = document.createElement("span");
+    inner.className = "wa-text";
+    wrap.appendChild(inner);
+    for (let i = 0; i < WORDART_TEXT.length; i++) {
+      const b = document.createElement("b");
+      const ch = WORDART_TEXT.charAt(i);
+      if (ch === " ") {
+        b.innerHTML = "&nbsp;";
+      } else {
+        b.textContent = ch;
+      }
+      b.style.setProperty("--d", (i * 0.07).toFixed(2) + "s");
+      b.style.setProperty("--h", (-(i * 0.21)).toFixed(2) + "s");
+      inner.appendChild(b);
+    }
+    for (let i = 0; i < 5; i++) {
+      const s = document.createElement("span");
+      s.className = "spark";
+      s.style.left = (8 + i * 20 + rand(-6, 6)).toFixed(0) + "%";
+      s.style.top = rand(-30, 70).toFixed(0) + "%";
+      s.style.setProperty("--s", rand(5, 9).toFixed(1) + "px");
+      s.style.setProperty("--sd", rand(1600, 2600).toFixed(0) + "ms");
+      s.style.setProperty("--st", rand(0, 2000).toFixed(0) + "ms");
+      wrap.appendChild(s);
+    }
+    return wrap;
+  }
+
+  // The two gradient tiles are the special ones, so their own screens say what
+  // has been unlocked instead of pointing further ahead.
+  function winSubParts(value) {
+    if (value === GRADIENT_LAST) {
+      return ["All ", " unlocked!"];
+    }
+    if (value === GRADIENT_FIRST) {
+      return ["1/2 ", " unlocked!"];
+    }
+    return ["Keep going to unlock ", ""];
+  }
+
+  function buildWinSub(value) {
+    const parts = winSubParts(value);
+    ovSub.textContent = "";
+    ovSub.appendChild(document.createTextNode(value + " reached"));
+    ovSub.appendChild(document.createElement("br"));
+    ovSub.appendChild(document.createTextNode(parts[0]));
+    ovSub.appendChild(buildWordart());
+    if (parts[1]) {
+      ovSub.appendChild(document.createTextNode(parts[1]));
+    }
+  }
+
+  // Two nested spans, so the spin and the hop run on separate elements and
+  // never have to share a clock. `.bigpop` is what starts them.
+  function buildWinBig() {
+    const sp = document.createElement("span");
+    sp.className = "sp";
+    const sc = document.createElement("span");
+    sc.className = "sc";
+    sc.textContent = "YIPPEE";
+    sp.appendChild(sc);
+    ovBig.textContent = "";
+    ovBig.appendChild(sp);
+  }
+
+  // The classes go on before the confetti starts: a display:none element
+  // measures zero, and the canvas sizes itself off the overlay.
+  function showWin(value) {
+    buildWinBig();
+    buildWinSub(value);
+    ovBtn.textContent = "Keep going";
+    overlay.classList.add("show", "win");
+    startConfetti();
+  }
+
+  // The plain overlay - game over, and anything else that is not a win.
   function showOverlay(big, sub, btn) {
+    stopConfetti();
+    overlay.classList.remove("win");
+    ovBig.classList.remove("bigpop");
     ovBig.textContent = big;
     ovSub.textContent = sub;
     ovBtn.textContent = btn;
@@ -935,7 +1036,214 @@ window.Hex2 = (function () {
   }
 
   function hideOverlay() {
-    overlay.classList.remove("show");
+    stopConfetti();
+    overlay.classList.remove("show", "win");
+    ovBig.classList.remove("bigpop");
+  }
+
+  // ---------------------------- confetti ------------------------------
+  // The DOM version of this motion, evaluated here instead of by the browser:
+  // same keyframes, same easing curves, same numbers. What changed is who does
+  // the arithmetic. One canvas is one compositor layer however many pieces are
+  // in it, where one DOM node per piece was already costing frames at 160.
+  const CONFETTI_COLOURS = [
+    "#e05a5a", "#d5722e", "#f0c22a", "#9ed42a", "#2ec96a",
+    "#2ab5a8", "#3cc3e2", "#4a6fe0", "#8a5ae0", "#d54ab0"
+  ];
+
+  // one off each side and one from the bottom; ox/oy are shares of the overlay
+  const CANNONS = [
+    { ox: -0.04, oy: 0.50, aim: 68, spread: 34, share: 0.3 },
+    { ox: 1.04, oy: 0.50, aim: -68, spread: 34, share: 0.3 },
+    { ox: 0.5, oy: 1.04, aim: 0, spread: 52, share: 0.4 }
+  ];
+
+  const CONFETTI_POWER = 400;
+  const CONFETTI_DUR = 2000;
+  const CONFETTI_APEX = 0.38;  // where the arc turns over, as in the keyframes
+
+  const confettiCanvas = document.getElementById("confetti");
+  const confettiCtx = confettiCanvas.getContext("2d");
+  let confettiPieces = [];
+  let confettiDpr = 1;
+  let confettiW = 0;
+  let confettiH = 0;
+  let confettiStart = 0;
+  let confettiNext = 0;
+  let confettiRaf = 0;
+
+  // A CSS cubic-bezier, sampled once into a table and read back by lerp.
+  // Solving it per piece per frame would cost more than the drawing does.
+  function makeEase(x1, y1, x2, y2) {
+    const N = 256;
+    const table = new Float32Array(N + 1);
+    function cx(t) {
+      return 3 * (1 - t) * (1 - t) * t * x1 +
+             3 * (1 - t) * t * t * x2 + t * t * t;
+    }
+    function cy(t) {
+      return 3 * (1 - t) * (1 - t) * t * y1 +
+             3 * (1 - t) * t * t * y2 + t * t * t;
+    }
+    for (let i = 0; i <= N; i++) {
+      const x = i / N;
+      let lo = 0;
+      let hi = 1;
+      let t = x;
+      for (let k = 0; k < 22; k++) {
+        t = (lo + hi) / 2;
+        if (cx(t) < x) {
+          lo = t;
+        } else {
+          hi = t;
+        }
+      }
+      table[i] = cy(t);
+    }
+    return function (x) {
+      if (x <= 0) {
+        return 0;
+      }
+      if (x >= 1) {
+        return 1;
+      }
+      const f = x * N;
+      const i0 = f | 0;
+      return table[i0] + (table[i0 + 1] - table[i0]) * (f - i0);
+    };
+  }
+
+  const easeRise = makeEase(0.15, 0.72, 0.4, 1);
+  const easeFall = makeEase(0.55, 0, 0.85, 0.45);
+  const easeTumble = makeEase(0.12, 0.72, 0.35, 1);
+
+  function resizeConfetti() {
+    const r = overlay.getBoundingClientRect();
+    confettiW = r.width;
+    confettiH = r.height;
+    confettiDpr = Math.min(window.devicePixelRatio || 1, 3);
+    confettiCanvas.width = Math.round(confettiW * confettiDpr);
+    confettiCanvas.height = Math.round(confettiH * confettiDpr);
+  }
+
+  function fireConfetti() {
+    confettiPieces = [];
+    for (const c of CANNONS) {
+      const n = Math.round(CONFETTI_COUNT * c.share);
+      const half = c.spread / 2;
+      for (let i = 0; i < n; i++) {
+        const a = (c.aim + rand(-half, half)) * Math.PI / 180;
+        const speed = CONFETTI_POWER * rand(0.55, 1.3);
+        const w = rand(5, 11);
+        confettiPieces.push({
+          x0: c.ox * confettiW,
+          y0: c.oy * confettiH,
+          // exactly the three numbers the keyframes were handed
+          dx: Math.sin(a) * speed,
+          up: -Math.cos(a) * speed * 0.95 - rand(10, 40),
+          down: speed * 2.9 + rand(60, 200),
+          w: w,
+          h: w * rand(0.5, 1.7),
+          round: Math.random() < 0.22,
+          col: CONFETTI_COLOURS[(Math.random() * CONFETTI_COLOURS.length) | 0],
+          rx: rand(540, 1440),
+          ry: rand(360, 1080),
+          delay: rand(0, 130)
+        });
+      }
+    }
+    confettiStart = performance.now();
+    ovBig.classList.remove("bigpop");
+    // reflow, so a replay restarts the animation rather than ignoring it
+    void ovBig.offsetWidth;
+    ovBig.classList.add("bigpop");
+    confettiNext = 0;
+  }
+
+  function drawConfetti(now) {
+    confettiCtx.setTransform(confettiDpr, 0, 0, confettiDpr, 0, 0);
+    confettiCtx.clearRect(0, 0, confettiW, confettiH);
+    let live = 0;
+    for (const p of confettiPieces) {
+      const u = (now - confettiStart - p.delay) / CONFETTI_DUR;
+      if (u < 0) {
+        live++;
+        continue;
+      }
+      if (u >= 1) {
+        continue;
+      }
+      live++;
+
+      const x = p.x0 + p.dx * u;
+      let y = p.y0 + p.up * easeRise(u / CONFETTI_APEX);
+      if (u >= CONFETTI_APEX) {
+        y = p.y0 + p.up + (p.down - p.up) *
+          easeFall((u - CONFETTI_APEX) / (1 - CONFETTI_APEX));
+      }
+
+      // in by 6% of the flight, out across the rest
+      let alpha = u / 0.06;
+      if (u >= 0.06) {
+        alpha = 1 - (u - 0.06) / 0.94;
+      }
+
+      // A flat card turned about X and Y and viewed head-on keeps a silhouette
+      // of width x cos(Y) by height x cos(X), so the tumble is two cosines -
+      // which is what the browser was working out anyway.
+      const e = easeTumble(u);
+      const sx = Math.cos(p.ry * e * Math.PI / 180);
+      const sy = Math.cos(p.rx * e * Math.PI / 180);
+
+      confettiCtx.save();
+      confettiCtx.globalAlpha = alpha;
+      confettiCtx.translate(x, y);
+      confettiCtx.scale(sx, sy);
+      confettiCtx.fillStyle = p.col;
+      if (p.round) {
+        confettiCtx.beginPath();
+        confettiCtx.ellipse(0, 0, p.w / 2, p.h / 2, 0, 0, Math.PI * 2);
+        confettiCtx.fill();
+      } else {
+        confettiCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      }
+      confettiCtx.restore();
+    }
+    return live;
+  }
+
+  function loopConfetti(now) {
+    confettiRaf = requestAnimationFrame(loopConfetti);
+    if (drawConfetti(now)) {
+      return;
+    }
+    if (!confettiNext) {
+      confettiNext = now + CONFETTI_REPLAY_MS;
+      return;
+    }
+    if (now >= confettiNext) {
+      fireConfetti();
+    }
+  }
+
+  function startConfetti() {
+    if (confettiRaf) {
+      return;
+    }
+    resizeConfetti();
+    fireConfetti();
+    confettiRaf = requestAnimationFrame(loopConfetti);
+  }
+
+  function stopConfetti() {
+    if (!confettiRaf) {
+      return;
+    }
+    cancelAnimationFrame(confettiRaf);
+    confettiRaf = 0;
+    confettiPieces = [];
+    confettiCtx.setTransform(confettiDpr, 0, 0, confettiDpr, 0, 0);
+    confettiCtx.clearRect(0, 0, confettiW, confettiH);
   }
 
   // -------------------------- scores + storage ------------------------
@@ -994,7 +1302,7 @@ window.Hex2 = (function () {
       tiles: tiles,
       score: score,
       idCounter: idCounter,
-      announcedWin: announcedWin,
+      announcedTile: announcedTile,
       rng: rng,
       history: history,
       hearts: hearts,
@@ -1016,7 +1324,10 @@ window.Hex2 = (function () {
       }
       score = data.score || 0;
       idCounter = data.idCounter || 1;
-      announcedWin = !!data.announcedWin;
+      announcedTile = 0;
+      if (typeof data.announcedTile === "number") {
+        announcedTile = data.announcedTile;
+      }
       if (Array.isArray(data.rng) && data.rng.length === 4) {
         rng = data.rng.slice();
       }
@@ -1038,7 +1349,7 @@ window.Hex2 = (function () {
     board = new Map();
     score = 0;
     over = false;
-    announcedWin = false;
+    announcedTile = 0;
     history = [];
     idCounter = 1;
     hearts = START_HEARTS;
@@ -1312,6 +1623,11 @@ window.Hex2 = (function () {
     function relayout() {
       computeLayout();
       drawStatic();
+      // the confetti canvas rides the overlay, which only has a size while it
+      // is showing, so it is resized alongside rather than on its own
+      if (confettiRaf) {
+        resizeConfetti();
+      }
     }
     window.addEventListener("resize", relayout);
     if (window.ResizeObserver) {
