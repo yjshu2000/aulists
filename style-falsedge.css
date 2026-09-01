@@ -128,6 +128,8 @@
   .sec-dailies   { --glow: var(--c-deep-blue); }
   .sec-others    { --glow: var(--c-indigo); }
   .sec-set       { --glow: var(--c-purple); }
+  /* the shop is its own page, so it sits outside the page's hue ramp */
+  .sec-grass     { --glow: var(--c-green); }
 
   /* halo (outer bloom + hairline) plus inner sheen along the top edge */
   .ledger-region,
@@ -687,6 +689,29 @@
   }
 
   /* ---------------------------------- footer ------------------------------ */
+  /* Its own row under the header, held to the left, arrows pointing the
+     opposite way to the Hex 2^ link above it. */
+  .page-nav-grass {
+    display: flex;
+    justify-content: flex-start;
+    margin-top: 14px;
+  }
+
+  /* ------------------------------ grass shop ------------------------------ */
+  #grassCard {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .grass-icon {
+    width: 36px;
+    height: 36px;
+  }
+  .grass-count {
+    font-size: 22px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
   .page-nav-bottom {
     display: flex;
     justify-content: center;

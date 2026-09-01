@@ -3127,8 +3127,8 @@
 
   /**
    * Rebuilds the entire #app DOM tree from the current in-memory state, in
-   * page order: ledger, scores, active tasks, ACTIVATE (dailies), ACTIVATE
-   * (others), SET.
+   * page order: scores, active tasks, ACTIVATE (dailies), ACTIVATE (others),
+   * SET, ledger.
    */
   function render() {
     closeAllMenus();
@@ -3136,12 +3136,12 @@
       n.remove();
     });
     appEl.innerHTML = "";
-    appEl.appendChild(buildLedger());
     appEl.appendChild(buildScores());
     appEl.appendChild(buildTasks());
     appEl.appendChild(buildDailies());
     appEl.appendChild(buildOthers());
     appEl.appendChild(buildSet());
+    appEl.appendChild(buildLedger());
     var list = appEl.querySelector(".ledger-list");
     if (list) {
       list.scrollTop = list.scrollHeight;

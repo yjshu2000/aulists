@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Grass Shop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style-colourful.css">
+<link rel="stylesheet" href="style-falsedge.css">
+<link rel="icon" href="assets/icon-grass.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12141c">
+</head>
+<body>
+
+<header>
+  <h1>Grass Shop</h1>
+  <a class="btn" href="index.html"><span class="lbl">&rarr; Go to Falsedge &rarr;</span></a>
+</header>
+
+<div class="fd-section sec-grass">
+  <div class="card" id="grassCard">
+    <img class="grass-icon" src="assets/icon-grass.svg" alt="grass">
+    <span class="grass-count">Touched grass: <span id="grassCount">0</span></span>
+  </div>
+</div>
+
+<script>
+// Grass lives under its own key rather than inside falsedge.data, so
+// Falsedge's undo ring can never rewind grass earned in Hex 2^.
+(function () {
+  "use strict";
+  var GRASS_KEY = "grass.count";
+  var n = 0;
+  try {
+    n = parseInt(localStorage.getItem(GRASS_KEY) || "0", 10) || 0;
+  } catch (e) {
+    // storage blocked; the count falls back to zero
+  }
+  document.getElementById("grassCount").textContent = n;
+})();
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
+</script>
+</body>
+</html>

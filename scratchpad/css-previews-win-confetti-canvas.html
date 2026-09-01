@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Win screen &mdash; confetti (canvas)</title>
+<style>
+  :root{
+    --hex-bg:#12141a; --hex-panel:#1b1e27; --hex-panel-2:#232734;
+    --hex-line:#2c313f; --hex-ink:#e8ebf2; --hex-ink-dim:#8b93a7;
+    --hex-accent:#3cc3e2;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--hex-bg); color:var(--hex-ink);
+    font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
+    padding:16px 12px 60px; line-height:1.5;
+  }
+  h1{font-size:19px;font-weight:800;letter-spacing:.04em;margin:0 0 10px;}
+
+  .panel{
+    background:var(--hex-panel); border:1px solid var(--hex-line);
+    border-radius:12px; padding:12px; margin-bottom:14px;
+  }
+  .plabel{
+    font-size:11px;font-weight:800;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--hex-ink-dim);margin:0 0 6px;
+  }
+  .slider{display:flex;align-items:center;gap:10px;font-size:12px;margin-top:8px;}
+  .slider label{flex:0 0 62px;color:var(--hex-ink-dim);letter-spacing:.03em;}
+  .slider input{flex:1;min-width:0;accent-color:var(--hex-accent);}
+  .stepbtn{
+    flex:0 0 auto;width:40px;min-height:40px;padding:0;
+    background:var(--hex-panel-2);color:var(--hex-accent);
+    border:1px solid var(--hex-line);border-radius:9px;
+    font-family:inherit;font-size:18px;font-weight:800;line-height:1;
+  }
+  .val{flex:0 0 46px;text-align:right;color:var(--hex-accent);
+       font-variant-numeric:tabular-nums;font-weight:700;}
+
+  /* ------------------------- the overlay, for real ---------------------- */
+  .stage{
+    position:relative; overflow:hidden;
+    width:min(390px, 92vw);
+    aspect-ratio:390 / 780;
+    max-height:calc(100vh - 120px);
+    margin:0 auto;
+    border:1px solid var(--hex-line); border-radius:14px;
+    background:
+      radial-gradient(900px 400px at 50% 120%, rgba(60,195,226,.05), transparent 60%),
+      var(--hex-bg);
+  }
+  .overlay{
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(18,20,26,.78); backdrop-filter:blur(2px);
+    text-align:center;
+  }
+  .card{padding:22px 26px; position:relative; z-index:2;}
+  .big{
+    font-size:30px; font-weight:800; letter-spacing:.04em; margin-bottom:6px;
+    transform-origin:center;
+  }
+  .sub{color:var(--hex-ink-dim); font-size:14px; margin-bottom:16px;}
+  .card button{
+    background:var(--hex-accent); color:var(--hex-bg);
+    border:0; border-radius:12px; padding:11px 20px; min-height:44px;
+    font-family:inherit; font-size:15px; font-weight:800;
+  }
+  /* one canvas, one layer, one paint - however many pieces are in it */
+  .confetti{
+    position:absolute; inset:0; z-index:3; pointer-events:none;
+    width:100%; height:100%;
+  }
+
+  .bigpop .sp{
+    display:inline-block;
+    animation:bigspin .5s cubic-bezier(.34,1.3,.5,1),
+              hoprot 1.04s ease-in-out .5s infinite,
+              hopx 1.04s ease-in-out .5s infinite;
+  }
+  .bigpop .sc{
+    display:inline-block;
+    transform-origin:50% 100%;
+    animation:bigscale .5s cubic-bezier(.28,1.5,.45,1),
+              hop .52s linear .5s infinite;
+  }
+  @keyframes bigspin{
+    from{rotate:0deg;}
+    to{rotate:360deg;}
+  }
+  @keyframes bigscale{
+    from{transform:scale(.35);}
+    to{transform:scale(1);}
+  }
+  @keyframes hoprot{
+    0%{rotate:7deg; transform-origin:100% 100%;}
+    24%{rotate:0deg; transform-origin:100% 100%;}
+    25%{rotate:0deg; transform-origin:0% 100%;}
+    50%{rotate:-7deg; transform-origin:0% 100%;}
+    74%{rotate:0deg; transform-origin:0% 100%;}
+    75%{rotate:0deg; transform-origin:100% 100%;}
+    100%{rotate:7deg; transform-origin:100% 100%;}
+  }
+  @keyframes hopx{
+    0%{transform:translateX(.45em);}
+    50%{transform:translateX(-.45em);}
+    100%{transform:translateX(.45em);}
+  }
+  @keyframes hop{
+    0%{
+      transform:translateY(0) scale(1.14, .86);
+      animation-timing-function:cubic-bezier(.1, .8, .3, 1);
+    }
+    14%{
+      transform:translateY(-.4em) scale(.93, 1.1);
+      animation-timing-function:cubic-bezier(.3, .5, .55, 1);
+    }
+    50%{
+      transform:translateY(-1em) scale(1, 1);
+      animation-timing-function:cubic-bezier(.5, 0, .85, .4);
+    }
+    86%{
+      transform:translateY(-.36em) scale(.94, 1.08);
+      animation-timing-function:cubic-bezier(.6, 0, .9, .5);
+    }
+    100%{transform:translateY(0) scale(1.14, .86);}
+  }
+
+  /* No gradient, no background-clip, no filter on the clipped element -
+     because every one of those can fail silently and leave the two words
+     as an empty gap. The rainbow is each letter animating its own `color`,
+     staggered down the line, which is about the most universally supported
+     thing a browser can do. Worst case it holds still on one colour. */
+  .wordart{
+    position:relative;
+    display:inline-block;
+    filter:drop-shadow(1px 1px 0 rgba(0,0,0,.75))
+           drop-shadow(0 0 6px rgba(240,194,42,.35));
+  }
+  .wa-text{
+    display:inline-block;
+    font-weight:800;
+    font-style:italic;
+    letter-spacing:.02em;
+    color:#f0c22a;
+  }
+  /* two clocks on one element: the wave on its own delay, the colour on a
+     larger negative one, so the rainbow starts partway through per letter
+     and reads as travelling across the phrase */
+  .wa-text b{
+    display:inline-block;
+    font-weight:inherit;
+    animation:wave 1.5s ease-in-out infinite,
+              hue 3.4s linear infinite;
+    animation-delay:var(--d), var(--h);
+  }
+  @keyframes hue{
+    0%{color:#f0c22a;}
+    16%{color:#9ed42a;}
+    33%{color:#2ec96a;}
+    50%{color:#3cc3e2;}
+    66%{color:#8a5ae0;}
+    83%{color:#d54ab0;}
+    100%{color:#f0c22a;}
+  }
+  @keyframes wave{
+    0%,100%{transform:translateY(0) rotate(0deg);}
+    50%{transform:translateY(-3px) rotate(-3deg);}
+  }
+  .spark{
+    position:absolute;
+    width:var(--s); height:var(--s);
+    background:#fff;
+    clip-path:polygon(50% 0%, 58% 42%, 100% 50%, 58% 58%,
+                      50% 100%, 42% 58%, 0% 50%, 42% 42%);
+    opacity:0;
+    animation:twinkle var(--sd) ease-in-out infinite;
+    animation-delay:var(--st);
+    pointer-events:none;
+  }
+  @keyframes twinkle{
+    0%,72%,100%{opacity:0; transform:scale(.3);}
+    82%{opacity:1; transform:scale(1);}
+  }
+  .hint{font-size:11.5px;color:var(--hex-ink-dim);margin-top:8px;}
+</style>
+</head>
+<body>
+
+<h1>Win screen &mdash; confetti (canvas)</h1>
+
+<div class="panel">
+  <div class="plabel">tuning</div>
+  <div class="slider">
+    <label for="sCount">pieces</label>
+    <button class="stepbtn" data-t="sCount" data-dir="-1">&minus;</button>
+    <input type="range" id="sCount" min="20" max="1200" step="10" value="160">
+    <button class="stepbtn" data-t="sCount" data-dir="1">+</button>
+    <span class="val" id="vCount">160</span>
+  </div>
+  <div class="slider">
+    <label for="sGap">replay in</label>
+    <button class="stepbtn" data-t="sGap" data-dir="-1">&minus;</button>
+    <input type="range" id="sGap" min="4" max="12" step="1" value="6">
+    <button class="stepbtn" data-t="sGap" data-dir="1">+</button>
+    <span class="val" id="vGap">6s</span>
+  </div>
+  <div class="slider">
+    <label>fps</label>
+    <span class="val" id="fps" style="flex:0 0 auto">&ndash;</span>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="overlay">
+    <div class="card">
+      <div class="big" id="big"><span class="sp"><span
+        class="sc">YIPPEE</span></span></div>
+      <div class="sub">16384 reached<br>Keep going to unlock <span
+        class="wordart" id="wordart"></span></div>
+      <button id="again">Keep going</button>
+    </div>
+  </div>
+  <canvas class="confetti" id="confetti"></canvas>
+</div>
+<p class="hint">Tap the stage to replay.</p>
+
+<script>
+(function () {
+  "use strict";
+
+  // ------------------------------------------------------------------
+  // The DOM version's motion, evaluated here instead of by the browser.
+  // Same keyframes, same easing curves, same numbers - the only thing
+  // that changed is who does the arithmetic. No gravity model, no drag,
+  // no in-plane spin: those were additions that made it look wrong.
+  // ------------------------------------------------------------------
+
+  var COLOURS = [
+    "#e05a5a", "#d5722e", "#f0c22a", "#9ed42a", "#2ec96a",
+    "#2ab5a8", "#3cc3e2", "#4a6fe0", "#8a5ae0", "#d54ab0"
+  ];
+
+  var CANNONS = [
+    {ox: -0.04, oy: 0.50, aim: 68, spread: 34, share: 0.3},
+    {ox: 1.04, oy: 0.50, aim: -68, spread: 34, share: 0.3},
+    {ox: 0.5, oy: 1.04, aim: 0, spread: 52, share: 0.4}
+  ];
+
+  var POWER = 400;
+  var DUR = 2000;
+  var APEX = 0.38;           // where the arc turns over, as in the keyframes
+
+  var count = 160;
+  var gap = 6;
+
+  var canvas = document.getElementById("confetti");
+  var ctx = canvas.getContext("2d");
+  var stage = document.getElementById("stage");
+  var big = document.getElementById("big");
+  var fpsEl = document.getElementById("fps");
+
+  var pieces = [];
+  var dpr = 1;
+  var cssW = 0;
+  var cssH = 0;
+  var startAt = 0;
+  var nextFire = 0;
+
+  function rand(a, b) {
+    return a + Math.random() * (b - a);
+  }
+
+  // A CSS cubic-bezier, sampled once into a table and read back by lerp.
+  // Solving it per piece per frame would cost more than the drawing does.
+  function makeEase(x1, y1, x2, y2) {
+    var N = 256;
+    var table = new Float32Array(N + 1);
+    function cx(t) {
+      return 3 * (1 - t) * (1 - t) * t * x1 +
+             3 * (1 - t) * t * t * x2 + t * t * t;
+    }
+    function cy(t) {
+      return 3 * (1 - t) * (1 - t) * t * y1 +
+             3 * (1 - t) * t * t * y2 + t * t * t;
+    }
+    var i;
+    for (i = 0; i <= N; i++) {
+      var x = i / N;
+      var lo = 0;
+      var hi = 1;
+      var t = x;
+      var k;
+      for (k = 0; k < 22; k++) {
+        t = (lo + hi) / 2;
+        if (cx(t) < x) {
+          lo = t;
+        } else {
+          hi = t;
+        }
+      }
+      table[i] = cy(t);
+    }
+    return function (x) {
+      if (x <= 0) {
+        return 0;
+      }
+      if (x >= 1) {
+        return 1;
+      }
+      var f = x * N;
+      var i0 = f | 0;
+      return table[i0] + (table[i0 + 1] - table[i0]) * (f - i0);
+    };
+  }
+
+  // the three curves the DOM version used, verbatim
+  var easeRise = makeEase(0.15, 0.72, 0.4, 1);
+  var easeFall = makeEase(0.55, 0, 0.85, 0.45);
+  var easeTumble = makeEase(0.12, 0.72, 0.35, 1);
+
+  function resize() {
+    var r = stage.getBoundingClientRect();
+    cssW = r.width;
+    cssH = r.height;
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+  }
+
+  (function buildWordart() {
+    var el = document.getElementById("wordart");
+    var text = "special tiles";
+    var i;
+    var inner = document.createElement("span");
+    inner.className = "wa-text";
+    el.appendChild(inner);
+    for (i = 0; i < text.length; i++) {
+      var b = document.createElement("b");
+      if (text.charAt(i) === " ") {
+        b.innerHTML = "&nbsp;";
+      } else {
+        b.textContent = text.charAt(i);
+      }
+      b.style.setProperty("--d", (i * 0.07).toFixed(2) + "s");
+      b.style.setProperty("--h", (-(i * 0.21)).toFixed(2) + "s");
+      inner.appendChild(b);
+    }
+    for (i = 0; i < 5; i++) {
+      var s = document.createElement("span");
+      s.className = "spark";
+      s.style.left = (8 + i * 20 + rand(-6, 6)).toFixed(0) + "%";
+      s.style.top = rand(-30, 70).toFixed(0) + "%";
+      s.style.setProperty("--s", rand(5, 9).toFixed(1) + "px");
+      s.style.setProperty("--sd", rand(1600, 2600).toFixed(0) + "ms");
+      s.style.setProperty("--st", rand(0, 2000).toFixed(0) + "ms");
+      el.appendChild(s);
+    }
+  })();
+
+  function fire() {
+    pieces = [];
+    CANNONS.forEach(function (c) {
+      var n = Math.round(count * c.share);
+      var half = c.spread / 2;
+      var i;
+      for (i = 0; i < n; i++) {
+        var deg = c.aim + rand(-half, half);
+        var a = deg * Math.PI / 180;
+        var speed = POWER * rand(0.55, 1.3);
+        var w = rand(5, 11);
+        pieces.push({
+          x0: c.ox * cssW,
+          y0: c.oy * cssH,
+          // exactly the three numbers the keyframes were handed
+          dx: Math.sin(a) * speed,
+          up: -Math.cos(a) * speed * 0.95 - rand(10, 40),
+          down: speed * 2.9 + rand(60, 200),
+          w: w,
+          h: w * rand(0.5, 1.7),
+          round: Math.random() < 0.22,
+          col: COLOURS[(Math.random() * COLOURS.length) | 0],
+          rx: rand(540, 1440),
+          ry: rand(360, 1080),
+          delay: rand(0, 130)
+        });
+      }
+    });
+    startAt = performance.now();
+    big.classList.remove("bigpop");
+    // reflow, so a replay restarts the animation rather than ignoring it
+    void big.offsetWidth;
+    big.classList.add("bigpop");
+    nextFire = 0;
+  }
+
+  function draw(now) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+    var live = 0;
+    var i;
+    for (i = 0; i < pieces.length; i++) {
+      var p = pieces[i];
+      var u = (now - startAt - p.delay) / DUR;
+      if (u < 0) {
+        live++;
+        continue;
+      }
+      if (u >= 1) {
+        continue;
+      }
+      live++;
+
+      var x = p.x0 + p.dx * u;
+      var y;
+      if (u < APEX) {
+        y = p.y0 + p.up * easeRise(u / APEX);
+      } else {
+        y = p.y0 + p.up +
+          (p.down - p.up) * easeFall((u - APEX) / (1 - APEX));
+      }
+
+      // opacity: in by 6%, out across the rest
+      var alpha = 1;
+      if (u < 0.06) {
+        alpha = u / 0.06;
+      } else {
+        alpha = 1 - (u - 0.06) / 0.94;
+      }
+
+      // A flat card turned about X and Y and viewed head-on keeps a
+      // silhouette of width x cos(Y) by height x cos(X) - so the tumble is
+      // two cosines, which is what the browser was working out anyway.
+      var e = easeTumble(u);
+      var sx = Math.cos(p.ry * e * Math.PI / 180);
+      var sy = Math.cos(p.rx * e * Math.PI / 180);
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(x, y);
+      ctx.scale(sx, sy);
+      ctx.fillStyle = p.col;
+      if (p.round) {
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.w / 2, p.h / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      }
+      ctx.restore();
+    }
+    return live;
+  }
+
+  var frames = 0;
+  var fpsAt = performance.now();
+
+  function loop(now) {
+    frames++;
+    if (now - fpsAt >= 500) {
+      fpsEl.textContent = Math.round(frames * 1000 / (now - fpsAt));
+      frames = 0;
+      fpsAt = now;
+    }
+
+    var live = draw(now);
+    if (!live) {
+      if (!nextFire) {
+        nextFire = now + gap * 1000;
+      } else if (now >= nextFire) {
+        fire();
+      }
+    }
+    requestAnimationFrame(loop);
+  }
+
+  function bind(id, valId, set, fmt) {
+    var el = document.getElementById(id);
+    function apply() {
+      var v = parseInt(el.value, 10);
+      set(v);
+      document.getElementById(valId).textContent = fmt(v);
+    }
+    el.addEventListener("input", apply);
+    apply();
+  }
+
+  bind("sCount", "vCount", function (v) { count = v; },
+    function (v) { return String(v); });
+  bind("sGap", "vGap", function (v) { gap = v; },
+    function (v) { return v + "s"; });
+
+  Array.prototype.forEach.call(
+    document.querySelectorAll(".stepbtn"),
+    function (b) {
+      b.addEventListener("click", function () {
+        var el = document.getElementById(b.getAttribute("data-t"));
+        var dir = parseFloat(b.getAttribute("data-dir"));
+        var v = parseFloat(el.value) + parseFloat(el.step) * dir;
+        el.value = Math.max(parseFloat(el.min),
+                            Math.min(parseFloat(el.max), v));
+        el.dispatchEvent(new Event("input"));
+      });
+    }
+  );
+
+  document.getElementById("again").addEventListener("click", fire);
+  stage.addEventListener("click", function (e) {
+    if (e.target.id !== "again") {
+      fire();
+    }
+  });
+  window.addEventListener("resize", resize);
+
+  resize();
+  fire();
+  requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>

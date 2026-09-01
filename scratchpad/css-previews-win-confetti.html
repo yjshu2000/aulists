@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Win screen &mdash; confetti</title>
+<style>
+  :root{
+    --hex-bg:#12141a; --hex-panel:#1b1e27; --hex-panel-2:#232734;
+    --hex-line:#2c313f; --hex-ink:#e8ebf2; --hex-ink-dim:#8b93a7;
+    --hex-accent:#3cc3e2;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--hex-bg); color:var(--hex-ink);
+    font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
+    padding:16px 12px 60px; line-height:1.5;
+  }
+  h1{font-size:19px;font-weight:800;letter-spacing:.04em;margin:0 0 6px;}
+  .note{color:var(--hex-ink-dim);font-size:12.5px;margin:0 0 16px;max-width:660px;}
+  .note b{color:var(--hex-ink);}
+
+  .panel{
+    background:var(--hex-panel); border:1px solid var(--hex-line);
+    border-radius:12px; padding:12px; margin-bottom:14px;
+  }
+  .plabel{
+    font-size:11px;font-weight:800;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--hex-ink-dim);margin:0 0 6px;
+  }
+  .plabel + .plabel{margin-top:14px;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;}
+  .num{
+    min-width:84px;min-height:44px;padding:0 12px;
+    background:var(--hex-panel-2);color:var(--hex-ink-dim);
+    border:1px solid var(--hex-line);border-radius:10px;
+    font-family:inherit;font-size:13px;font-weight:800;
+  }
+  .num.on{border-color:var(--hex-accent);color:var(--hex-accent);}
+  .slider{display:flex;align-items:center;gap:10px;font-size:12px;margin-top:8px;}
+  .slider label{flex:0 0 62px;color:var(--hex-ink-dim);letter-spacing:.03em;}
+  .slider input{flex:1;min-width:0;accent-color:var(--hex-accent);}
+  .stepbtn{
+    flex:0 0 auto;width:40px;min-height:40px;padding:0;
+    background:var(--hex-panel-2);color:var(--hex-accent);
+    border:1px solid var(--hex-line);border-radius:9px;
+    font-family:inherit;font-size:18px;font-weight:800;line-height:1;
+  }
+  .val{flex:0 0 46px;text-align:right;color:var(--hex-accent);
+       font-variant-numeric:tabular-nums;font-weight:700;}
+
+  /* ------------------------- the overlay, for real ---------------------- */
+  /* phone proportions, since the cannons fire across the whole screen and
+     a letterbox reads completely differently from a tall one */
+  .stage{
+    position:relative; overflow:hidden;
+    width:min(390px, 92vw);
+    aspect-ratio:390 / 780;
+    max-height:calc(100vh - 120px);
+    margin:0 auto;
+    border:1px solid var(--hex-line); border-radius:14px;
+    background:
+      radial-gradient(900px 400px at 50% 120%, rgba(60,195,226,.05), transparent 60%),
+      var(--hex-bg);
+  }
+  .overlay{
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(18,20,26,.78); backdrop-filter:blur(2px);
+    text-align:center;
+  }
+  .card{padding:22px 26px; position:relative; z-index:2;}
+  .big{
+    font-size:30px; font-weight:800; letter-spacing:.04em; margin-bottom:6px;
+    transform-origin:center;
+  }
+  .sub{color:var(--hex-ink-dim); font-size:14px; margin-bottom:16px;}
+  .card button{
+    background:var(--hex-accent); color:var(--hex-bg);
+    border:0; border-radius:12px; padding:11px 20px; min-height:44px;
+    font-family:inherit; font-size:15px; font-weight:800;
+  }
+  /* It hops: the two bottom corners are its legs. The rotation carries it
+     from standing on one to standing on the other, and the hop lifts it off
+     the ground in between - twice per rotation cycle, once per leg.
+     Nested spans: .sp hugs the word and carries the rotation, .sc carries
+     the lift and the squash, so neither transform clobbers the other. */
+  .bigpop .sp{
+    display:inline-block;
+    animation:bigspin .5s cubic-bezier(.34,1.3,.5,1),
+              hoprot 1.04s ease-in-out .5s infinite,
+              hopx 1.04s ease-in-out .5s infinite;
+  }
+  .bigpop .sc{
+    display:inline-block;
+    transform-origin:50% 100%;
+    animation:bigscale .5s cubic-bezier(.28,1.5,.45,1),
+              hop .52s linear .5s infinite;
+  }
+  @keyframes bigspin{
+    from{rotate:0deg;}
+    to{rotate:360deg;}
+  }
+  @keyframes bigscale{
+    from{transform:scale(.35);}
+    to{transform:scale(1);}
+  }
+  /* The pivot swaps at the apex of each hop, where the tilt is zero and the
+     word is off the ground - so the leg it lands on is never seen changing. */
+  @keyframes hoprot{
+    0%{rotate:7deg; transform-origin:100% 100%;}
+    24%{rotate:0deg; transform-origin:100% 100%;}
+    25%{rotate:0deg; transform-origin:0% 100%;}
+    50%{rotate:-7deg; transform-origin:0% 100%;}
+    74%{rotate:0deg; transform-origin:0% 100%;}
+    75%{rotate:0deg; transform-origin:100% 100%;}
+    100%{rotate:7deg; transform-origin:100% 100%;}
+  }
+  /* Travel runs on the rotation's period, not the hop's - it lands right,
+     left, right, so one round trip per two hops. Uses `transform` while the
+     rotation uses the `rotate` property, so both sit on the same element
+     without overwriting each other. Eased so the ground is covered while
+     airborne and it is nearly still at each contact. */
+  @keyframes hopx{
+    0%{transform:translateX(.45em);}
+    50%{transform:translateX(-.45em);}
+    100%{transform:translateX(.45em);}
+  }
+
+  /* A full word-height off the ground, squashed on contact and stretched
+     through the launch and the fall.
+     Gravity: an arc is fast at the bottom and slow at the top, so the rise
+     decelerates and the fall accelerates. One ease-in-out over the whole
+     hop gives the opposite - slowest exactly where it should be quickest -
+     so each segment carries its own curve instead. */
+  @keyframes hop{
+    0%{
+      transform:translateY(0) scale(1.14, .86);
+      animation-timing-function:cubic-bezier(.1, .8, .3, 1);
+    }
+    14%{
+      transform:translateY(-.4em) scale(.93, 1.1);
+      animation-timing-function:cubic-bezier(.3, .5, .55, 1);
+    }
+    50%{
+      transform:translateY(-1em) scale(1, 1);
+      animation-timing-function:cubic-bezier(.5, 0, .85, .4);
+    }
+    86%{
+      transform:translateY(-.36em) scale(.94, 1.08);
+      animation-timing-function:cubic-bezier(.6, 0, .9, .5);
+    }
+    100%{transform:translateY(0) scale(1.14, .86);}
+  }
+
+  /* ------------------------------ wordart ------------------------------- */
+  /* Two words in an otherwise plain sentence, advertising themselves. Each
+     letter is its own span so the baseline can wave; the gradient is on the
+     wrapper and clipped to the glyphs, so it stays one continuous sweep
+     across the phrase rather than restarting per letter. */
+  /* The filter lives on the wrapper, not on the element doing the text
+     clip - a filter rasterises its own element, and several engines drop
+     background-clip:text when that happens. Sparks sit on the wrapper too,
+     so they are never inside the clip. */
+  .wordart{
+    position:relative;
+    display:inline-block;
+    filter:drop-shadow(1px 1px 0 rgba(0,0,0,.75))
+           drop-shadow(0 0 6px rgba(240,194,42,.35));
+  }
+  /* Gold by default. The text only goes transparent where the browser has
+     said it understands the clip - otherwise transparent text over a
+     gradient it cannot clip is simply an empty gap. */
+  .wa-text{
+    display:inline-block;
+    font-weight:800;
+    font-style:italic;
+    letter-spacing:.02em;
+    color:#f0c22a;
+    background:linear-gradient(100deg,
+      #f0c22a, #9ed42a, #2ec96a, #3cc3e2, #8a5ae0, #d54ab0, #f0c22a);
+    background-size:300% 100%;
+    -webkit-background-clip:text;
+    background-clip:text;
+    animation:sweep 3.4s linear infinite;
+  }
+  @supports (background-clip: text) or (-webkit-background-clip: text){
+    .wa-text{color:transparent;}
+  }
+  .wa-text b{
+    display:inline-block;
+    font-weight:inherit;
+    animation:wave 1.5s ease-in-out infinite;
+    animation-delay:var(--d);
+  }
+  @keyframes sweep{
+    0%{background-position:0% 50%;}
+    100%{background-position:300% 50%;}
+  }
+  @keyframes wave{
+    0%,100%{transform:translateY(0) rotate(0deg);}
+    50%{transform:translateY(-3px) rotate(-3deg);}
+  }
+  /* four-point glints crawling over the phrase, on their own clocks */
+  .spark{
+    position:absolute;
+    width:var(--s); height:var(--s);
+    background:#fff;
+    clip-path:polygon(50% 0%, 58% 42%, 100% 50%, 58% 58%,
+                      50% 100%, 42% 58%, 0% 50%, 42% 42%);
+    opacity:0;
+    animation:twinkle var(--sd) ease-in-out infinite;
+    animation-delay:var(--st);
+    pointer-events:none;
+  }
+  @keyframes twinkle{
+    0%,72%,100%{opacity:0; transform:scale(.3);}
+    82%{opacity:1; transform:scale(1);}
+  }
+
+  /* --------------------------- confetti pieces -------------------------- */
+  /* Perspective, so a piece turning edge-on foreshortens into a line rather
+     than just looking smaller. That flash is what reads as paper. */
+  .confetti{
+    position:absolute; inset:0; pointer-events:none; z-index:3;
+    perspective:700px;
+  }
+  /* Three nested elements, three transforms that must not overwrite one
+     another: the outer travels sideways at a constant rate, the middle
+     carries the vertical arc, the inner tumbles. */
+  .piece{
+    position:absolute; left:50%; top:50%;
+    animation:fx var(--dur) linear forwards;
+    animation-delay:var(--delay);
+  }
+  .piece i{
+    display:block;
+    animation:fy var(--dur) linear forwards;
+    animation-delay:var(--delay);
+  }
+  .piece b{
+    display:block; width:var(--w); height:var(--h);
+    background:var(--col); border-radius:var(--r);
+    animation:tumble var(--dur) cubic-bezier(.12,.72,.35,1) forwards;
+    animation-delay:var(--delay);
+  }
+  @keyframes fx{
+    0%{transform:translate(-50%,-50%);opacity:0;}
+    6%{opacity:1;}
+    100%{transform:translate(calc(-50% + var(--dx)),-50%);opacity:0;}
+  }
+  /* An arc is quick at the bottom and slow at the top, so the rise
+     decelerates and the fall accelerates. A timing function applies between
+     every PAIR of keyframes, so each segment carries its own - one curve
+     over the whole thing would ease the fall too, and the pieces would
+     slow down as they drop. */
+  @keyframes fy{
+    0%{
+      transform:translateY(0);
+      animation-timing-function:cubic-bezier(.15, .72, .4, 1);
+    }
+    38%{
+      transform:translateY(var(--up));
+      animation-timing-function:cubic-bezier(.55, 0, .85, .45);
+    }
+    100%{transform:translateY(var(--down));}
+  }
+  /* Edge over edge on two axes, decelerating, rather than a wheel spinning
+     at a fixed rate for the whole flight. */
+  @keyframes tumble{
+    from{transform:rotateX(0deg) rotateY(0deg);}
+    to{transform:rotateX(var(--rx)) rotateY(var(--ry));}
+  }
+  .hint{font-size:11.5px;color:var(--hex-ink-dim);margin-top:8px;}
+</style>
+</head>
+<body>
+
+<h1>Win screen &mdash; confetti</h1>
+
+<div class="panel">
+
+  <div class="plabel">tuning</div>
+  <div class="slider">
+    <label for="sCount">pieces</label>
+    <button class="stepbtn" data-t="sCount" data-dir="-1">&minus;</button>
+    <input type="range" id="sCount" min="8" max="320" step="4" value="160">
+    <button class="stepbtn" data-t="sCount" data-dir="1">+</button>
+    <span class="val" id="vCount">160</span>
+  </div>
+  <div class="slider">
+    <label for="sPower">power</label>
+    <button class="stepbtn" data-t="sPower" data-dir="-1">&minus;</button>
+    <input type="range" id="sPower" min="40" max="900" step="10" value="400">
+    <button class="stepbtn" data-t="sPower" data-dir="1">+</button>
+    <span class="val" id="vPower">400</span>
+  </div>
+  <div class="slider">
+    <label for="sDur">duration</label>
+    <button class="stepbtn" data-t="sDur" data-dir="-1">&minus;</button>
+    <input type="range" id="sDur" min="600" max="3600" step="100" value="2000">
+    <button class="stepbtn" data-t="sDur" data-dir="1">+</button>
+    <span class="val" id="vDur">2000</span>
+  </div>
+  <div class="slider">
+    <label for="sAngle">side angle</label>
+    <button class="stepbtn" data-t="sAngle" data-dir="-1">&minus;</button>
+    <input type="range" id="sAngle" min="5" max="85" step="1" value="68">
+    <button class="stepbtn" data-t="sAngle" data-dir="1">+</button>
+    <span class="val" id="vAngle">68</span>
+  </div>
+  <div class="slider">
+    <label for="sSideY">side height</label>
+    <button class="stepbtn" data-t="sSideY" data-dir="-1">&minus;</button>
+    <input type="range" id="sSideY" min="0" max="100" step="1" value="50">
+    <button class="stepbtn" data-t="sSideY" data-dir="1">+</button>
+    <span class="val" id="vSideY">50</span>
+  </div>
+  <div class="slider">
+    <label for="sGap">replay in</label>
+    <button class="stepbtn" data-t="sGap" data-dir="-1">&minus;</button>
+    <input type="range" id="sGap" min="0" max="6000" step="250" value="2500">
+    <button class="stepbtn" data-t="sGap" data-dir="1">+</button>
+    <span class="val" id="vGap">2500</span>
+  </div>
+  <div class="slider">
+    <label>fps</label>
+    <span class="val" id="fps" style="flex:0 0 auto">&ndash;</span>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="overlay">
+    <div class="card">
+      <div class="big" id="big"><span class="sp"><span
+        class="sc">YIPPEE</span></span></div>
+      <div class="sub">16384 reached<br>Keep going to unlock <span
+        class="wordart" id="wordart"></span></div>
+      <button id="again">Keep going</button>
+    </div>
+  </div>
+  <div class="confetti" id="confetti"></div>
+</div>
+<p class="hint">Tap the stage to replay.</p>
+
+<script>
+(function () {
+  "use strict";
+
+  // straight off the tile palette, so the confetti belongs to this game
+  var COLOURS = [
+    "#e05a5a", "#d5722e", "#f0c22a", "#9ed42a", "#2ec96a",
+    "#2ab5a8", "#3cc3e2", "#4a6fe0", "#8a5ae0", "#d54ab0"
+  ];
+
+  // Three cannons. `aim` is the direction fired, 0 straight up, positive
+  // clockwise. ox/oy are where the barrel sits, as a share of the stage -
+  // the side pair sit just off the edges. `share` is how much of the total
+  // count each one throws.
+  var CANNONS = [
+    {ox: -0.04, oy: 0.50, aim: 68, spread: 34, share: 0.3},
+    {ox: 1.04, oy: 0.50, aim: -68, spread: 34, share: 0.3},
+    {ox: 0.5, oy: 1.04, aim: 0, spread: 52, share: 0.4}
+  ];
+
+  var count = 160;
+  var power = 400;
+  var dur = 2000;
+  var gap = 2500;
+  var loopTimer = 0;
+
+  var layer = document.getElementById("confetti");
+  var stage = document.getElementById("stage");
+  var big = document.getElementById("big");
+
+  // One span per letter, each waving a beat behind the last, plus a few
+  // glints scattered over the phrase. Spaces keep their width or the words
+  // run together once every letter is inline-block.
+  (function buildWordart() {
+    var el = document.getElementById("wordart");
+    var text = "special tiles";
+    var i;
+    var inner = document.createElement("span");
+    inner.className = "wa-text";
+    el.appendChild(inner);
+    for (i = 0; i < text.length; i++) {
+      var b = document.createElement("b");
+      if (text.charAt(i) === " ") {
+        b.innerHTML = "&nbsp;";
+      } else {
+        b.textContent = text.charAt(i);
+      }
+      b.style.setProperty("--d", (i * 0.07).toFixed(2) + "s");
+      inner.appendChild(b);
+    }
+    for (i = 0; i < 5; i++) {
+      var s = document.createElement("span");
+      s.className = "spark";
+      s.style.left = (8 + i * 20 + rand(-6, 6)).toFixed(0) + "%";
+      s.style.top = rand(-30, 70).toFixed(0) + "%";
+      s.style.setProperty("--s", rand(5, 9).toFixed(1) + "px");
+      s.style.setProperty("--sd", rand(1600, 2600).toFixed(0) + "ms");
+      s.style.setProperty("--st", rand(0, 2000).toFixed(0) + "ms");
+      el.appendChild(s);
+    }
+  })();
+
+  function rand(a, b) {
+    return a + Math.random() * (b - a);
+  }
+
+  function piece(cx, cy, angleDeg) {
+    var el = document.createElement("span");
+    var arc = document.createElement("i");
+    var card = document.createElement("b");
+    var a = angleDeg * Math.PI / 180;
+    var speed = power * rand(0.55, 1.3);
+
+    // 0deg points up, so x uses sin and the rise uses cos
+    var dx = Math.sin(a) * speed;
+    var up = -Math.cos(a) * speed * 0.95 - rand(10, 40);
+    var down = speed * 2.9 + rand(60, 200);
+
+    var w = rand(5, 11);
+    var h = w * rand(0.5, 1.7);
+    var round = 1;
+    if (Math.random() < 0.22) {
+      round = 50;
+    }
+
+    el.className = "piece";
+    el.style.left = (cx * 100) + "%";
+    el.style.top = (cy * 100) + "%";
+    el.style.setProperty("--dx", dx.toFixed(1) + "px");
+    el.style.setProperty("--dur", dur + "ms");
+    el.style.setProperty("--delay", rand(0, 130).toFixed(0) + "ms");
+
+    arc.style.setProperty("--up", up.toFixed(1) + "px");
+    arc.style.setProperty("--down", down.toFixed(1) + "px");
+
+    card.style.setProperty("--w", w.toFixed(1) + "px");
+    card.style.setProperty("--h", h.toFixed(1) + "px");
+    card.style.setProperty("--r", round + "px");
+    card.style.setProperty("--col",
+      COLOURS[(Math.random() * COLOURS.length) | 0]);
+    // whole turns plus a part turn, so pieces do not all land face-on
+    card.style.setProperty("--rx", rand(540, 1440).toFixed(0) + "deg");
+    card.style.setProperty("--ry", rand(360, 1080).toFixed(0) + "deg");
+
+    arc.appendChild(card);
+    el.appendChild(arc);
+    return el;
+  }
+
+  function fire() {
+    layer.innerHTML = "";
+    CANNONS.forEach(function (c) {
+      var n = Math.round(count * c.share);
+      var half = c.spread / 2;
+      var i;
+      for (i = 0; i < n; i++) {
+        layer.appendChild(
+          piece(c.ox, c.oy, c.aim + rand(-half, half)));
+      }
+    });
+    big.classList.remove("bigpop");
+    // reflow, so a replay restarts the animation rather than ignoring it
+    void big.offsetWidth;
+    big.classList.add("bigpop");
+    // clear once the longest piece has finished, delay included
+    setTimeout(function () {
+      layer.innerHTML = "";
+    }, dur + 400);
+    // and go again from the top - burst, spin and all
+    clearTimeout(loopTimer);
+    loopTimer = setTimeout(fire, dur + 400 + gap);
+  }
+
+  function bind(id, valId, set) {
+    var el = document.getElementById(id);
+    function apply() {
+      set(parseInt(el.value, 10));
+      document.getElementById(valId).textContent = el.value;
+    }
+    el.addEventListener("input", apply);
+    apply();
+    return el;
+  }
+
+  bind("sCount", "vCount", function (v) { count = v; });
+  bind("sPower", "vPower", function (v) { power = v; });
+  bind("sDur", "vDur", function (v) { dur = v; });
+  bind("sGap", "vGap", function (v) { gap = v; });
+  // one number drives both side barrels, mirrored
+  bind("sAngle", "vAngle", function (v) {
+    CANNONS[0].aim = v;
+    CANNONS[1].aim = -v;
+  });
+  // how far up the edge the side barrels sit, as a percentage
+  bind("sSideY", "vSideY", function (v) {
+    CANNONS[0].oy = v / 100;
+    CANNONS[1].oy = v / 100;
+  });
+
+  Array.prototype.forEach.call(
+    document.querySelectorAll(".stepbtn"),
+    function (b) {
+      b.addEventListener("click", function () {
+        var el = document.getElementById(b.getAttribute("data-t"));
+        var dir = parseFloat(b.getAttribute("data-dir"));
+        var v = parseFloat(el.value) + parseFloat(el.step) * dir;
+        el.value = Math.max(parseFloat(el.min),
+                            Math.min(parseFloat(el.max), v));
+        el.dispatchEvent(new Event("input"));
+      });
+    }
+  );
+
+  document.getElementById("again").addEventListener("click", fire);
+  stage.addEventListener("click", function (e) {
+    if (e.target.id !== "again") {
+      fire();
+    }
+  });
+
+
+  // rolling frame counter, sampled twice a second
+  (function fpsMeter() {
+    var el = document.getElementById("fps");
+    var frames = 0;
+    var last = performance.now();
+    function tick(now) {
+      frames++;
+      if (now - last >= 500) {
+        el.textContent = Math.round(frames * 1000 / (now - last));
+        frames = 0;
+        last = now;
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  })();
+  fire();
+})();
+</script>
+
+</body>
+</html>

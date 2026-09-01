@@ -5,6 +5,7 @@ const SHELL = [
   './aulists.html',
   './hex2.html',
   './about.html',
+  './grass.html',
   './style-minim.css',
   './style-colourful.css',
   './style-falsedge.css',
@@ -19,7 +20,8 @@ const SHELL = [
   './hex2-cascading.js',
   './manifest.json',
   './assets/icon.svg',
-  './assets/icon-hex2.svg'
+  './assets/icon-hex2.svg',
+  './assets/icon-grass.svg'
 ];
 
 self.addEventListener('install', (event) => {

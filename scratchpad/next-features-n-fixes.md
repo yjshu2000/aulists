@@ -20,6 +20,7 @@
     - [\[i35\] Custom tasks (CL) ⬜](#i35-custom-tasks-cl-)
     - [\[i36\] Template row spacing and manual sort ⚪](#i36-template-row-spacing-and-manual-sort-)
     - [\[i45\] Queue ⬜](#i45-queue-)
+    - [\[i??\] BUG FIX THE STUPID TIME TOAST SAYS "TOO SOON" FOR EVERYTHING \[BUG EMOJI\] \[RED\]](#i-bug-fix-the-stupid-time-toast-says-too-soon-for-everything-bug-emoji-red)
   - [Aulists](#aulists)
     - [\[i15\] Tear down and rebuild Aulists ⬜ 🟡](#i15-tear-down-and-rebuild-aulists--)
   - [Hex 2^](#hex-2)
@@ -32,6 +33,7 @@
     - [\[i43\] Challenge mode has bug due to outline ⚪ 🐞 🟢](#i43-challenge-mode-has-bug-due-to-outline---)
   - [Multi-page items](#multi-page-items)
     - [\[i41\] Cooldown on the Go to Hex 2^ button ⚪](#i41-cooldown-on-the-go-to-hex-2-button-)
+    - [\[i46\] Grass shop ⬜](#i46-grass-shop-)
     - [\[i27\] (low priority/far future) - Server side ⬜⬜⬜ 🔵](#i27-low-priorityfar-future---server-side--)
   - [Colourcaln?](#colourcaln)
     - [\[i42\] Revive Colourcaln as a vibes tracker ⬜](#i42-revive-colourcaln-as-a-vibes-tracker-)
@@ -53,7 +55,7 @@
 
 **D6. The bracketed `iN` labels are IDs and nothing else.** Not priority, not chronological, not an ordering — nothing carries any of that, much less the ID. An ID is assigned once and never changes: items keep theirs when reordered or moved between sections, and a deleted item's ID is retired rather than reused. Gaps in the sequence are normal and expected. Sub-items are `iN.1`, `iN.2`, … numbered from `.1`, as `####` headings under their parent, and follow the same rules.
 ```
-LAST USED ID: i45
+LAST USED ID: i46
 (update this with every new item)
 ```
 
@@ -343,6 +345,11 @@ Queue is manually ordered using the plan for the manual ordering of Activate (ot
 Update 26-08-30:  
 queue must be collapsible
 
+### [i??] BUG FIX THE STUPID TIME TOAST SAYS "TOO SOON" FOR EVERYTHING [BUG EMOJI] [RED]
+
+UPDATE 26-09-01  
+FIX THIS *NOW*!!! WHY IS THE TIME TOAST ALWAYS "TOO SOON" EVEN FOR TIMES IN THE PAST?! IT SHOULD JUST SAY "INVALID TIME"!!!!
+
 ## Aulists
 
 ### [i15] Tear down and rebuild Aulists ⬜ 🟡
@@ -470,6 +477,25 @@ Falsedge's "Go to Hex 2^" button is inert for **10 seconds** after the page load
 Shown as a filling bar, never as numbers. Ticking once a second is acceptable; a smooth fill is preferred only if it costs nothing structurally — this is one small bar, not a reason to restructure how the page draws.
 
 The clock runs from page load, so it applies once per visit and cannot be banked.
+
+### [i46] Grass shop ⬜
+last consolidated: 26-09-01
+
+A second currency. Grass is earned in Hex 2^ and spent on Falsedge things, so it belongs to neither page alone.
+
+**Earning.** One grass per fake ad waited out. The × only becomes tappable once the countdown finishes, so every × is a completed wait and there is no partial credit.
+
+`+1` and the grass icon sit **beside the ×** for the whole wait, not as a popup afterwards — a promise rather than a receipt, so the notice costs none of the 30 seconds of game that follow. Tapping the × pops the whole `+1 [grass]` as one unit, then lets through to the board.
+
+Use `assets/icon-grass.svg`, already drawn: overlapping blades in five emerald greens rising from a flat bottom edge, back layer darkest.
+
+**Spending.**
+
+- **60 grass buys 1 pt.**
+- **Lockdown reduction**, an unset amount of grass per hour taken off. Applies to any lockdown, not one in particular: the 36h streak-break lockdown, the 36h cancel cooldown on a dated `others` row, and whatever else grows one later.
+- More exchanges, not yet decided.
+
+**Undecided:** where grass is stored, which is the load-bearing question — Falsedge keeps its state in `falsedge.data` and Hex 2^ keeps its own under `hex2.*`, and the two share nothing today. Also open: where the shop's UI lives, the grass-per-hour rate for lockdown reduction, whether a streak break costs grass or leaves it alone, and what else grass can be spent on.
 
 ### [i27] (low priority/far future) - Server side ⬜⬜⬜ 🔵
 last consolidated: none
