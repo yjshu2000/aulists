@@ -823,15 +823,24 @@
   }
 
   /**
+   * The live task an `others` row spawned, if it still has one out.
+   * @param {string} id - the row id.
+   * @returns {Object|undefined} the task, if there is one.
+   */
+  function activeTaskOfRow(id) {
+    return state.activeTasks.find(function (t) {
+      return t.sourceRowId === id;
+    });
+  }
+
+  /**
    * Whether an `others` row already has a task of its own out, which is what
    * `activateRow` refuses on.
    * @param {string} id - the row id.
    * @returns {boolean} true if a live task came from this row.
    */
   function rowIsOut(id) {
-    return state.activeTasks.some(function (t) {
-      return t.sourceRowId === id;
-    });
+    return activeTaskOfRow(id) !== undefined;
   }
 
   /**
@@ -882,27 +891,30 @@
   }
 
   /**
-   * Returns the `others` rows in display order: by `lastDone` descending, most
-   * recently completed first. A row that has never been completed carries no
-   * `lastDone` at all and pins above everything, so anything new or untouched
-   * is the first thing in the section.
+   * Returns the `others` rows in display order, in two groups. Rows whose
+   * task is currently out come first, sorted by that task's live deadline -
+   * the same order the active stack itself uses, not the time stored on the
+   * row. Everything else follows in manual order, which is simply the order
+   * `state.others` holds them in.
    * @returns {Object[]} a sorted shallow copy of `state.others`.
    */
   function sortedOthers() {
-    return state.others.slice().sort(function (a, b) {
-      var ta = null;
-      var tb = null;
-      if (a.lastDone) {
-        ta = new Date(a.lastDone).getTime();
+    var out = [];
+    var manual = [];
+    state.others.forEach(function (r) {
+      if (rowIsOut(r.id)) {
+        out.push(r);
+      } else {
+        manual.push(r);
       }
-      if (b.lastDone) {
-        tb = new Date(b.lastDone).getTime();
-      }
-      if (ta === null && tb === null) return 0;
-      if (ta === null) return -1;
-      if (tb === null) return 1;
-      return tb - ta;
     });
+    out.sort(function (a, b) {
+      var ta = activeTaskOfRow(a.id);
+      var tb = activeTaskOfRow(b.id);
+      return new Date(ta.deadline).getTime() -
+        new Date(tb.deadline).getTime();
+    });
+    return out.concat(manual);
   }
 
   // --------------------------------- ledger ----------------------------------
@@ -1876,6 +1888,46 @@
     if (at === -1) return;
     pushUndo("delete row");
     rowList(kind).splice(at, 1);
+    save();
+    render();
+  }
+
+  /**
+   * The array index a chevron would move a row to: the nearest neighbour in
+   * that direction that is not currently out as a task. Rows that are out sit
+   * in their own deadline-sorted group, so swapping with one would move
+   * nothing anybody can see.
+   * @param {string} id - the row id.
+   * @param {number} delta - -1 for up, +1 for down.
+   * @returns {number} the target index, or -1 when there is nowhere to go.
+   */
+  function moveTargetIndex(id, delta) {
+    var at = indexOfRow("others", id);
+    if (at === -1) return -1;
+    var to = at + delta;
+    while (to >= 0 && to < state.others.length &&
+      rowIsOut(state.others[to].id)) {
+      to = to + delta;
+    }
+    if (to < 0 || to >= state.others.length) return -1;
+    return to;
+  }
+
+  /**
+   * Swaps an `others` row with that neighbour. `state.others` is itself the
+   * manual order, so there is no separate index field to hold in step. Rows
+   * skipped over keep their own places in the array.
+   * @param {string} id - the row id.
+   * @param {number} delta - -1 to move up, +1 to move down.
+   */
+  function moveRow(id, delta) {
+    var to = moveTargetIndex(id, delta);
+    if (to === -1) return;
+    var at = indexOfRow("others", id);
+    pushUndo("move row");
+    var moved = state.others[at];
+    state.others[at] = state.others[to];
+    state.others[to] = moved;
     save();
     render();
   }
@@ -2954,11 +3006,33 @@
   }
 
   /**
+   * Builds the up/down chevrons that move an `others` row inside the manual
+   * group. Each press moves it one visible place. Items at the top/bottom
+   * boundary have their chev greyed out.
+   * @param {string} id - the row id.
+   * @returns {Element} the chevron pair in their wrapper.
+   */
+  function buildRowChevrons(id) {
+    var wrap = el("div", "row-chevs");
+    var specs = [["▲", -1, "Move up"], ["▼", 1, "Move down"]];
+    specs.forEach(function (spec) {
+      var b = el("button", "mini", spec[0]);
+      b.setAttribute("aria-label", spec[2]);
+      b.disabled = moveTargetIndex(id, spec[1]) === -1;
+      b.addEventListener("click", function () {
+        moveRow(id, spec[1]);
+      });
+      wrap.appendChild(b);
+    });
+    return wrap;
+  }
+
+  /**
    * Builds one ACTIVATE row: its text, then the control row of time dropdown,
-   * optional date picker, WL/HL toggles and hamburger. Swipe left activates it
-   * outright, swipe right prefills SET. An `others` row on cooldown dims and
-   * carries its remaining time inline, but stays fully editable - only
-   * activation is blocked.
+   * optional date picker, WL/HL toggles, sort chevrons and hamburger. Swipe
+   * left activates it outright, swipe right prefills SET. An `others` row on
+   * cooldown dims and carries its remaining time inline, but stays fully
+   * editable - only activation is blocked.
    * @param {string} kind - "dailies" or "others".
    * @param {string} id - the row id.
    * @returns {Element} the row.
@@ -3006,6 +3080,10 @@
     }, function (next) {
       editRow(kind, id, "mode", next);
     }));
+    // a row that is out is sorted by its task's deadline, not by hand
+    if (kind === "others" && !rowIsOut(id)) {
+      controls.appendChild(buildRowChevrons(id));
+    }
     controls.appendChild(buildRowMenu(kind, id, row));
     row.appendChild(controls);
     swipeCore(row, function (dir) {

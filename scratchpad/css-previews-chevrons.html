@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chevrons &mdash; right aligned</title>
+<style>
+  :root{
+    --bg:#12141c; --panel:#1a1d27; --panel-2:#20242f;
+    --line:#2b3140; --line-soft:#242938;
+    --text:#e9ebf2; --muted:#878da2; --faint:#5a6072;
+    --c-indigo:#4d4ad9;
+    --glow:var(--c-indigo);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:monospace; line-height:1.5;
+    padding:18px 14px 60px;
+  }
+  h1{font-size:16px;font-weight:700;letter-spacing:.04em;margin:0 0 4px;}
+  .note{font-size:11.5px;color:var(--faint);margin:0 0 18px;}
+
+  .opt{max-width:380px;margin:0 auto 26px;}
+  .opt-label{
+    font-size:11px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--muted);margin-bottom:8px;
+  }
+  .opt-sub{
+    font-size:11px;color:var(--faint);text-transform:none;
+    letter-spacing:0;font-weight:400;
+  }
+
+  /* everything below is lifted straight from style-falsedge.css */
+  button{font-family:inherit;font-size:13px;color:var(--text);}
+  .tpl-list{display:flex;flex-direction:column;gap:10px;}
+  .tpl-row{
+    padding:8px; border-radius:10px; background:var(--panel-2);
+    border:1px solid color-mix(in srgb, var(--glow) 55%, var(--line-soft));
+  }
+  .tpl-text{font-size:14px;margin-bottom:14px;word-break:break-word;}
+  .tpl-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  /* Block 1 of the draft: the gap that does not exist today */
+  .tpl-controls + .tpl-controls{margin-top:10px;}
+  .field-pair{display:flex;align-items:center;gap:6px;}
+  .field-label{font-size:12px;color:var(--faint);}
+  select,input{
+    background:var(--panel-2); border:1px solid var(--line);
+    border-radius:10px; min-height:40px; padding:0 8px;
+    font-family:inherit; font-size:13px; color:var(--text);
+  }
+  .mode-row{display:flex;gap:8px;}
+  .mode-btn{
+    min-height:40px; padding:0 16px; background:var(--panel-2);
+    border:1px solid var(--line); border-radius:10px;
+    color:var(--muted); font-size:13px; font-weight:700;
+  }
+  .mini{
+    min-width:40px; min-height:40px; padding:0;
+    background:var(--panel-2); border:1px solid var(--line);
+    border-radius:10px; font-size:15px;
+  }
+  .mini:disabled{opacity:.38;}
+  .menu-anchor{position:relative;margin-left:auto;}
+
+  /* Block 2 of the draft, as revised: the chevrons take the slack, and the
+     hamburger's own auto margin is cancelled so the two do not split it
+     between them and drift apart. */
+  .row-chevs{display:flex;gap:6px;margin-left:auto;}
+  .row-chevs + .menu-anchor{margin-left:0;}
+
+  /* the comparison row only - what the old left-aligned plan looked like */
+  .left-plan .row-chevs{margin-left:0;}
+  .left-plan .row-chevs + .menu-anchor{margin-left:auto;}
+</style>
+</head>
+<body>
+
+<h1>Chevrons &mdash; &#9650;&#9660;, right aligned</h1>
+<p class="note">First row of each group has its up chevron greyed, the way the
+top of the manual group would. Everything else is the real Others row.</p>
+
+<div id="out"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var UP = "▲";
+  var DOWN = "▼";
+
+  var GROUPS = [
+    ["Right aligned", "as it ships &mdash; WL | HL today", false,
+      ["WL", "HL"]],
+    ["Right aligned", "once MT lands, the left cluster grows and the " +
+      "chevrons stay put", false, ["WL", "HL", "MT"]],
+    ["Left aligned", "the old plan, for comparison &mdash; the chevrons " +
+      "get shoved along by every new toggle", true, ["WL", "HL", "MT"]]
+  ];
+
+  var out = document.getElementById("out");
+
+  function row(text, modes, topOfGroup) {
+    var r = document.createElement("div");
+    r.className = "tpl-row";
+    var dis = "";
+    if (topOfGroup) {
+      dis = " disabled";
+    }
+    var modeHtml = "";
+    modes.forEach(function (m) {
+      modeHtml += '<button class="mode-btn">' + m + '</button>';
+    });
+    r.innerHTML =
+      '<div class="tpl-text">' + text + '</div>' +
+      '<div class="tpl-controls">' +
+        '<div class="field-pair"><span class="field-label">by</span>' +
+        '<select><option>09:30</option></select></div>' +
+        '<div class="field-pair"><span class="field-label">on</span>' +
+        '<input type="date" value="2026-09-03"></div>' +
+      '</div>' +
+      '<div class="tpl-controls">' +
+        '<div class="mode-row">' + modeHtml + '</div>' +
+        '<div class="row-chevs">' +
+          '<button class="mini"' + dis + '>' + UP + '</button>' +
+          '<button class="mini">' + DOWN + '</button>' +
+        '</div>' +
+        '<div class="menu-anchor"><button class="mini">&#9776;</button></div>' +
+      '</div>';
+    return r;
+  }
+
+  GROUPS.forEach(function (g) {
+    var wrap = document.createElement("div");
+    wrap.className = "opt";
+    if (g[2]) {
+      wrap.className = "opt left-plan";
+    }
+    var label = document.createElement("div");
+    label.className = "opt-label";
+    label.innerHTML = g[0] + ' <span class="opt-sub">&mdash; ' + g[1] +
+      "</span>";
+    wrap.appendChild(label);
+    var list = document.createElement("div");
+    list.className = "tpl-list";
+    list.appendChild(row("water the plants", g[3], true));
+    list.appendChild(row("take the bins out", g[3], false));
+    wrap.appendChild(list);
+    out.appendChild(wrap);
+  });
+})();
+</script>
+
+</body>
+</html>

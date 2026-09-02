@@ -18,7 +18,6 @@
     - [\[i33\] Kill the failed path ⚪](#i33-kill-the-failed-path-)
     - [\[i34\] Streak break condition ⬜ 🟠](#i34-streak-break-condition--)
     - [\[i35\] Custom tasks (CL) ⬜](#i35-custom-tasks-cl-)
-    - [\[i36\] Template row spacing and manual sort ⚪](#i36-template-row-spacing-and-manual-sort-)
     - [\[i45\] Queue ⬜ 🔴](#i45-queue--)
   - [Aulists](#aulists)
     - [\[i15\] Tear down and rebuild Aulists ⬜ 🟡](#i15-tear-down-and-rebuild-aulists--)
@@ -321,25 +320,13 @@ A third leniency setting beside WL and HL, on the same row: **CL**, custom lenie
 
 **Undecided:** CL strictly dominates DOLI. DOLI's 12 points cost a deadline and a -6 downside; CL's 12 points cost typing `12`. More broadly it is an unbounded self-award available on any task, so it undercuts the whole scoring economy rather than just DOLI. No limiter has been chosen.
 
-### [i36] Template row spacing and manual sort ⚪
-last consolidated: 26-08-22
-
-**Spacing.** There is no gap at all between the `by TIME on DATE` row and the `WL/HL — hamburger` row under it. They need separating.
-
-**Manual sort.** The WL/HL row has room for two more icons — chevron up and chevron down — moving a template within its group.
-
-Sorting is two-tier. Templates whose task is currently active group together and sort by that task's **active** deadline — the same order the active tasks list uses, not the deadline stored on the template. Everything else sits in the other group, in manual order.
-
-**Undecided:** whether the active group goes above the rest or below, leaning above.
-
-
 ### [i45] Queue ⬜ 🔴
 last consolidated: none
 
 Update 26-08-30:  
 New section named Queue. It goes after Set. (small caps like the others). colour is red. text only. swipe left (from right to left) to "prefill SET", with only the text, no times or anything else.
 
-Queue is manually ordered using the plan for the manual ordering of Activate (others) section — [i36].
+Queue is manually ordered with the same ▲▼ chevrons as ACTIVATE (others).
 
 Update 26-08-30:  
 queue must be collapsible

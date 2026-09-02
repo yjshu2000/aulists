@@ -594,6 +594,9 @@
     gap: 8px;
     flex-wrap: wrap;
   }
+  .tpl-controls + .tpl-controls {
+    margin-top: 10px;
+  }
   .field-pair {
     display: flex;
     align-items: center;
@@ -653,6 +656,17 @@
     border: 1px solid var(--line);
     border-radius: 10px;
     font-size: 15px;
+  }
+  .mini:disabled {
+    opacity: .38;
+  }
+  .row-chevs {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+  }
+  .row-chevs + .menu-anchor {
+    margin-left: 0;
   }
   .menu-anchor {
     position: relative;
