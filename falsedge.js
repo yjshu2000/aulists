@@ -120,7 +120,7 @@
    * @param {Date} d - the moment to format.
    * @returns {string} "YYYY-MM-DD HH:MM".
    */
-  function fmtDateTime(d) {
+  function formatDateTime(d) {
     return dayKey(d) + " " + hhmm(d);
   }
 
@@ -129,7 +129,7 @@
    * @param {number} ms - milliseconds since.
    * @returns {string} e.g. "just now", "42m ago", "5h ago", "3d ago".
    */
-  function fmtAgo(ms) {
+  function formatAgo(ms) {
     if (ms < 60 * 1000) {
       return "just now";
     }
@@ -247,7 +247,7 @@
    * @param {number} ms - milliseconds remaining.
    * @returns {string} e.g. "31h 12m", or "44m" once under an hour.
    */
-  function fmtLeft(ms) {
+  function formatLeft(ms) {
     var mins = Math.max(0, Math.ceil(ms / 60000));
     var h = Math.floor(mins / 60);
     var m = mins % 60;
@@ -262,7 +262,7 @@
    * @param {number} n - the value to format.
    * @returns {string} the formatted value, e.g. "-5".
    */
-  function fmtPts(n) {
+  function formatPts(n) {
     return String(Math.round(n));
   }
 
@@ -272,7 +272,7 @@
    * @param {number} n - the value to format.
    * @returns {string} the formatted value.
    */
-  function fmtScr(n) {
+  function formatScr(n) {
     var r = Math.round(n * 10) / 10;
     if (r % 1 === 0) {
       return String(r);
@@ -936,17 +936,17 @@
     }
     var lines = [];
     lines.push(task.text);
-    lines.push("by " + fmtDateTime(new Date(task.deadline)) +
+    lines.push("by " + formatDateTime(new Date(task.deadline)) +
       " (" + mode + ")");
     lines.push("completed by: " + byText);
     if (award > 0 && ptsDelta === 0) {
-      lines.push("pts = " + fmtPts(oldPts));
+      lines.push("pts = " + formatPts(oldPts));
     } else {
-      lines.push("pts = " + fmtPts(oldPts) + " + " + fmtPts(ptsDelta) +
-        " = " + fmtPts(oldPts + ptsDelta));
+      lines.push("pts = " + formatPts(oldPts) + " + " + formatPts(ptsDelta) +
+        " = " + formatPts(oldPts + ptsDelta));
     }
-    lines.push("scr = " + fmtScr(oldScr) + " + " + fmtScr(award) +
-      " = " + fmtScr(oldScr + award));
+    lines.push("scr = " + formatScr(oldScr) + " + " + formatScr(award) +
+      " = " + formatScr(oldScr + award));
     return lines.join("\n");
   }
 
@@ -967,8 +967,8 @@
       head = text + " ×" + count;
       owed = cost + "×" + count;
     }
-    return head + "\non " + day + "\npts = " + fmtPts(oldPts) + " - " +
-      owed + " = " + fmtPts(oldPts - cost * count);
+    return head + "\non " + day + "\npts = " + formatPts(oldPts) + " - " +
+      owed + " = " + formatPts(oldPts - cost * count);
   }
 
   /**
@@ -1167,7 +1167,7 @@
   function lockdownClear(now) {
     var left = lockdownLeft(now);
     if (left > 0) {
-      toast("streak broke lockdown - " + fmtLeft(left) + " left");
+      toast("streak broke lockdown - " + formatLeft(left) + " left");
       return false;
     }
     return true;
@@ -1332,7 +1332,7 @@
    * @returns {string} the formatted line.
    */
   function highScoreLine(h, i) {
-    return (i + 1) + ". " + fmtScr(h.score) + "  " + h.date;
+    return (i + 1) + ". " + formatScr(h.score) + "  " + h.date;
   }
 
   /**
@@ -1543,7 +1543,7 @@
     if (dayKey(when) === dayKey(new Date(task.deadline))) {
       return hhmm(when);
     }
-    return fmtDateTime(when);
+    return formatDateTime(when);
   }
 
   /**
@@ -1991,7 +1991,7 @@
     if (kind === "others") {
       var left = cooldownLeft(row, now);
       if (left > 0) {
-        toast("on cooldown - " + fmtLeft(left) + " left");
+        toast("on cooldown - " + formatLeft(left) + " left");
         return;
       }
       if (rowIsOut(id)) {
@@ -2389,7 +2389,7 @@
     var wrap = el("div", "scores-wrap");
     var ptsBox = el("button", "score-box");
     ptsBox.appendChild(el("span", "score-label",
-      "Current pts: " + fmtPts(state.pts)));
+      "Current pts: " + formatPts(state.pts)));
     var ptsChev = ">";
     if (spendOpen) {
       ptsChev = "^";
@@ -2406,7 +2406,7 @@
     var scrBox = el("button", "score-box");
     scrBox.id = "scrBox";
     scrBox.appendChild(el("span", "score-label",
-      "Current scr: " + fmtScr(state.scr)));
+      "Current scr: " + formatScr(state.scr)));
     scrBox.appendChild(el("span", "score-chev", ">"));
     scrBox.addEventListener("click", function () {
       scoresOpen = true;
@@ -2651,6 +2651,32 @@
   }
 
   /**
+   * Hours left in one streak window, floored.
+   * @param {string} type - "any" or "other".
+   * @param {Date} now - the reference moment.
+   * @returns {string} the hours, or "-" when the window has no start.
+   */
+  function streakHoursLeft(type, now) {
+    var win = streakWindow(type);
+    if (!win) {
+      return "-";
+    }
+    return String(Math.floor((win.to - now.getTime()) / (60 * 60 * 1000)));
+  }
+
+  /**
+   * Builds the countdown pair riding the ACTIVE TASKS label.
+   * @param {Date} now - the reference moment.
+   * @returns {Element} the counter.
+   */
+  function buildStreakLeft(now) {
+    var text = [["any", 24], ["other", 48]].map(function (pair) {
+      return streakHoursLeft(pair[0], now) + "/" + pair[1] + "h";
+    }).join(" | ");
+    return el("span", "streak-left", text);
+  }
+
+  /**
    * Builds the ACTIVE TASKS section: a labelled card wrapping the task stack,
    * or the empty state with `[streak broke]`. The card is the only thing that
    * glows - the blocks inside keep their per-position border colour but have no
@@ -2662,7 +2688,9 @@
    * @returns {Element} the section wrapper.
    */
   function buildTasks() {
-    var section = buildSection("ACTIVE TASKS", "tasksCard", "sec-tasks");
+    var now = getNow();
+    var section = buildSection("ACTIVE TASKS", "tasksCard", "sec-tasks",
+      buildStreakLeft(now));
     var wrap = el("div", "tasks");
     section.card.appendChild(wrap);
     if (!state.activeTasks.length) {
@@ -2672,7 +2700,6 @@
       wrap.appendChild(brk);
       return section.wrap;
     }
-    var now = getNow();
     var sorted = state.activeTasks.slice().sort(function (a, b) {
       return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
     });
@@ -2697,9 +2724,13 @@
    *   `--glow` colour is set.
    * @returns {{wrap: Element, card: Element}} the wrapper and its card.
    */
-  function buildSection(label, cardId, modifier) {
+  function buildSection(label, cardId, modifier, extra) {
     var wrap = el("div", "fd-section " + modifier);
-    wrap.appendChild(el("h2", "fd-label", label));
+    var head = el("h2", "fd-label", label);
+    if (extra) {
+      head.appendChild(extra);
+    }
+    wrap.appendChild(head);
     var card = el("div", "card");
     card.id = cardId;
     wrap.appendChild(card);
@@ -3057,7 +3088,7 @@
       if (left > 0) {
         row.classList.add("row-oncooldown");
         row.appendChild(el("div", "row-oncooldown-note",
-          "on cooldown - " + fmtLeft(left) + " left"));
+          "on cooldown - " + formatLeft(left) + " left"));
       }
     }
     var controls = el("div", "tpl-controls");
@@ -3074,8 +3105,8 @@
         var done = new Date(r.lastDone);
         if (!isNaN(done.getTime())) {
           row.appendChild(el("div", "row-lastdone-note",
-            "last done: " + fmtDateTime(done) + " · " +
-            fmtAgo(now.getTime() - done.getTime())));
+            "last done: " + formatDateTime(done) + " · " +
+            formatAgo(now.getTime() - done.getTime())));
         }
       }
       controls = el("div", "tpl-controls");

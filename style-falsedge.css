@@ -150,6 +150,9 @@
     margin-top: 40px;
   }
   .fd-label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
     font-size: 13px;
     font-weight: 700;
     color: color-mix(in srgb, var(--glow) 62%, var(--muted));
@@ -157,6 +160,12 @@
     letter-spacing: .08em;
     margin: 0 0 6px 2px;
     text-shadow: 0 0 12px color-mix(in srgb, var(--glow) 35%, transparent);
+  }
+  .streak-left {
+    font-size: 11px;
+    letter-spacing: .04em;
+    text-transform: none;
+    font-variant-numeric: tabular-nums;
   }
   .fd-section .card {
     margin-top: 0;
