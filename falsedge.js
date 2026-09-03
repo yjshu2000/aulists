@@ -15,7 +15,7 @@
   // cancelling a dated `others` activation locks that row out this long
   var COOLDOWN_MS = 36 * 60 * 60 * 1000;
   // auto streak breakers + lockdown
-  var DAILY_STREAK_WINDOW_MS = 24 * 60 * 60 * 1000;
+  var ANY_STREAK_WINDOW_MS = 24 * 60 * 60 * 1000;
   var OTHER_STREAK_WINDOW_MS = 48 * 60 * 60 * 1000;
   var STREAK_LOCKDOWN_MS = 36 * 60 * 60 * 1000;
   var STREAK_GRACE_MS = 12 * 60 * 60 * 1000;
@@ -1096,8 +1096,9 @@
   }
 
   // ---------------------------------- streak ---------------------------------
-  // Auto streak breaker. Minimum 1 daily in the last 24h, and min 1 non-daily
-  // in the last 48h. Time checks last completion of each or last lockdown end.
+  // Auto streak breaker. Minimum 1 task of any kind in the last 24h, and min 1
+  // non-daily in the last 48h. Time checks last completion or last lockdown
+  // end. A daily resets only the 24h window; a non-daily resets both.
 
   // What the indicator text reads. Not saved to undo/storage.
   var streakIndicator = "";
@@ -1120,19 +1121,29 @@
   }
 
   /**
-   * When one type was last completed.
-   * @param {string} type - "daily" or "other".
-   * @returns {number} its time in ms, or 0 if there has never been one.
+   * Parses one stored completion stamp.
+   * @param {string|null} raw - an ISO string, or null.
+   * @returns {number} its time in ms, or 0 when absent or unparseable.
    */
-  function lastCompletionOf(type) {
-    var raw = state.lastOtherAt;
-    if (type === "daily") {
-      raw = state.lastDailyAt;
-    }
+  function stampTime(raw) {
     if (!raw) return 0;
     var t = new Date(raw).getTime();
     if (isNaN(t)) return 0;
     return t;
+  }
+
+  /**
+   * When a window's kind of task was last completed. "any" is the later of the
+   * two stamps, since a daily now counts toward the 24h window as well.
+   * @param {string} type - "any" or "other".
+   * @returns {number} its time in ms, or 0 if there has never been one.
+   */
+  function lastCompletionOf(type) {
+    var other = stampTime(state.lastOtherAt);
+    if (type !== "any") {
+      return other;
+    }
+    return Math.max(other, stampTime(state.lastDailyAt));
   }
 
   /**
@@ -1165,7 +1176,7 @@
   /**
    * Where one streak window starts: its own last completion, or the end of a
    * lockdown plus its grace, whichever is later.
-   * @param {string} type - "daily" or "other".
+   * @param {string} type - "any" or "other".
    * @returns {number} that moment in ms, or 0 when there is nothing to start
    *   it from at all.
    */
@@ -1183,7 +1194,7 @@
   /**
    * A streak window as two absolute times, which is what decides whether a
    * backdated completion could still land inside it.
-   * @param {string} type - "daily" or "other".
+   * @param {string} type - "any" or "other".
    * @returns {{from: number, to: number}|null} the window, or null when there
    *   is nothing to start it from.
    */
@@ -1191,26 +1202,22 @@
     var from = streakWindowStart(type);
     if (!from) return null;
     var len = OTHER_STREAK_WINDOW_MS;
-    if (type === "daily") {
-      len = DAILY_STREAK_WINDOW_MS;
+    if (type === "any") {
+      len = ANY_STREAK_WINDOW_MS;
     }
     return { from: from, to: from + len };
   }
 
   /**
-   * Whether an unresolved task could still be backdated into a lapsed window:
-   * matching type, deadline inside the window.
-   * @param {string} type - "daily" or "other".
+   * Whether an unresolved task could still be backdated into a lapsed window.
+   * The 24h window takes any task; the 48h one takes non-dailies only.
+   * @param {string} type - "any" or "other".
    * @param {{from: number, to: number}} win - the lapsed window.
    * @returns {boolean} true while the streak break is only provisional.
    */
   function windowCoverable(type, win) {
     return state.activeTasks.some(function (t) {
-      var tType = "other";
-      if (t.daily) {
-        tType = "daily";
-      }
-      if (tType !== type) return false;
+      if (type === "other" && t.daily) return false;
       var at = new Date(t.deadline).getTime();
       return at >= win.from && at <= win.to;
     });
@@ -1223,7 +1230,7 @@
    */
   function lapsedStreakWindows(now) {
     var out = [];
-    [["daily", 24], ["other", 48]].forEach(function (pair) {
+    [["any", 24], ["other", 48]].forEach(function (pair) {
       var win = streakWindow(pair[0]);
       if (!win) return;
       if (now.getTime() > win.to) {
@@ -1267,7 +1274,7 @@
     lapsedStreakWindows(now).forEach(function (hours) {
       var type = "other";
       if (hours === 24) {
-        type = "daily";
+        type = "any";
       }
       if (windowCoverable(type, streakWindow(type))) {
         tentative.push(hours);
