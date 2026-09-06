@@ -331,6 +331,37 @@ Queue is manually ordered with the same ▲▼ chevrons as ACTIVATE (others).
 Update 26-08-30:  
 queue must be collapsible
 
+Update 26-09-03:  
+- if an item from queue is canceled it should go back into queue into the position it was from
+- actually nvm on the prefill SET thing. we might as well give each one its own stuff exactly the same as "activate others" so this is literally just others templates BUT non recurring... or not necessarily recurring...? lol. idk. or maybe I should be using others templates as queue now that I can order it anyway... man idk anymore
+
+Update 26-09-03:  
+maybe I should revamp "others" entirely into "queue" and then instead label items recurring or not, somehow, and maybe recurring items have some kind of flag (like icon) on the item
+
+items marked recurring:
+- on cancel OR completion: returns to list
+
+items not marked recurring:
+- returns to list on cancel BUT completing it removes from list. oh man that means we should probably nvm on the thing that "removes failed vs cancel" or whatever.
+
+Update 26-09-04:  
+holding down on either button should open a list of positions 1 to n, and also (like, always on) all items will gain a number on the left side. small number. maybe around the size of the word "by / on" and it's the same grey colour too.
+
+oh right the number should be OUTSIDE the box. so the boxes' left border is shifted right very slightly. just a lil bit. also the number is uhhh center aligned (vertically) to the item.
+
+also this is only for "activate others" (which might become activate (queue) or smth soon)
+
+Update 26-09-04:  
+THE LINE. I FIGURED OUT HOW TO MAKE THE OTHERS CATEGORY REPURPOSED INTO THE QUEUE. THE *LINE*. WE NEED A LINE WHERE EVERYTHING BELOW IT IS GREYED OUT LIKE ACTIVE TASKS' "FURTHER" STUFF. AND THEN STUFF ABOVE THE LINE IS IN THE QUEUE AND STUFF BELOW *ISNT*. ALSO WE NEED DRAG POSITIONING. WE'RE GONNA CHANGE THE CHEVRON BUTTONS TO A DRAG BUTTON.
+
+two options I'm not sure which is easier:
+- the button is the draggable area; the rest of the item is for swipe actions. any touch on the button (which will say "Move |" instead) (with | being vertical version of <-> arrow) will be a vertical  drag action.
+- the button is a toggle which highlights the item and turns the whole thing draggable, overriding the swipes until turned off
+
+The numbers from the update above survive; the chevrons they hung off do not. **Undecided:** where the position picker lives, the hamburger being the candidate.
+
+
+
 ## Aulists
 
 ### [i15] Tear down and rebuild Aulists ⬜ 🟡
