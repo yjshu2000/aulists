@@ -1776,8 +1776,7 @@
     var now = getNow();
     if (!lockdownClear(now)) return;
     var textEl = document.getElementById("setText");
-    var selectEl = document.getElementById("setSelect");
-    if (!textEl || !selectEl) return;
+    if (!textEl) return;
     var text = textEl.value.trim();
     if (!text) {
       toast("Task needs text");
@@ -1793,7 +1792,7 @@
       toast("invalid date");
       return;
     }
-    var deadline = resolveDeadline(selectEl.value, date, now);
+    var deadline = resolveDeadline(setChosenTime(now), date, now);
     if (deadline.getTime() - now.getTime() < MIN_LEAD_MS) {
       toast("refreshed");
       render();
@@ -2532,23 +2531,11 @@
     var task = findTask(id);
     var wrap = el("div", "task-edit-rows");
     var row = el("div", "task-time-edit");
-    var opts = dropdownOptions(now);
-    var sel = el("select", "time-select");
-    opts.forEach(function (t) {
-      var o = el("option", "", t);
-      o.value = t;
-      sel.appendChild(o);
-    });
-    // an overdue deadline isn't on offer any more, so fall to the first slot
-    var cur = hhmm(new Date(task.deadline));
-    if (opts.indexOf(cur) === -1) {
-      cur = opts[0];
-    }
-    sel.value = cur;
-    sel.addEventListener("change", function () {
-      editTaskTime(id, sel.value);
-    });
-    row.appendChild(sel);
+    row.appendChild(buildTimeSelects(hhmm(new Date(task.deadline)),
+      function (v) {
+        if (!v) return;
+        editTaskTime(id, v);
+      }));
     row.appendChild(buildModeToggles(function () {
       var live = findTask(id);
       if (!live) return null;
@@ -2759,57 +2746,104 @@
   }
 
   /**
-   * Builds SET's dropdown options: 24 hours forward in 10-minute steps,
-   * wrapping past midnight, starting 20 to 29 minutes out. Strictly increasing
-   * in real time, so a past deadline is unreachable by construction.
-   * @param {Date} now - the reference moment.
-   * @returns {string[]} 144 clock times, "HH:MM".
+   * Builds one half of an H : M pair: a "--" placeholder, then zero-padded
+   * numbers from 0 up to `limit` in steps of `step`.
+   * @param {string} cls - a second class, naming which half this is.
+   * @param {number} limit - one past the highest value.
+   * @param {number} step - the gap between options.
+   * @param {string} value - the held value, or "".
+   * @returns {Element} the select.
    */
-  function dropdownOptions(now) {
-    var start = ceil10(addMinutes(now, 20));
-    var out = [];
-    var i;
-    for (i = 0; i < 144; i++) {
-      out.push(hhmm(addMinutes(start, i * 10)));
+  function buildTimeUnit(cls, limit, step, value) {
+    var sel = el("select", "time-select " + cls);
+    var ph = el("option", "", "--");
+    ph.value = "";
+    sel.appendChild(ph);
+    var n;
+    for (n = 0; n < limit; n += step) {
+      var o = el("option", "", pad2(n));
+      o.value = pad2(n);
+      sel.appendChild(o);
     }
-    return out;
+    sel.value = value;
+    return sel;
   }
 
   /**
-   * Builds a full-day time control: a "by" caption, then a `<select>` of 00:00
-   * through 23:50 in 10-minute steps, identical every time and unrelated to
-   * `now`. Both ACTIVATE row types and both adders route through here, so the
-   * caption reaches all four from this one place.
-   * @param {string} value - the currently selected "HH:MM", or "".
-   * @param {boolean} withPlaceholder - include a leading "--:--" option.
+   * Builds an H : M pair covering the whole day, unrelated to `now`. Both
+   * halves start at "--" when there is no time. Picking an hour fills the
+   * minutes to "00" only when they are still blank, so minutes chosen first
+   * are kept.
+   *
+   * `onChange` fires with "HH:MM" once an hour is set, or "" when the hour is
+   * cleared. A minute on its own reports nothing, because a lone minute is not
+   * a time and the callers turn every report into an undo entry.
+   * @param {string} value - the held "HH:MM", or "".
    * @param {Function} onChange - called with the new value.
-   * @returns {Element} the caption and `<select>` in their wrapper.
+   * @returns {Element} the two selects and their separator, in a wrapper.
    */
-  function buildDayTimeSelect(value, withPlaceholder, onChange) {
+  function buildTimeSelects(value, onChange) {
+    var wrap = el("div", "time-pair");
+    var parts = String(value || "").split(":");
+    var hSel = buildTimeUnit("hour-select", 24, 1, parts[0] || "");
+    var mSel = buildTimeUnit("min-select", 60, 10, parts[1] || "");
+    /**
+     * Reports the pair's combined value, or "" when no hour is set.
+     */
+    function report() {
+      if (!hSel.value) {
+        onChange("");
+        return;
+      }
+      onChange(hSel.value + ":" + mSel.value);
+    }
+    hSel.addEventListener("change", function () {
+      if (hSel.value && !mSel.value) {
+        mSel.value = "00";
+      }
+      report();
+    });
+    mSel.addEventListener("change", function () {
+      if (!hSel.value) return;
+      report();
+    });
+    wrap.appendChild(hSel);
+    wrap.appendChild(el("span", "time-colon", ":"));
+    wrap.appendChild(mSel);
+    return wrap;
+  }
+
+  /**
+   * The same pair behind a "by" caption
+   * @param {string} value - the held "HH:MM", or "".
+   * @param {Function} onChange - called with the new value.
+   * @returns {Element} the caption and the pair in their wrapper.
+   */
+  function buildByTime(value, onChange) {
     var wrap = el("div", "field-pair");
     wrap.appendChild(el("span", "field-label", "by"));
-    var sel = el("select", "time-select");
-    if (withPlaceholder) {
-      var ph = el("option", "", "--:--");
-      ph.value = "";
-      sel.appendChild(ph);
-    }
-    var h;
-    var m;
-    for (h = 0; h < 24; h++) {
-      for (m = 0; m < 60; m += 10) {
-        var t = pad2(h) + ":" + pad2(m);
-        var o = el("option", "", t);
-        o.value = t;
-        sel.appendChild(o);
+    wrap.appendChild(buildTimeSelects(value, onChange));
+    return wrap;
+  }
+
+  /**
+   * The clock time SET is working with: the draft's, or the next 10-minute mark
+   * past the 20-minute floor. Both the dropdown and the submit read this.
+   * @param {Date} now - the reference moment.
+   * @returns {string} a clock time, "HH:MM".
+   */
+  function setChosenTime(now) {
+    var held = state.setDraft.time;
+    if (held) {
+      if (state.setDraft.date) {
+        return held;
+      }
+      var lead = resolveClockTime(held, now).getTime() - now.getTime();
+      if (lead >= MIN_LEAD_MS) {
+        return held;
       }
     }
-    sel.value = value;
-    sel.addEventListener("change", function () {
-      onChange(sel.value);
-    });
-    wrap.appendChild(sel);
-    return wrap;
+    return hhmm(ceil10(addMinutes(now, 20)));
   }
 
   /**
@@ -2886,26 +2920,8 @@
     textRow.appendChild(input);
     card.appendChild(textRow);
 
-    // Resolved before the buttons are built: the dropdown's value is what
-    // lights a time button, so a button is lit only while it agrees with the
-    // dropdown, and nothing is lit when the dropdown holds some other time.
-    var opts = dropdownOptions(now);
-    // A draft time under the 20-minute floor silently lands on the first
-    // available option, leaving text and WL/HL intact. The floor is measured
-    // against today only, so a date being held exempts the draft time from it -
-    // 07:00 is long past by 14:00, but 07:00 three days out plainly isn't.
-    var chosen = opts[0];
-    if (state.setDraft.time && opts.indexOf(state.setDraft.time) !== -1) {
-      if (state.setDraft.date) {
-        chosen = state.setDraft.time;
-      } else {
-        var lead = resolveClockTime(state.setDraft.time, now).getTime() -
-          now.getTime();
-        if (lead >= MIN_LEAD_MS) {
-          chosen = state.setDraft.time;
-        }
-      }
-    }
+    // a time button lights only while it agrees with the pair
+    var chosen = setChosenTime(now);
 
     var btnRow = el("div", "time-btns");
     btnRow.appendChild(el("span", "time-btns-label", "by"));
@@ -2924,19 +2940,11 @@
 
     var selRow = el("div", "set-select-row");
     selRow.appendChild(el("span", "set-select-label", "or select"));
-    var sel = el("select", "set-select");
-    sel.id = "setSelect";
-    opts.forEach(function (t) {
-      var o = el("option", "", t);
-      o.value = t;
-      sel.appendChild(o);
-    });
-    sel.value = chosen;
-    sel.addEventListener("change", function () {
-      writeSetDraft("time", sel.value);
+    selRow.appendChild(buildTimeSelects(chosen, function (v) {
+      if (!v) return;
+      writeSetDraft("time", v);
       render();
-    });
-    selRow.appendChild(sel);
+    }));
     card.appendChild(selRow);
 
     // an independent control, not a modifier on the two above it: with no date
@@ -3092,7 +3100,7 @@
       }
     }
     var controls = el("div", "tpl-controls");
-    controls.appendChild(buildDayTimeSelect(r.time || "", true, function (v) {
+    controls.appendChild(buildByTime(r.time || "", function (v) {
       editRow(kind, id, "time", v);
     }));
     // only `others` splits; dailies doesn't split line
@@ -3149,7 +3157,7 @@
       input.placeholder = "Add daily...";
     }
     var controls = el("div", "tpl-controls");
-    var sel = buildDayTimeSelect(draft.time, true, function (v) {
+    var sel = buildByTime(draft.time, function (v) {
       draft.time = v;
       refresh();
     });

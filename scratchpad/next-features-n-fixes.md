@@ -321,46 +321,49 @@ A third leniency setting beside WL and HL, on the same row: **CL**, custom lenie
 **Undecided:** CL strictly dominates DOLI. DOLI's 12 points cost a deadline and a -6 downside; CL's 12 points cost typing `12`. More broadly it is an unbounded self-award available on any task, so it undercuts the whole scoring economy rather than just DOLI. No limiter has been chosen.
 
 ### [i45] Queue ⬜ 🔴
-last consolidated: none
+last consolidated: 26-09-05
 
-Update 26-08-30:  
-New section named Queue. It goes after Set. (small caps like the others). colour is red. text only. swipe left (from right to left) to "prefill SET", with only the text, no times or anything else.
+**ACTIVATE (others) becomes ACTIVATE (QUEUE).** No new section is added — the existing one is repurposed. Manual ordering was the only thing a separate Queue would have had that others lacked, and others has it now.
 
-Queue is manually ordered with the same ▲▼ chevrons as ACTIVATE (others).
+**The line.** A divider inside the section. Rows above it are the **active queue**; rows below it are the **inactive queue**, greyed the way a `further` active task is. The greying is purely visual — every action still works on an inactive-queue row. Moving a row across the line is how it joins or leaves the active queue.
 
-Update 26-08-30:  
-queue must be collapsible
+**Row colours.** A row in the queue takes a red border. A row currently out as a task keeps its blue text. The section's own border stays indigo.
 
-Update 26-09-03:  
-- if an item from queue is canceled it should go back into queue into the position it was from
-- actually nvm on the prefill SET thing. we might as well give each one its own stuff exactly the same as "activate others" so this is literally just others templates BUT non recurring... or not necessarily recurring...? lol. idk. or maybe I should be using others templates as queue now that I can order it anyway... man idk anymore
+**Ordering is by drag.** The ▲▼ chevrons are replaced by a `Move ↕` handle — touching it starts a vertical drag, and the rest of the row keeps its swipe actions. **Long-pressing the handle** opens a position picker: a native `<select>` of positions 1 to n, which renders as a popup on mobile.
 
-Update 26-09-03:  
-maybe I should revamp "others" entirely into "queue" and then instead label items recurring or not, somehow, and maybe recurring items have some kind of flag (like icon) on the item
+**Every row carries its position number**, always shown, to the left of the row and **outside** its box, so the boxes' left border shifts right slightly. Small, vertically centred against the row, sized and coloured like the `by` / `on` labels.
 
-items marked recurring:
-- on cancel OR completion: returns to list
+**Rows are marked recurring or not**, shown by an icon on the row.
+- **Recurring** — completing sends it to the inactive queue. Cancelling returns it to the position it came from.
+- **Not recurring** — completing **deletes it outright**. Cancelling returns it to the position it came from *and* applies the 36h cooldown; tracking one-shots in the queue is largely what buys that.
 
-items not marked recurring:
-- returns to list on cancel BUT completing it removes from list. oh man that means we should probably nvm on the thing that "removes failed vs cancel" or whatever.
+**A new row is added at the bottom of the active queue.**
 
-Update 26-09-04:  
-holding down on either button should open a list of positions 1 to n, and also (like, always on) all items will gain a number on the left side. small number. maybe around the size of the word "by / on" and it's the same grey colour too.
+**The section is collapsible.**
 
-oh right the number should be OUTSIDE the box. so the boxes' left border is shifted right very slightly. just a lil bit. also the number is uhhh center aligned (vertically) to the item.
+**"Fail" is a misnomer and needs renaming.** It means *completed, too late to score* — the item was done. It therefore belongs on the complete path, and [i33]'s plan to collapse it into cancel is wrong.
 
-also this is only for "activate others" (which might become activate (queue) or smth soon)
-
-Update 26-09-04:  
-THE LINE. I FIGURED OUT HOW TO MAKE THE OTHERS CATEGORY REPURPOSED INTO THE QUEUE. THE *LINE*. WE NEED A LINE WHERE EVERYTHING BELOW IT IS GREYED OUT LIKE ACTIVE TASKS' "FURTHER" STUFF. AND THEN STUFF ABOVE THE LINE IS IN THE QUEUE AND STUFF BELOW *ISNT*. ALSO WE NEED DRAG POSITIONING. WE'RE GONNA CHANGE THE CHEVRON BUTTONS TO A DRAG BUTTON.
-
-two options I'm not sure which is easier:
-- the button is the draggable area; the rest of the item is for swipe actions. any touch on the button (which will say "Move |" instead) (with | being vertical version of <-> arrow) will be a vertical  drag action.
-- the button is a toggle which highlights the item and turns the whole thing draggable, overriding the swipes until turned off
-
-The numbers from the update above survive; the chevrons they hung off do not. **Undecided:** where the position picker lives, the hamburger being the candidate.
+**Undecided:**
+- Whether the section reads **QUEUE** or **QUEUED**.
+- Whether a completed **recurring** row lands at the **top or the bottom** of the inactive queue.
+- **What the recurring icon is.**
+- **What replaces the word "fail".**
+- **How the line is stored.** Either an index — `state.others` stays a clean array of rows, but the count is a second source of truth every mutation has to maintain — or a sentinel object sitting in the array at the divide, which makes position the only source of truth and gives a draggable line for free, at the cost of a skip in `sortedOthers`, `buildOthers`, `addRow`, and a `normalise()` rule guaranteeing exactly one. A per-row boolean is **not** an option: it breaks the premise, since position is what defines membership and a flag lets `false` rows sit above `true` ones with no line to draw.
 
 
+Update 26-09-06:  
+- nvm on several features
+- nvm the numbers 
+- nvm the jump to position thing (can't decide how to UI anyway)
+- queue is just anything above the line is red and anything below isnt. 
+- actually no wait. there's the Move | button, but also 1 chevron to the left of it, ...oh gods im not sure if there will be room for it TwT we're so running out of space.... y'know what, the WL/HL buttons can afford to be smaller!! there's a heckton of margin on those things! 
+- anyway. so eventually it will look like 
+[WL] [HL] [MT] (<left vs right align>) [^/v] [Move |] [hambugu]
+- the chevron button is only 1 bcuz it either moves it into or out of queue. 
+- actually I'm debating on the move dragger... maybe we only need "move to top of queue" or "move to bottom of queue"...? idk
+- wait no just, let's go with just like, simplest path... repurpose existing chevron buttons. now there's essentially two hamburger menus but the other one is specifically for queue positions. so the chevron buttons become. [X][Y] where X is either up or down depending on whether item is in queue (point down for move out of queue) or vice versa. Y is the queue position menu but I'm not sure of the symbol yet... honestly might just use literal Q lol. opens a menu that says "move to top of queue" "move to bottom of queue" "..... wait no that's not the idea. hold on. what am I doing. no.
+- no we need to keep both chevron buttons for fine positioning (I don't want the drag anymore) and then we're bringing back the numbers but also the menu thing is actually gonna  just be from long press on the chevron buttons and... 
+- OH MY GODS FORGET ALL OF THAT CAN WE ADD LIKE. PURE CSS LOGIC. ZERO BUTTON CHANGES. JUST THE DIVIDER LINE AND THE LOGIC OF "ABOVE LINE IS RED, BELOW LINE IS GREY"
 
 ## Aulists
 
