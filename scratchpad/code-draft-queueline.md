@@ -6,7 +6,7 @@ The line is **a fake item sitting in `state.others`** at the divide, so position
 
 ## Open, decide while reading
 
-1. **Where the line lands for data that has no line yet.** Written below as **the top**, so nothing is in the queue until you deliberately move it up. The alternative is the bottom, which puts every row you already have into the queue at once, all red.
+1. **Where the line lands for data that has no line yet.** Settled: **the bottom**, so every row you already have starts in the queue, all red.
 2. **The out-group still hoists above everything.** Rows whose task is currently out sort to the top of the section by deadline, which means one can appear above the line while sitting below it in the array. They are already visually distinct (blue text), so this is left alone rather than reworked — but it does mean the visual order and the array order disagree for those rows.
 3. Greying is `.task-further`'s exact treatment — the same dimming, the same softened border, and `--muted` text — since the rows below the line stay fully interactive and anything heavier would read as disabled.
 4. Red is `--c-red` at the same 55% mix the other row borders use.
@@ -40,9 +40,7 @@ Added — placed above `el` so the storage helpers below can reach it:
 
 ```js
   /**
-   * The queue line: a fake entry in `state.others` marking where the queue
-   * ends. Position is the only source of truth, so nothing has to be kept in
-   * step when rows move.
+   * The queue line: a fake entry in `state.others`; marks where queue ends
    * @returns {Object} a fresh line entry.
    */
   function lineRow() {
@@ -88,8 +86,8 @@ Added — as a sibling of `normalise`, above it:
 ```js
   /**
    * Guarantees exactly one line in an `others` array: extras are dropped, and
-   * a list with none gets one at the top, so nothing is in the queue until it
-   * is deliberately moved up.
+   * a list with none gets one at the bottom, so existing rows all start in the
+   * queue.
    * @param {Object[]} rows - the parsed array.
    * @returns {Object[]} the same rows with exactly one line.
    */
@@ -99,7 +97,7 @@ Added — as a sibling of `normalise`, above it:
     });
     var at = rows.findIndex(isLine);
     if (at === -1) {
-      at = 0;
+      at = out.length;
     }
     out.splice(at, 0, lineRow());
     return out;
@@ -216,13 +214,14 @@ With:
     var r = findRow(kind, id);
     var now = getNow();
     var row = el("div", "tpl-row");
-    if (kind === "others" && rowIsOut(id)) {
-      row.classList.add("row-isout");
-    }
-    if (kind === "others" && below) {
-      row.classList.add("row-belowline");
-    } else if (kind === "others") {
-      row.classList.add("row-queued");
+    if (kind === "others") {
+      if (rowIsOut(id)) {
+        row.classList.add("row-isout");
+      } else if (below) {
+        row.classList.add("row-belowline");
+      } else {
+        row.classList.add("row-queued");
+      }
     }
 ```
 

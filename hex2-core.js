@@ -1642,7 +1642,13 @@ window.Hex2 = (function () {
     }
 
     const padBtn = document.getElementById("padtoggle");
-    let padsOn = store.get(PADS_KEY) === "1";
+    // show click pads if they're (probably) on desktop - if they have a mouse
+    // pointer.
+    const savedPads = store.get(PADS_KEY);
+    let padsOn = savedPads === "1";
+    if (savedPads === null) {
+      padsOn = window.matchMedia("(pointer: fine)").matches;
+    }
 
     // the label states what the pads are doing, not what tapping will do
     function applyPads() {
