@@ -141,6 +141,20 @@ With:
 
 > **New heading.** The sentence as it should read instead.
 
+---
+
+The last block of a code draft should be its changelog entry:
+
+---
+
+### Block 5: changelog
+
+increment: +0.0.1
+
+- The limit is 20 now instead of 10.
+
+---
+
 ## Falsedge
 
 ### [i5] DOLI (Double Or Lose It) mechanism ⬜ 🟢
