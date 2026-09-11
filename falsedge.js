@@ -2113,7 +2113,10 @@
     var dx = 0;
     var dy = 0;
     var tracking = false;
+    var axis = null;
     var THRESH = 80;
+    var DEADZONE = 10;
+    var BIAS = 1.5;
     var origBg = "";
     node.addEventListener("touchstart", function (e) {
       if (e.touches.length !== 1) return;
@@ -2122,6 +2125,7 @@
         return;
       }
       tracking = true;
+      axis = null;
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       dx = 0;
@@ -2132,43 +2136,50 @@
       if (!tracking) return;
       dx = e.touches[0].clientX - startX;
       dy = e.touches[0].clientY - startY;
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 8) {
-        node.style.transform = "translateX(" + dx * 0.5 + "px)";
-        node.style.opacity = String(Math.max(0.4, 1 - Math.abs(dx) / 300));
-        if (Math.abs(dx) > THRESH) {
-          node.style.backgroundColor =
-            "color-mix(in srgb, var(--c-green) 30%, transparent)";
-        } else {
-          node.style.backgroundColor = origBg;
+      if (!axis) {
+        if (Math.hypot(dx, dy) < DEADZONE) return;
+        if (Math.abs(dx) <= Math.abs(dy) * BIAS) {
+          tracking = false;
+          return;
         }
+        axis = "x";
       }
-    }, { passive: true });
+      // the row owns the gesture now, so the page must not scroll under it
+      e.preventDefault();
+      node.style.transform = "translateX(" + dx * 0.5 + "px)";
+      node.style.opacity = String(Math.max(0.4, 1 - Math.abs(dx) / 300));
+      if (Math.abs(dx) > THRESH) {
+        node.style.backgroundColor =
+          "color-mix(in srgb, var(--c-green) 30%, transparent)";
+      } else {
+        node.style.backgroundColor = origBg;
+      }
+    });
     node.addEventListener("touchend", function (e) {
       if (!tracking) return;
       tracking = false;
       node.style.transform = "";
       node.style.opacity = "";
       node.style.backgroundColor = origBg;
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > THRESH) {
-        // a real swipe happened: stop the underlying button's click firing
-        var btn = e.target.closest("button");
-        if (btn) {
-          var swallow = function (ev) {
-            ev.stopPropagation();
-            ev.preventDefault();
-            btn.removeEventListener("click", swallow, true);
-          };
-          btn.addEventListener("click", swallow, true);
-          setTimeout(function () {
-            btn.removeEventListener("click", swallow, true);
-          }, 350);
-        }
-        var swipeDir = "right";
-        if (dx < 0) {
-          swipeDir = "left";
-        }
-        onCommit(swipeDir);
+      if (axis !== "x" || Math.abs(dx) <= THRESH) return;
+      // a real swipe happened: stop the underlying button's click firing
+      var btn = e.target.closest("button");
+      if (btn) {
+        var swallow = function (ev) {
+          ev.stopPropagation();
+          ev.preventDefault();
+          btn.removeEventListener("click", swallow, true);
+        };
+        btn.addEventListener("click", swallow, true);
+        setTimeout(function () {
+          btn.removeEventListener("click", swallow, true);
+        }, 350);
       }
+      var swipeDir = "right";
+      if (dx < 0) {
+        swipeDir = "left";
+      }
+      onCommit(swipeDir);
     });
   }
 

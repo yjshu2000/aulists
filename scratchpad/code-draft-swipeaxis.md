@@ -142,8 +142,6 @@ With:
       if (!tracking) return;
       dx = e.touches[0].clientX - startX;
       dy = e.touches[0].clientY - startY;
-      // Decided once, while the path and the offset still agree. Left alone
-      // for the rest of the gesture, however far it wanders back.
       if (!axis) {
         if (Math.hypot(dx, dy) < DEADZONE) return;
         if (Math.abs(dx) <= Math.abs(dy) * BIAS) {
@@ -198,4 +196,4 @@ With:
 
 increment: +0.0.1
 
-- A row decides in the first few pixels whether you are swiping it or scrolling the page, and sticks with that for the rest of the gesture. Scrolling down the list and back up leaves rows alone.
+- fix stupid scroll bug (vertical scrolling kept wrongly triggering horizontal swipes)

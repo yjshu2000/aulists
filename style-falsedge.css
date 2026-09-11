@@ -588,6 +588,7 @@
     border-radius: 10px;
     background: var(--panel-2);
     border: 1px solid color-mix(in srgb, var(--glow) 55%, var(--line-soft));
+    touch-action: pan-y;
   }
   /* the gap has to clear the inline editor's border too, not just the text -
      editing is where the two rows used to visibly collide */

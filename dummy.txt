@@ -1,0 +1,3 @@
+rewind test file
+created 2026-09-11 02:06
+if this file is back after a rewind, rewind covers bash rm
