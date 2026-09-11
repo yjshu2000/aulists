@@ -1349,9 +1349,14 @@
   /**
    * The red indicator's text, worked out fresh at every draw.
    * @param {Date} now - the reference moment.
-   * @returns {string} the text, or "" when nothing is provisionally lapsed.
+   * @returns {string} the text, or "" when the streak is neither broken nor
+   *   provisionally lapsed.
    */
   function streakIndicatorText(now) {
+    var left = lockdownLeft(now);
+    if (left > 0) {
+      return "streak broken. (" + Math.floor(left / (60 * 60 * 1000)) + "h)";
+    }
     var tentative = streakStatus(now).tentative;
     if (!tentative.length) {
       return "";
@@ -1982,10 +1987,10 @@
   }
 
   /**
-   * The array index a chevron would move a row to: the nearest neighbour in
-   * that direction that is not currently out as a task. Rows that are out sit
-   * in their own deadline-sorted group, so swapping with one would move
-   * nothing anybody can see.
+   * The array index Shift up / Shift down would move a row to: the nearest
+   * neighbour in that direction that is not currently out as a task. Rows
+   * that are out sit in their own deadline-sorted group, so swapping with one
+   * would move nothing anybody can see.
    * @param {string} id - the row id.
    * @param {number} delta - -1 for up, +1 for down.
    * @returns {number} the target index, or -1 when there is nowhere to go.
@@ -2017,6 +2022,40 @@
     var moved = state.others[at];
     state.others[at] = state.others[to];
     state.others[to] = moved;
+    save();
+    render();
+  }
+
+  /**
+   * @param {string} id - the row id.
+   * @param {string} end - "top" or "bottom".
+   * @returns {boolean} true when the row already sits at that end.
+   */
+  function rowAtEnd(id, end) {
+    var at = indexOfRow("others", id);
+    if (at === -1) return true;
+    if (end === "bottom") {
+      return at === state.others.length - 1;
+    }
+    return at === 0;
+  }
+
+  /**
+   * Sends an `others` row to one end of the list.
+   * @param {string} id - the row id.
+   * @param {string} end - "top" for the head of the queue, "bottom" for the
+   *   last place below the line.
+   */
+  function moveRowToEnd(id, end) {
+    if (rowAtEnd(id, end)) return;
+    var at = indexOfRow("others", id);
+    pushUndo("move row");
+    var moved = state.others.splice(at, 1)[0];
+    if (end === "bottom") {
+      state.others.push(moved);
+    } else {
+      state.others.unshift(moved);
+    }
     save();
     render();
   }
@@ -3106,6 +3145,15 @@
       menu.appendChild(pre);
 
       if (kind === "others") {
+        [["Shift up", -1], ["Shift down", 1]].forEach(function (spec) {
+          var s = el("button", "", spec[0]);
+          s.addEventListener("click", function () {
+            closeAllMenus();
+            moveRow(id, spec[1]);
+          });
+          menu.appendChild(s);
+        });
+
         var clr = el("button", "", "Clear datetime");
         clr.addEventListener("click", function () {
           closeAllMenus();
@@ -3147,21 +3195,23 @@
   }
 
   /**
-   * Builds the up/down chevrons that move an `others` row inside the manual
-   * group. Each press moves it one visible place. Items at the top/bottom
-   * boundary have their chev greyed out.
+   * Builds the chevrons that throw an `others` row to one end of the list.
+   * Greyed only on the row already at that end.
    * @param {string} id - the row id.
    * @returns {Element} the chevron pair in their wrapper.
    */
   function buildRowChevrons(id) {
     var wrap = el("div", "row-chevs");
-    var specs = [["▲", -1, "Move up"], ["▼", 1, "Move down"]];
+    var specs = [
+      ["▲", "top", "Move to top of queue"],
+      ["▼", "bottom", "Move to bottom"]
+    ];
     specs.forEach(function (spec) {
       var b = el("button", "mini", spec[0]);
       b.setAttribute("aria-label", spec[2]);
-      b.disabled = moveTargetIndex(id, spec[1]) === -1;
+      b.disabled = rowAtEnd(id, spec[1]);
       b.addEventListener("click", function () {
-        moveRow(id, spec[1]);
+        moveRowToEnd(id, spec[1]);
       });
       wrap.appendChild(b);
     });
