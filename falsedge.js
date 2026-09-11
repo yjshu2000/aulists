@@ -294,6 +294,22 @@
   }
 
   /**
+   * The queue line: a fake entry in `state.others`; marks where queue ends
+   * @returns {Object} a fresh line entry.
+   */
+  function lineRow() {
+    return { line: true };
+  }
+
+  /**
+   * @param {*} r - an entry from `state.others`.
+   * @returns {boolean} true when it is the line rather than a row.
+   */
+  function isLine(r) {
+    return !!r && r.line === true;
+  }
+
+  /**
    * Creates an element with an optional class and text content.
    * @param {string} tag - the tag name.
    * @param {string} [cls] - a class name (or a space-separated list).
@@ -341,7 +357,7 @@
       ledger: [],
       activeTasks: [],
       templates: [],
-      others: [],
+      others: [lineRow()],
       setDraft: { text: "", time: null, mode: null, date: "" },
       spendDraft: { text: "", cost: null, count: null, date: "" },
       spendCostCounts: {},
@@ -351,6 +367,25 @@
       lastOtherAt: null,
       lockdownEnd: null
     };
+  }
+
+  /**
+   * Guarantees exactly one line in an `others` array: extras are dropped, and
+   * a list with none gets one at the bottom, so existing rows all start in the
+   * queue.
+   * @param {Object[]} rows - the parsed array.
+   * @returns {Object[]} the same rows with exactly one line.
+   */
+  function withOneLine(rows) {
+    var out = rows.filter(function (r) {
+      return !isLine(r);
+    });
+    var at = rows.findIndex(isLine);
+    if (at === -1) {
+      at = out.length;
+    }
+    out.splice(at, 0, lineRow());
+    return out;
   }
 
   /**
@@ -371,7 +406,7 @@
     if (Array.isArray(raw.ledger)) s.ledger = raw.ledger;
     if (Array.isArray(raw.activeTasks)) s.activeTasks = raw.activeTasks;
     if (Array.isArray(raw.templates)) s.templates = raw.templates;
-    if (Array.isArray(raw.others)) s.others = raw.others;
+    if (Array.isArray(raw.others)) s.others = withOneLine(raw.others);
     if (raw.setDraft && typeof raw.setDraft === "object") {
       if (typeof raw.setDraft.text === "string") {
         s.setDraft.text = raw.setDraft.text;
@@ -903,7 +938,7 @@
     var out = [];
     var manual = [];
     state.others.forEach(function (r) {
-      if (rowIsOut(r.id)) {
+      if (!isLine(r) && rowIsOut(r.id)) {
         out.push(r);
       } else {
         manual.push(r);
@@ -1873,7 +1908,7 @@
     if (kind === "dailies" && !draft.time) return;
     pushUndo("add " + kind + " row");
     if (kind === "others") {
-      state.others.push({
+      state.others.splice(state.others.findIndex(isLine), 0, {
         id: uid(),
         text: text,
         time: draft.time,
@@ -1960,7 +1995,7 @@
     if (at === -1) return -1;
     var to = at + delta;
     while (to >= 0 && to < state.others.length &&
-      rowIsOut(state.others[to].id)) {
+      !isLine(state.others[to]) && rowIsOut(state.others[to].id)) {
       to = to + delta;
     }
     if (to < 0 || to >= state.others.length) return -1;
@@ -3143,12 +3178,18 @@
    * @param {string} id - the row id.
    * @returns {Element} the row.
    */
-  function buildRow(kind, id) {
+  function buildRow(kind, id, below) {
     var r = findRow(kind, id);
     var now = getNow();
     var row = el("div", "tpl-row");
-    if (kind === "others" && rowIsOut(id)) {
-      row.classList.add("row-isout");
+    if (kind === "others") {
+      if (rowIsOut(id)) {
+        row.classList.add("row-isout");
+      } else if (below) {
+        row.classList.add("row-belowline");
+      } else {
+        row.classList.add("row-queued");
+      }
     }
     row.appendChild(el("div", "tpl-text", r.text));
     if (kind === "others") {
@@ -3298,8 +3339,14 @@
     var section = buildSection("ACTIVATE (others)", "othersCard",
       "sec-others");
     var list = el("div", "tpl-list");
+    var below = false;
     sortedOthers().forEach(function (r) {
-      list.appendChild(buildRow("others", r.id));
+      if (isLine(r)) {
+        below = true;
+        list.appendChild(el("div", "queue-line"));
+        return;
+      }
+      list.appendChild(buildRow("others", r.id, below));
     });
     section.card.appendChild(list);
     section.card.appendChild(buildAdder("others"));

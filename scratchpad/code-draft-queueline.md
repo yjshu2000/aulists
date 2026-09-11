@@ -14,7 +14,7 @@ The line is **a fake item sitting in `state.others`** at the divide, so position
 
 ---
 
-### Block 1: Replace [falsedge.js line 344](../falsedge.js#L344)
+### Block 1: Replace [falsedge.js line 360](../falsedge.js#L360)
 
 ```js
       others: [],
@@ -28,7 +28,7 @@ With:
 
 ---
 
-### Block 2: Add at [falsedge.js line 295](../falsedge.js#L295)
+### Block 2: Add at [falsedge.js line 296](../falsedge.js#L296)
 
 Just prior:
 
@@ -59,7 +59,7 @@ Added — placed above `el` so the storage helpers below can reach it:
 
 ---
 
-### Block 3: Replace [falsedge.js line 374](../falsedge.js#L374)
+### Block 3: Replace [falsedge.js line 409](../falsedge.js#L409)
 
 ```js
     if (Array.isArray(raw.others)) s.others = raw.others;
@@ -73,7 +73,7 @@ With:
 
 ---
 
-### Block 4: Add at [falsedge.js line 375](../falsedge.js#L375)
+### Block 4: Add at [falsedge.js line 372](../falsedge.js#L372)
 
 Just prior:
 
@@ -107,7 +107,7 @@ Added — as a sibling of `normalise`, above it:
 
 ---
 
-### Block 5: Replace [falsedge.js lines 901-918](../falsedge.js#L901-L918)
+### Block 5: Replace [falsedge.js lines 937-954](../falsedge.js#L937-L954)
 
 ```js
   function sortedOthers() {
@@ -155,7 +155,7 @@ With:
 
 ---
 
-### Block 6: Replace [falsedge.js lines 3229-3239](../falsedge.js#L3229-L3239)
+### Block 6: Replace [falsedge.js lines 3338-3354](../falsedge.js#L3338-L3354)
 
 ```js
   function buildOthers() {
@@ -195,7 +195,7 @@ With:
 
 ---
 
-### Block 7: Replace [falsedge.js lines 3078-3084](../falsedge.js#L3078-L3084)
+### Block 7: Replace [falsedge.js lines 3181-3193](../falsedge.js#L3181-L3193)
 
 ```js
   function buildRow(kind, id) {
@@ -227,7 +227,7 @@ With:
 
 ---
 
-### Block 8: Replace [falsedge.js line 1829](../falsedge.js#L1829)
+### Block 8: Replace [falsedge.js line 1911](../falsedge.js#L1911)
 
 ```js
       state.others.push({
@@ -241,7 +241,7 @@ With — a new row joins the queue, so it lands just above the line:
 
 ---
 
-### Block 9: Replace [falsedge.js lines 1911-1918](../falsedge.js#L1911-L1918)
+### Block 9: Replace [falsedge.js lines 1993-2000](../falsedge.js#L1993-L2000)
 
 ```js
   function moveTargetIndex(id, delta) {
@@ -269,7 +269,7 @@ With — the line is a valid thing to swap with, since that is how a row crosses
 
 ---
 
-### Block 10: Add at [style-falsedge.css line 646](../style-falsedge.css#L646)
+### Block 10: Add at [style-falsedge.css line 656](../style-falsedge.css#L656)
 
 Just prior:
 
@@ -312,4 +312,7 @@ Just after:
 
 ### Block 11: changelog
 
-A version entry for `about.html`, drafted and approved before anything is pushed.
+increment: +0.1
+
+- Queue line FINALLY ADDED to ACTIVATE (others). Rows above the line are in the queue and take a red border; rows below it grey out but still work exactly the same. Move a row across the line with the existing ▲▼ chevrons (for now) (will be changed later)
+- Existing rows all start above the line.

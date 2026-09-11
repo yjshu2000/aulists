@@ -653,6 +653,24 @@
   .row-isout .tpl-text {
     color: var(--c-sky);
   }
+  .row-queued {
+    border-color: color-mix(in srgb, var(--c-red) 55%, var(--line-soft));
+  }
+  .row-belowline {
+    opacity: .72;
+    border-color: color-mix(in srgb, var(--glow) 16%, var(--line-soft));
+  }
+  .row-belowline .tpl-text {
+    color: var(--muted);
+  }
+  .queue-line {
+    height: 1px;
+    margin: 4px 0;
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--c-red) 45%, transparent),
+      transparent);
+  }
   .tpl-adder {
     border-top: 1px solid var(--line-soft);
     margin-top: 12px;
