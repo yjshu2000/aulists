@@ -652,6 +652,7 @@
     state = JSON.parse(JSON.stringify(target));
     save();
     undoWriteWithRetry(writeUndoIndex);
+    confirmStreakBreak();
     render();
     refreshUndoRedoButtons();
     return true;
@@ -1096,12 +1097,16 @@
   }
 
   // ---------------------------------- streak ---------------------------------
-  // Auto streak breaker. Minimum 1 task of any kind in the last 24h, and min 1
-  // non-daily in the last 48h. Time checks last completion or last lockdown
-  // end. A daily resets only the 24h window; a non-daily resets both.
+  /* Auto streak breaker. Minimum 1 task of any kind in the last 24h, and min 1
+   * non-daily in the last 48h. Time checks last completion or last lockdown
+   * end. A daily resets only the 24h window; a non-daily resets both.
 
-  // What the indicator text reads. Not saved to undo/storage.
-  var streakIndicator = "";
+  THE TERM "STREAK BREAK" REFERS TO THIS SECTION AND ONLY THE FULL TERM —
+  *STREAK BREAK*. ABSOLUTELY NEVER USE JUST "BREAK" TO REFER TO ANYTHING 
+  RELATING TO STREAKS. THAT'S LIKE CALLING A SEA HORSE JUST "HORSE" DOESN'T MAKE
+  ANY FCKING SENSE YOU ASININE BOT
+  */
+
 
   /**
    * Stamps a completion onto whichever streak window the task belongs to.
@@ -1241,19 +1246,18 @@
   }
 
   /**
-   * Confirms a streak break: banks the run, zeroes `scr`, and starts the
-   * lockdown. Pushes no undo entry because that'd be stupid.
-   * @param {Date} now - the moment it is confirmed.
+   * Breaks the streak: banks the run, zeroes `scr`, starts the lockdown.
+   * Pushes no undo entry because that'd be stupid.
+   * @param {Date} now - the moment it happens.
    * @param {number[]} hours - the windows that ran out, for the announcement.
    */
-  function confirmStreakBreak(now, hours) {
+  function breakStreak(now, hours) {
     if (state.scr > 0) {
       insertHighScore(state.scr, dayKey(now));
     }
     state.scr = 0;
     state.lockdownEnd =
       new Date(now.getTime() + STREAK_LOCKDOWN_MS).toISOString();
-    streakIndicator = "";
     save();
     var msg = "streak broke";
     if (hours.length) {
@@ -1263,32 +1267,75 @@
   }
 
   /**
-   * Re-evaluates both streak windows. Runs on every resolve.
-   * No undo OBVIOUSLY because tIME ISN'T UNDOABLE. this line is only here 
-   * bcuz claude is a fCKING IDIOT WHO THINKS UNDO MEANS TIME TRAVELING. 
+   * Whether a completion feeds one streak window at all. A daily never feeds
+   * the 48h window.
+   * @param {string} type - "any" or "other".
+   * @param {boolean} daily - whether the completed task was a daily.
+   * @returns {boolean} true if the completion counts toward that window.
    */
-  function checkStreak() {
-    var now = getNow();
-    var confirmed = [];
-    var tentative = [];
+  function completionFeeds(type, daily) {
+    if (type === "other" && daily) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Both streak windows' standing, pure so the renderer can ask freely.
+   * @param {Date} now - the reference moment.
+   * @param {{when: Date, daily: boolean}} [cover] - a completion being
+   *   recorded; a window it lands inside is dropped.
+   * @returns {{confirmed: number[], tentative: number[]}} the lapsed windows,
+   *   split by whether an unresolved task could still cover them.
+   */
+  function streakStatus(now, cover) {
+    var out = { confirmed: [], tentative: [] };
     lapsedStreakWindows(now).forEach(function (hours) {
       var type = "other";
       if (hours === 24) {
         type = "any";
       }
-      if (windowCoverable(type, streakWindow(type))) {
-        tentative.push(hours);
-      } else {
-        confirmed.push(hours);
+      var win = streakWindow(type);
+      if (cover && completionFeeds(type, cover.daily)) {
+        var t = cover.when.getTime();
+        if (t >= win.from && t <= win.to) {
+          return;
+        }
       }
+      if (windowCoverable(type, win)) {
+        out.tentative.push(hours);
+        return;
+      }
+      out.confirmed.push(hours);
     });
-    if (confirmed.length) {
-      confirmStreakBreak(now, confirmed);
-      return;
+    return out;
+  }
+
+  /**
+   * The red indicator's text, worked out fresh at every draw.
+   * @param {Date} now - the reference moment.
+   * @returns {string} the text, or "" when nothing is provisionally lapsed.
+   */
+  function streakIndicatorText(now) {
+    var tentative = streakStatus(now).tentative;
+    if (!tentative.length) {
+      return "";
     }
-    streakIndicator = "";
-    if (tentative.length) {
-      streakIndicator = "streak broke? (" + tentative.join(", ") + ")";
+    return "streak broke? (" + tentative.join(", ") + ")";
+  }
+
+  /**
+   * Breaks the streak if a lapsed window is past covering.
+   * No undo OBVIOUSLY because tIME ISN'T UNDOABLE. this line is only here
+   * bcuz claude is a fCKING IDIOT WHO THINKS UNDO CAN MEAN TIME TRAVELING.
+   * @param {{when: Date, daily: boolean}} [cover] - a completion being
+   *   recorded, whose stamp has not moved the windows yet.
+   */
+  function confirmStreakBreak(cover) {
+    var now = getNow();
+    var confirmed = streakStatus(now, cover).confirmed;
+    if (confirmed.length) {
+      breakStreak(now, confirmed);
     }
   }
 
@@ -1320,7 +1367,7 @@
       return;
     }
     pushUndo("streak broke");
-    confirmStreakBreak(getNow(), []);
+    breakStreak(getNow(), []);
     render();
   }
 
@@ -1508,15 +1555,16 @@
       row.cooldownUntil =
         new Date(getNow().getTime() + COOLDOWN_MS).toISOString();
     }
-    if (kind === "complete") {
-      recordCompletion(task, when);
-    }
     var at = indexOfTask(id);
     if (at !== -1) {
       state.activeTasks.splice(at, 1);
     }
+    if (kind === "complete") {
+      confirmStreakBreak({ when: when, daily: task.daily === true });
+      recordCompletion(task, when);
+    }
     save();
-    checkStreak();
+    confirmStreakBreak();
     render();
   }
 
@@ -2412,8 +2460,9 @@
       render();
     });
     wrap.appendChild(scrBox);
-    if (streakIndicator) {
-      wrap.appendChild(el("div", "streak-indicator", streakIndicator));
+    var indicator = streakIndicatorText(getNow());
+    if (indicator) {
+      wrap.appendChild(el("div", "streak-indicator", indicator));
     }
     return wrap;
   }
@@ -3350,13 +3399,13 @@
     if (document.hidden) {
       return;
     }
-    checkStreak();
+    confirmStreakBreak();
     render();
     refreshUndoRedoButtons();
   });
 
   loadUndoRing();
-  checkStreak();
+  confirmStreakBreak();
   render();
   refreshUndoRedoButtons();
 })();
