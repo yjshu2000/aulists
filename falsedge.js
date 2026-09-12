@@ -27,7 +27,7 @@
   // ML = mega leniency (not built yet)
   var WL_OFFSETS = [0, 10, 30, 60];
   var HL_OFFSETS = [0, 5, 15, 30];
-  var DAY_ABBR = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+  var DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   // the active-task stack walks the page ramp's blue stretch backwards
   var TASK_HUE_SOONEST = 224;
@@ -2734,13 +2734,11 @@
         if (i === live) {
           cls = "tier tier-live";
         }
-        // a further task's clock time alone is ambiguous - which TU is it?
         var line = el("div", cls);
         line.appendChild(document.createTextNode("by " + hhmm(tier.at)));
         if (further) {
-          line.appendChild(document.createTextNode(" "));
-          line.appendChild(el("span", "day-tag",
-            "(" + DAY_ABBR[tier.at.getDay()] + ")"));
+          line.appendChild(document.createTextNode(
+            " (" + DAY_ABBR[tier.at.getDay()] + ")"));
         }
         line.appendChild(document.createTextNode(" for " + tier.pts + " pts"));
         tierWrap.appendChild(line);

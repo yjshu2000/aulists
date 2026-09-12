@@ -4,6 +4,7 @@
     - [Block 2: Remove foo.js lines 55-57](#block-2-remove-foojs-lines-55-57)
     - [Block 3: Add at foo.js line 88](#block-3-add-at-foojs-line-88)
     - [Block 4: Replace bar.md line 12](#block-4-replace-barmd-line-12)
+    - [Block 5: changelog](#block-5-changelog)
   - [Falsedge](#falsedge)
     - [\[i5\] DOLI (Double Or Lose It) mechanism ⬜ 🟢](#i5-doli-double-or-lose-it-mechanism--)
     - [\[i14\] Complex tasks ⬜](#i14-complex-tasks-)
@@ -15,10 +16,10 @@
     - [\[i19\] Delete individual ledger entries ⚪ 🟡](#i19-delete-individual-ledger-entries--)
     - [\[i21\] Daily score chart ⬜ 🟡](#i21-daily-score-chart--)
     - [\[i26\] Export all app data ⚪ 🔴](#i26-export-all-app-data--)
-    - [\[i33\] Kill the failed path ⚪](#i33-kill-the-failed-path-)
-    - [\[i34\] Streak break condition ⬜ 🟠](#i34-streak-break-condition--)
+    - [\[i33\] Rename the failed path ⚪](#i33-rename-the-failed-path-)
     - [\[i35\] Custom tasks (CL) ⬜](#i35-custom-tasks-cl-)
     - [\[i45\] Queue ⬜ 🔴](#i45-queue--)
+    - [\[i47\] new 0.1 pts scoring ▫️ 🟡](#i47-new-01-pts-scoring--)
   - [Aulists](#aulists)
     - [\[i15\] Tear down and rebuild Aulists ⬜ 🟡](#i15-tear-down-and-rebuild-aulists--)
   - [Hex 2^](#hex-2)
@@ -53,7 +54,7 @@
 
 **D6. The bracketed `iN` labels are IDs and nothing else.** Not priority, not chronological, not an ordering — nothing carries any of that, much less the ID. An ID is assigned once and never changes: items keep theirs when reordered or moved between sections, and a deleted item's ID is retired rather than reused. Gaps in the sequence are normal and expected. Sub-items are `iN.1`, `iN.2`, … numbered from `.1`, as `####` headings under their parent, and follow the same rules.
 ```
-LAST USED ID: i46
+LAST USED ID: i47
 (update this with every new item)
 ```
 
@@ -236,6 +237,10 @@ Keeping only the "NL" and 1 pt part, the rest of the task looks exactly the same
 
 ...actually no wait now I can't decide if I want this to be "2 pts / 1 pts leniency" but idk what I'd call that... ugh.
 
+update 26-09-01
+
+2 pts at deadline. 1 pts for 1h late. the button is changed from NL to MT (micro task). also, is there still a comment somewhere about ML (mega leniency)? get rid of that... delete that and update with the new MT.
+
 #### [i14.4] Tasks with secondary/minor (name/vocab uncertain) tasks ⬜
 last consolidated: 26-08-26
 
@@ -290,35 +295,11 @@ A full Falsedge state export — templates, ledger, points, scores, the lot — 
 
 Aulists already has exactly this and is the model to copy: `exportJSON()` (`JSON.stringify(state, null, 2)`), an export-to-textarea button, an export-to-file button, `importFromText()` behind a confirm that replaces state wholesale, and a `lastExported` stamp with a "last exported" note. Falsedge gets the same set, running through its own `normalise()` on import for the same reason Aulists does.
 
-### [i33] Kill the failed path ⚪
-last consolidated: 26-08-22
+### [i33] Rename the failed path ⚪
+last consolidated: none
 
-"Failed" stops existing. A task that runs out of road is cancelled — same state, same wording, same accounting. There is no separate outcome for *did not finish in time*.
-
-Everything branching on failed-versus-cancelled collapses to the cancel path. `lastDone` does not need that precision.
-
-**Undecided:** whether the ledger keeps any trace that a cancellation happened at a deadline rather than by hand.
-
-### [i34] Streak break condition ⬜ 🟠
-last consolidated: 26-08-22
-
-**The condition.** The streak breaks when 48 hours pass with nothing completed. Measured against the completion time *recorded on the task*, so a backdated "completed before" counts at its stated time, not at the moment the button was pressed. Exact 48h granularity, never calendar days: if the last completion was Monday 08:00, a task backdated to Wednesday 10:00 does not save it.
-
-**It stays tentative until resolved.** Because tasks can be backdated, a lapsed window is only provisionally broken. While tasks still exist that could cover the gap, the UI shows `streak broke?` in red — slightly muted, not actually faint. Two ways out:
-
-- Completing or backdating any of those tasks into the window clears it and the marker disappears.
-- Cancelling all of them confirms it: `streak broke` in red at the centre of the screen — not the existing toast, its own treatment — and the score drops to zero immediately.
-
-Undoing the cancellation undoes all of it, score included.
-
-The manual streak-broke button stays. This adds the automatic path beside it, which means active further tasks can now coexist with a broken streak — previously impossible.
-
-**Vacation.** Time can be booked off, but only ahead of time, never retroactively. A vacation is date-only with no time granularity: `from` and `to` through the calendar picker, `to` defaulting to the same day, so one day is the minimum. The 48h clock restarts at 00:00 on the day after the vacation ends.
-
-**Undecided:** where the `streak broke?` marker sits on the page, and where vacations are booked from.
-
-Update 26-08-26:  
-change streak break condition to: either no dailies completed in last 24h, OR no non-dailies completed in last 48h. whichever comes first. so, it will need to track whether the last completed task was a daily or not, and ofc this still includes the tentative streak broke where no task was completed in the last (time period) BUT there are tasks that CAN be completed - tentative "streak broke?" until cleared.
+update 26-09-11:  
+changed from kill to rename. bcuz "failed" doesn't sound right but "late completion" needs better distinguishing from "late but within the leniency" vs "late and outside leniency" and we can't just call it "late and outside leniency" OBVIOUSLY we need an actual TERM HERE.
 
 ### [i35] Custom tasks (CL) ⬜
 last consolidated: 26-08-22
@@ -378,6 +359,11 @@ Update 26-09-06:
 - wait no just, let's go with just like, simplest path... repurpose existing chevron buttons. now there's essentially two hamburger menus but the other one is specifically for queue positions. so the chevron buttons become. [X][Y] where X is either up or down depending on whether item is in queue (point down for move out of queue) or vice versa. Y is the queue position menu but I'm not sure of the symbol yet... honestly might just use literal Q lol. opens a menu that says "move to top of queue" "move to bottom of queue" "..... wait no that's not the idea. hold on. what am I doing. no.
 - no we need to keep both chevron buttons for fine positioning (I don't want the drag anymore) and then we're bringing back the numbers but also the menu thing is actually gonna  just be from long press on the chevron buttons and... 
 - OH MY GODS FORGET ALL OF THAT CAN WE ADD LIKE. PURE CSS LOGIC. ZERO BUTTON CHANGES. JUST THE DIVIDER LINE AND THE LOGIC OF "ABOVE LINE IS RED, BELOW LINE IS GREY"
+
+### [i47] new 0.1 pts scoring ▫️ 🟡
+last consolidated: none
+
+ALL tasks, no matter the leniency, will award 0.1 pts on completing past the final leniency time. 
 
 ## Aulists
 

@@ -424,10 +424,6 @@
     font-size: 14px;
     color: var(--text);
   }
-  .day-tag {
-    font-size: .82em;
-    letter-spacing: .04em;
-  }
   .task-actions {
     margin-top: 10px;
   }
