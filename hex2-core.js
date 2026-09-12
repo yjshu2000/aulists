@@ -1407,9 +1407,7 @@ window.Hex2 = (function () {
 
   // --------------------------- break timer ----------------------------
   // Falsedge stamps BREAK_KEY on its way here, so the break is timed only when
-  // you arrived through that link. The stamp lives in storage rather than
-  // memory because the mode switch reloads the page - otherwise flipping
-  // Normal/Jiggly would restart the clock forever.
+  // you arrived through that link.
   const lockout = document.getElementById("lockout");
 
   const fakeAd = document.getElementById("fake-ad");
@@ -1711,8 +1709,6 @@ window.Hex2 = (function () {
       applyDim();
     }
 
-    // Walking out of the page on purpose ends the break; the mode switch
-    // reloads without touching the stamp, so it cannot be used to escape.
     function rollGolden() {
       const raw = store.get(GOLDEN_KEY);
       let end = 0;
