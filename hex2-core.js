@@ -27,6 +27,12 @@ window.Hex2 = (function () {
   const MODE_KEY = "hex2.mode";
   const BREAK_KEY = "hex2.break.start";
   const GRASS_KEY = "grass.count";
+  // Falsedge's golden hour, rolled here because leaving the game is the only
+  // way in. One key: while `now` is under it the hour runs, for an hour after
+  // that it cannot be rolled again.
+  const GOLDEN_KEY = "golden.end";
+  const GOLDEN_MS = 60 * 60 * 1000;
+  const GOLDEN_ODDS = 8;
   const UNDO_DEPTH = 6;
   const START_HEARTS = 3;
   const MAX_HEARTS = 5;
@@ -1707,10 +1713,30 @@ window.Hex2 = (function () {
 
     // Walking out of the page on purpose ends the break; the mode switch
     // reloads without touching the stamp, so it cannot be used to escape.
+    function rollGolden() {
+      const raw = store.get(GOLDEN_KEY);
+      let end = 0;
+      if (raw) {
+        end = new Date(raw).getTime();
+        if (isNaN(end)) {
+          end = 0;
+        }
+      }
+      if (Date.now() < end + GOLDEN_MS) {
+        return;
+      }
+      if (Math.floor(Math.random() * GOLDEN_ODDS) !== 0) {
+        return;
+      }
+      store.set(GOLDEN_KEY,
+        new Date(Date.now() + GOLDEN_MS).toISOString());
+    }
+
     const exits = document.querySelectorAll(".navaway");
     for (const link of exits) {
       link.addEventListener("click", function () {
         store.set(BREAK_KEY, "0");
+        rollGolden();
       });
     }
 

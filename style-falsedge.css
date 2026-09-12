@@ -472,6 +472,21 @@
     font-size: 13px;
     letter-spacing: .02em;
   }
+  /* the golden hour banner, under the scores beside the streak indicator */
+  .golden-line {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+    color: var(--c-yellow);
+    font-size: 13px;
+    letter-spacing: .02em;
+  }
+  /* the whole column glows while a golden hour runs, not one section */
+  #app.golden {
+    border-radius: var(--radius);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--c-yellow) 55%, transparent),
+      0 0 26px -4px color-mix(in srgb, var(--c-yellow) 60%, transparent);
+  }
 
   /* the streak-break announcement: the toast, red, and centred */
   .red-toast {

@@ -36,9 +36,9 @@ Just prior:
 Added:
 
 ```js
-  // Golden hour: rolled by Hex 2^ on the way out, stored under its own key so
-  // the undo ring can neither rewind nor replay it. The cooldown after one
-  // ends is the same length as the hour itself.
+  // Golden hour: stored under its own key so undo can't affect it. 1h cooldown.
+  // Grants 0.2 pts bonus on setting tasks for its duration. Random chance to 
+  // trigger from navigating to Falsedge from hex2 game. 
   var GOLDEN_KEY = "golden.end";
   var GOLDEN_MS = 60 * 60 * 1000;
   var GOLDEN_SET_AWARD = 0.2;
@@ -244,8 +244,6 @@ Just after:
 With:
 
 ```js
-    // Math.random on purpose: the seeded rng is snapshotted for undo, so
-    // drawing from it here would shift every later spawn.
     function rollGolden() {
       const raw = store.get(GOLDEN_KEY);
       let end = 0;

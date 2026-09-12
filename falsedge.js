@@ -19,6 +19,13 @@
   var OTHER_STREAK_WINDOW_MS = 48 * 60 * 60 * 1000;
   var STREAK_LOCKDOWN_MS = 36 * 60 * 60 * 1000;
   var STREAK_GRACE_MS = 12 * 60 * 60 * 1000;
+  // Golden hour: stored under its own key so undo can't affect it. 1h cooldown.
+  // Grants 0.2 pts bonus on setting tasks for its duration. Random chance to
+  // trigger from navigating to Falsedge from hex2 game.
+  var GOLDEN_KEY = "golden.end";
+  var GOLDEN_MS = 60 * 60 * 1000;
+  var GOLDEN_SET_AWARD = 0.2;
+  var GOLDEN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   var TIER_POINTS = [6, 3, 2, 1];
   // Leniency: minutes past the deadline that still score, one entry per tier.
   // WL = whole leniency
@@ -1857,6 +1864,55 @@
   }
 
   /**
+   * When the running golden hour ends. Hex 2^ stamps this; Falsedge reads it.
+   * @returns {number} the end time in ms, or 0 when there has never been one.
+   */
+  function goldenEnd() {
+    var raw = null;
+    try {
+      raw = localStorage.getItem(GOLDEN_KEY);
+    } catch (e) {}
+    if (!raw) return 0;
+    var t = new Date(raw).getTime();
+    if (isNaN(t)) return 0;
+    return t;
+  }
+
+  /**
+   * @param {Date} now - the reference moment.
+   * @returns {boolean} true while a golden hour is running.
+   */
+  function goldenActive(now) {
+    return now.getTime() < goldenEnd();
+  }
+
+  /**
+   * The golden hour banner's text.
+   * @param {Date} now - the reference moment.
+   * @returns {string} the text, or "" when none is running.
+   */
+  function goldenLineText(now) {
+    if (!goldenActive(now)) {
+      return "";
+    }
+    var end = new Date(goldenEnd());
+    return "golden hour : ends " + hhmm(end) +
+      " (" + GOLDEN_DAYS[end.getDay()] + ")";
+  }
+
+  /**
+   * Pays for creating a task during a golden hour, carrying `scr` into `pts`
+   * at whole numbers the way a tier award does. Rides the caller's undo entry.
+   * @param {Date} now - the reference moment.
+   */
+  function awardGoldenSet(now) {
+    if (!goldenActive(now)) return;
+    var before = Math.floor(state.scr);
+    state.scr = state.scr + GOLDEN_SET_AWARD;
+    state.pts = state.pts + (Math.floor(state.scr) - before);
+  }
+
+  /**
    * Validates and commits the SET box. Every failure is a hard block with its
    * own toast; nothing is set and nothing silently defaults.
    */
@@ -1888,6 +1944,7 @@
     }
     if (!deadlineClear(deadline, now)) return;
     pushUndo("set task");
+    awardGoldenSet(now);
     state.activeTasks.push({
       id: uid(),
       text: text,
@@ -2133,6 +2190,7 @@
     if (!deadlineClear(deadline, now)) return;
     var iso = deadline.toISOString();
     pushUndo("activate row");
+    awardGoldenSet(now);
     var task = {
       id: uid(),
       text: text,
@@ -2548,6 +2606,10 @@
     var indicator = streakIndicatorText(getNow());
     if (indicator) {
       wrap.appendChild(el("div", "streak-indicator", indicator));
+    }
+    var golden = goldenLineText(getNow());
+    if (golden) {
+      wrap.appendChild(el("div", "golden-line", golden));
     }
     return wrap;
   }
@@ -3415,6 +3477,7 @@
       n.remove();
     });
     appEl.innerHTML = "";
+    appEl.classList.toggle("golden", goldenActive(getNow()));
     appEl.appendChild(buildScores());
     appEl.appendChild(buildTasks());
     appEl.appendChild(buildDailies());
