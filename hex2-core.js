@@ -32,7 +32,7 @@ window.Hex2 = (function () {
   // that it cannot be rolled again.
   const GOLDEN_KEY = "golden.end";
   const GOLDEN_MS = 60 * 60 * 1000;
-  const GOLDEN_ODDS = 8;
+  const GOLDEN_ODDS = 12;
   const UNDO_DEPTH = 6;
   const START_HEARTS = 3;
   const MAX_HEARTS = 5;
