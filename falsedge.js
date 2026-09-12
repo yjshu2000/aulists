@@ -25,7 +25,6 @@
   var GOLDEN_KEY = "golden.end";
   var GOLDEN_MS = 60 * 60 * 1000;
   var GOLDEN_SET_AWARD = 0.2;
-  var GOLDEN_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   var TIER_POINTS = [6, 3, 2, 1];
   // Leniency: minutes past the deadline that still score, one entry per tier.
   // WL = whole leniency
@@ -1897,7 +1896,7 @@
     }
     var end = new Date(goldenEnd());
     return "golden hour : ends " + hhmm(end) +
-      " (" + GOLDEN_DAYS[end.getDay()] + ")";
+      " (" + DAY_ABBR[end.getDay()] + ")";
   }
 
   /**
@@ -3477,7 +3476,7 @@
       n.remove();
     });
     appEl.innerHTML = "";
-    appEl.classList.toggle("golden", goldenActive(getNow()));
+    document.body.classList.toggle("golden", goldenActive(getNow()));
     appEl.appendChild(buildScores());
     appEl.appendChild(buildTasks());
     appEl.appendChild(buildDailies());

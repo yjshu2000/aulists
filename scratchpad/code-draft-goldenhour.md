@@ -323,3 +323,4 @@ increment: +0.1
 - Golden hour. Leaving Hex 2^ for Falsedge rolls a 1 in 8 chance of one starting. While it runs, every task you set is worth 0.2 pts, the app glows gold, and a line under the scores reads `golden hour : ends 08:47 (Sat)`.
 - One hour long, and it cannot come back for an hour after it ends. That cooldown is invisible.
 - Setting a task outside a golden hour is worth nothing, as before.
+- also all days are (Sat) format now instead of (SA).
