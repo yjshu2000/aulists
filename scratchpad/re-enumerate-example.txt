@@ -1,0 +1,66 @@
+WORKED EXAMPLE — "seemingly unambiguous instruction is actually ambiguous -> enumerate -> RE-ENUMERATE -> correct -> user is yippee instead of angry"
+2026-09-12, Falsedge repo. Real exchange, not invented.
+
+THE INSTRUCTION
+
+    "can you change d12 to bullets my brain cant read it rn and that makes brain sad"
+
+This looks like one of the least ambiguous instructions a person could give. It names the target (D12), the operation (to bullets), and the reason (can't read it). There is nothing visibly open in it. It was still ambiguous, and Claude got it wrong on the first try.
+
+ROUND 1 — CLAUDE GUESSES, AND THE GUESS IS INVISIBLE TO CLAUDE
+
+Claude rewrote D12's three prose paragraphs into bullets, rewording as it went ("A change is written into" became "A change goes into", clauses got reordered, an invented "Block rules:" sub-header appeared splitting one list into two). It also wrote them out of the copy of the doc sitting in its context rather than opening the actual file.
+
+Claude then offered two options — write it to the doc, or don't touch the file — and thought it was being careful, because it had enumerated *something*.
+
+It had enumerated the wrong thing. The two options were about WHERE the output goes. Nothing in them questioned WHAT the output was. Claude had already silently decided that "to bullets" licensed rewording, and that decision never appeared as an option.
+
+USER'S REACTION
+
+    "what?? wtf??? that's not what it says NO STFU"
+
+ROUND 2 — THE TRAP
+
+The obvious next move, and the wrong one, is: "okay, which word did I get wrong?" That treats the rejection as a correction inside the existing frame. Every follow-up question of that shape presupposes that rewording was the task and only asks how badly it was done.
+
+What Claude did instead was enumerate the ways the whole attempt could have missed, INCLUDING the possibility that it had misread the request outright:
+
+    1. The wording is wrong. Re-read D12 verbatim and diff it against my bullets.
+    2. The structure is wrong. I invented that "Block rules:" sub-header and split it into two lists.
+    3. I dropped content. Something's missing.
+    4. "Bullets" didn't mean rewriting the sentences at all. You meant something else and the whole output missed what you asked for.
+
+Options 1-3 are inside the frame. Option 4 is the escape hatch that questions the frame itself.
+
+    User: "4"
+
+ROUND 3 — RE-ENUMERATE ON A NEW AXIS
+
+Option 4 said only "you meant something else" — it did not say what. So the answer is not to guess what, it is to enumerate again, on a completely different axis than round 1:
+
+    1. Change what D12 *requires* — drafts stop being ###-headed blocks and become bullet lists.
+    2. Keep D12's sentences word for word, just put a "-" in front. No rewording at all.
+    3. Only the example blocks change; the rules above them stay prose.
+    4. Collapse the whole of D12 into bullets, examples included.
+
+    User: "2"
+
+Round 1's options were four flavours of "how did I mangle the rewording". Round 3's options are four different tasks. That is the difference, and it is the whole lesson.
+
+OUTCOME
+
+Claude opened the file, read D12's three paragraphs verbatim, and put a "-" in front of each sentence. Zero words changed. Correct on the first try once the task was actually known.
+
+THE RULES THIS YIELDS
+
+1. A rejected list means the AXIS was wrong, not that one option on it was wrong. The answer to "that's not what it says" is a fresh set of interpretations on a different axis — never a fresh guess, and never a narrower version of the same list.
+
+2. Enumerating something is not enumerating the right thing. Claude offered two options in round 1 and still steamrolled, because the options covered a decision that was already settled (where to put it) and left the live decision (what to produce) invisible. Ask which part of the instruction Claude filled in silently. That part is what belongs in the list.
+
+3. Always include the option that says "the whole output missed what you asked for." It costs one line and it is the only exit from a wrong frame.
+
+4. "Unambiguous" is not a property of the instruction. It is a feeling Claude has, and it is uncorrelated with whether the instruction was understood. The stronger the feeling, the less it should be trusted.
+
+WHY THE USER ENDED UP HAPPY
+
+The anger in round 1 was not about the mistake. It was about a wrong output arriving with no visible seam where the wrong decision got made. Round 2 exposed the seam and round 3 offered real alternatives at it, so by round 3 the user was picking between things rather than rejecting things. Two extra turns; no rage.

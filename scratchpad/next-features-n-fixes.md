@@ -19,9 +19,9 @@
     - [\[i33\] Rename the failed path ⚪](#i33-rename-the-failed-path-)
     - [\[i35\] Custom tasks (CL) ⬜](#i35-custom-tasks-cl-)
     - [\[i45\] Queue ⬜ 🔴](#i45-queue--)
-    - [\[i47\] new 0.1 pts scoring ▫️ 🟡](#i47-new-01-pts-scoring--)
+    - [\[i47\] late completion backdateable (yellow)](#i47-late-completion-backdateable-yellow)
   - [Aulists](#aulists)
-    - [\[i15\] Tear down and rebuild Aulists ⬜ 🟡](#i15-tear-down-and-rebuild-aulists--)
+    - [\[i15\] Tear down and rebuild Aulists ⬜ 🟢](#i15-tear-down-and-rebuild-aulists--)
   - [Hex 2^](#hex-2)
     - [\[i24\] Challenge mode v1 ⬜ 🟢 🆗](#i24-challenge-mode-v1---)
       - [\[i24.1\] Challenge v2 ⚪](#i241-challenge-v2-)
@@ -33,6 +33,7 @@
   - [Multi-page items](#multi-page-items)
     - [\[i41\] Cooldown on the Go to Hex 2^ button ⚪](#i41-cooldown-on-the-go-to-hex-2-button-)
     - [\[i46\] Grass shop ⬜](#i46-grass-shop-)
+    - [\[i48\] Golden Hour pre-roll ⬜](#i48-golden-hour-pre-roll-)
     - [\[i27\] (low priority/far future) - Server side ⬜⬜⬜ 🔵](#i27-low-priorityfar-future---server-side--)
   - [Colourcaln?](#colourcaln)
     - [\[i42\] Revive Colourcaln as a vibes tracker ⬜](#i42-revive-colourcaln-as-a-vibes-tracker-)
@@ -54,7 +55,7 @@
 
 **D6. The bracketed `iN` labels are IDs and nothing else.** Not priority, not chronological, not an ordering — nothing carries any of that, much less the ID. An ID is assigned once and never changes: items keep theirs when reordered or moved between sections, and a deleted item's ID is retired rather than reused. Gaps in the sequence are normal and expected. Sub-items are `iN.1`, `iN.2`, … numbered from `.1`, as `####` headings under their parent, and follow the same rules.
 ```
-LAST USED ID: i47
+LAST USED ID: i48
 (update this with every new item)
 ```
 
@@ -76,11 +77,25 @@ LAST USED ID: i47
 
 **D11. Claude states only the final decision about an item, not how it was reached.** This binds Claude's writing — item bodies, and consolidations. The user's own writing is the user's.
 
-**D12. Code changes are drafted before they are written.** A change is written into `scratchpad/code-draft-i<N>.md` as a numbered list of blocks before any source file is touched. Nothing is applied until the user says to apply it, and then every block lands in one turn, so line numbers stay accurate for the draft's whole life. Comments run heavy in a draft; the user cuts them there. The draft file is what gets applied, whoever last edited it. Trivial one-line changes skip this. The file is deleted once the change is committed, on the same rule as D2.
+**D12. Code changes are drafted before they are written.**
 
-Blocks never touch or overlap. Changes on adjacent lines merge into one Replace covering them all. Every line quoted as context is a line in the file as it stands now, never one another block introduces. A horizontal rule separates each block from the next.
+- A change is written into `scratchpad/code-draft-i<N>.md` as a numbered list of blocks before any source file is touched.
+- Nothing is applied until the user says to apply it, and then every block lands in one turn, so line numbers stay accurate for the draft's whole life. Whatever is the latest edited version is what's applied.
+- Comments run heavy in a draft; the user cuts them there.
+- Trivial one-line changes can skip the draft file; use an in-line (in chat convo) version. 
+- The file can be flagged for deletion once the change is committed, on the same rule as D2. (ONLY THE USER CAN DELETE FILES)
 
-Each block opens with an `###` heading numbering it, so the draft carries an outline to jump through and a block can be named out loud. The file and line range are always a markdown link. Source code goes in code blocks; markdown content goes in quote blocks. Three block shapes:
+- Blocks never touch or overlap.
+- Changes on adjacent lines merge into one Replace covering them all.
+- Every line quoted as context is a line in the file as it stands now, never one another block introduces.
+- A horizontal rule separates each block from the next.
+- The start of the file should have a last updated timestamp, just after the title, in order to tell if the file has become stale (target files could've been modified in the meantime).
+
+- Each block opens with an `###` heading numbering it, so the draft carries an outline to jump through and a block can be named out loud.
+- The file and line range are always a markdown link.
+- Source code goes in code blocks; markdown content goes in quote blocks.
+
+Three block shapes:
 
 ---
 
@@ -360,14 +375,19 @@ Update 26-09-06:
 - no we need to keep both chevron buttons for fine positioning (I don't want the drag anymore) and then we're bringing back the numbers but also the menu thing is actually gonna  just be from long press on the chevron buttons and... 
 - OH MY GODS FORGET ALL OF THAT CAN WE ADD LIKE. PURE CSS LOGIC. ZERO BUTTON CHANGES. JUST THE DIVIDER LINE AND THE LOGIC OF "ABOVE LINE IS RED, BELOW LINE IS GREY"
 
-### [i47] new 0.1 pts scoring ▫️ 🟡
-last consolidated: none
+Update 26-09-12:  
+- the icon to indicate a non-recurring task is a mirrored ⊫ (ie, smth like =||). badge visible only in queue (not in ACTIVE TASKS) and it's ...beside the date..? (tentative) (the buttons on that row are kinda big... maybe we should shrink them a bit... like the time ones are massive wtf. margins too big. gap between : could shrink a bit too. make room)
+- toggle recurring/non-recurring in hamburger menu eg "Mark recurring" or "Mark non-recurring" (recurring is default and has no icon)
+- the term "non-recurring" is NOT FINAL. might change to "singular" or "one-off" or smth- not sure yet.
 
-ALL tasks, no matter the leniency, will award 0.1 pts on completing past the final leniency time. 
+### [i47] late completion backdateable (yellow)
+
+update 26-09-12  
+I just want this for more accurate backdating smh. tapping the small "completed before" text opens a date and time picker.
 
 ## Aulists
 
-### [i15] Tear down and rebuild Aulists ⬜ 🟡
+### [i15] Tear down and rebuild Aulists ⬜ 🟢
 last consolidated: 26-08-22
 
 Replaces this item's previous contents wholesale rather than extending them. Recurrence, the list 2 → 1 promotion, `applyAutoReturn()` and all auto-move / auto-reprioritize, and the randomizer are all removed. **List 0 stays** — the earlier plan deleted it.
@@ -384,6 +404,8 @@ Swipe-between-lists navigation stays. So does the boundary mechanism (`pushBound
 
 Also undecided: the previous version of this item carried several UI changes that the teardown does not mention either way — the pencil leaving the main view for an "Edit" entry in the hamburger, every `buildPencil()` call site becoming a copy button using Falsedge's `COPY_ICON`, and deleting the dead `buildTrashBtn()`. They were decided, then written over. Unclear whether they survive the rebuild.
 
+update 26-09-13:  
+NOTE that aulists as it currently stands is STALE AND DEAD. this proposed version is just a vague 'maybe' and is the only reason Aulists isn't totally disconnected at the moment but CLAUDE SHOULD TREAT AULISTS LIKE IT'S DEAD FOR NOW. PARKED IN THE FRIDGE. Any links or references to it should be ignored, NOT treated as something to consider nor design around nor refer to nor ANYTHING.
 
 ## Hex 2^
 
@@ -510,12 +532,34 @@ Use `assets/icon-grass.svg`, already drawn: overlapping blades in five emerald g
 - **Lockdown reduction**, an unset amount of grass per hour taken off. Applies to any lockdown, not one in particular: the 36h streak-break lockdown, the 36h cancel cooldown on a dated `others` row, and whatever else grows one later.
 - More exchanges, not yet decided.
 
-**Undecided:** where grass is stored, which is the load-bearing question — Falsedge keeps its state in `falsedge.data` and Hex 2^ keeps its own under `hex2.*`, and the two share nothing today. Also open: where the shop's UI lives, the grass-per-hour rate for lockdown reduction, whether a streak break costs grass or leaves it alone, and what else grass can be spent on.
+### [i48] Golden Hour pre-roll ⬜
+last consolidated: 26-09-13
+
+`rollGolden()` and its 1-in-24 odds are unchanged. What changes is that the outcome becomes visible on the **lockout screen** before you decide whether to leave — the top-of-page `← Go to Falsedge ←` link keeps rolling silently on click, exactly as today.
+
+**The win is a pending flag.** It is set the instant it rolls, not written straight to `golden.end`. Tapping `Go to Falsedge` claims it and starts the hour; tapping the × forfeits it.
+
+**Nothing visible spins while a golden hour is already running, or during its 1h cooldown.** The lockout looks exactly as it does today in both cases.
+
+**The roll resolves at lockout-open, essentially instantly.**
+
+**Visual concept.** A ring around both lockout buttons — sized to clear the pair of them, not just one — styled as a fancy analog clock face: 24 hour-marks instead of 12, a nicer display font for the numbers than the app's usual monospace/sans stack.
+
+**Undecided:**
+- Whether 24 marks fit legibly on one ring, or it needs two concentric rings (1-12 outer, 13-24 inner, arrangement TBD).
+- The actual animation — what plays when it rolls (a hand sweeping round, marks lighting in sequence, something else).
+- The font.
+
 
 ### [i27] (low priority/far future) - Server side ⬜⬜⬜ 🔵
 last consolidated: none
 
-Storing data in server instead of locally. Would need to buy/rent server space or something... idk
+Storing data in server instead of locally. Would need to buy/rent server space or something... idk.
+
+two goals, kind of separate priorities - might aim for 1 before 2...
+
+1. cross-device syncing so I can update stuff from my pc instead of always being forced to use phone only
+2. commercializing (extremely far future)
 
 ## Colourcaln?
 
