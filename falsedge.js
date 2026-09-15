@@ -20,11 +20,11 @@
   var STREAK_LOCKDOWN_MS = 36 * 60 * 60 * 1000;
   var STREAK_GRACE_MS = 12 * 60 * 60 * 1000;
   // Golden hour: stored under its own key so undo can't affect it. 1h cooldown.
-  // Grants 0.2 pts bonus on setting tasks for its duration. Random chance to
+  // Grants 0.1 pts bonus on setting tasks for its duration. Random chance to
   // trigger from navigating to Falsedge from hex2 game.
   var GOLDEN_KEY = "golden.end";
   var GOLDEN_MS = 60 * 60 * 1000;
-  var GOLDEN_SET_AWARD = 0.2;
+  var GOLDEN_SET_AWARD = 0.1;
   var TIER_POINTS = [6, 3, 2, 1];
   // Leniency: minutes past the deadline that still score, one entry per tier.
   // WL = whole leniency

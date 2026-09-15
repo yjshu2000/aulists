@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en-CA">
 <head>
 <meta charset="UTF-8">
@@ -6,12 +6,25 @@
 <title>Golden hour &mdash; the pre-roll clock</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Marcellus&family=Cormorant+Garamond:wght@500;600;700&family=Italiana&display=swap" rel="stylesheet">
+<!--
+  REJECTED FONTS - running list, do not re-suggest these.
+  Append to it whenever more are cut; never re-add one that is on it.
+
+  Almendra, Anton, Antic Didone, Bagel Fat One, Bellefair, Bungee Shade,
+  Cardo, Cinzel (Cinzel Decorative stays), Cormorant Garamond,
+  Cormorant Upright, Creepster, Diplomata SC, Ewert, Fascinate Inline,
+  Faster One, Federo, Forum, Gilda Display, Grenze Gotisch, Gruppo,
+  IM Fell English, Instrument Serif, Italiana, Jacquard 12,
+  Julius Sans One, Major Mono Display, Marcellus SC, Megrim, Michroma,
+  Monoton, Nosifer, Pirata One, Playfair Display, Poiret One,
+  Rubik Moonrocks, Sarina, Sorts Mill Goudy, Space Mono, Tangerine,
+  Titan One, Vollkorn SC
+-->
+<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Audiowide&family=Bodoni+Moda:wght@500;700&family=Cinzel+Decorative:wght@400;700&family=Della+Respira&family=Eagle+Lake&family=Archivo+Black&family=Bruno+Ace+SC&family=Gloock&family=Iceberg&family=Kings&family=Limelight&family=Marcellus&family=MedievalSharp&family=Metamorphous&family=Modern+Antiqua&family=Orbitron:wght@500;700&family=Philosopher:wght@400;700&family=Pinyon+Script&family=Prata&family=Rampart+One&family=Ribeye&family=Rozha+One&family=Rye&family=Share+Tech+Mono&family=Silkscreen&family=Special+Elite&family=Syncopate:wght@400;700&family=Tenor+Sans&family=Tourney:wght@500;700&family=Trade+Winds&family=Uncial+Antiqua&family=UnifrakturMaguntia&family=Vast+Shadow&family=Yeseva+One&family=Zen+Dots&display=swap" rel="stylesheet">
 <style>
   /* ====================================================================== */
-  /* LIFTED VERBATIM FROM style-hex2.css - do not "improve" any of it.      */
-  /* The only edits are marked PREVIEW EDIT and exist to cage a fixed       */
-  /* overlay inside a phone-shaped box instead of the whole browser window. */
+  /* LIFTED VERBATIM FROM style-hex2.css. The only edits are marked         */
+  /* PREVIEW EDIT and exist to cage a fixed overlay inside a phone box.     */
   /* ====================================================================== */
   :root {
     --hex-bg: #12141a;
@@ -23,11 +36,12 @@
     --hex-accent: #3cc3e2;
   }
 
-  /* Falsedge's gold, from style-falsedge.css (--c-yellow). Hex 2^ has no
-     gold of its own - its accent is cyan - so the ring borrows the colour
-     the golden hour already wears on the other page. */
+  /* Falsedge's gold (--c-yellow in style-falsedge.css). Hex 2^ has none of
+     its own, so the ring and the win glow borrow the colour the golden hour
+     already wears on the other page. */
   :root {
     --gold: #ecc652;
+    --c-red: #f44b47;
   }
 
   * {
@@ -36,30 +50,37 @@
   }
   html, body { margin: 0; padding: 0; }
 
-  /* PREVIEW EDIT: the preview page's own chrome. Nothing below .screen. */
+  /* ------------------------ the preview page's chrome -------------------- */
   body {
     background: #0c0d12;
     color: var(--hex-ink);
     font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
-    padding: 16px 12px 60px;
+    padding: 16px;
     line-height: 1.5;
   }
   h1 { font-size: 19px; font-weight: 800; letter-spacing: .04em; margin: 0 0 6px; }
-  .note { color: var(--hex-ink-dim); font-size: 12.5px; margin: 0 0 14px; max-width: 680px; }
+  .note { color: var(--hex-ink-dim); font-size: 12.5px; margin: 0 0 14px; max-width: 700px; }
   .note b { color: var(--hex-ink); }
   .note code { color: var(--gold); }
 
+  .cols { display: flex; gap: 20px; align-items: flex-start; }
+  .left { flex: 1 1 400px; min-width: 300px; }
+  .right { flex: 0 0 auto; position: sticky; top: 16px; }
+  @media (max-width: 920px) {
+    .cols { flex-direction: column; }
+    .right { position: static; }
+  }
+
   .panel {
     background: var(--hex-panel); border: 1px solid var(--hex-line);
-    border-radius: 12px; padding: 12px; margin: 0 auto 14px;
-    max-width: 560px;
+    border-radius: 12px; padding: 12px; margin-bottom: 14px;
   }
   .plabel {
     font-size: 11px; font-weight: 800; text-transform: uppercase;
     letter-spacing: .08em; color: var(--hex-ink-dim); margin: 0 0 6px;
   }
-  .plabel + .plabel, .row + .plabel, .slider + .plabel { margin-top: 14px; }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row + .plabel, .slider + .plabel { margin-top: 14px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .opt {
     min-height: 40px; padding: 0 12px;
     background: var(--hex-panel-2); color: var(--hex-ink-dim);
@@ -67,22 +88,28 @@
     font-family: inherit; font-size: 12.5px; font-weight: 700;
   }
   .opt.on { border-color: var(--gold); color: var(--gold); }
+  .num {
+    width: 74px; min-height: 40px; padding: 0 8px;
+    background: var(--hex-panel-2); color: var(--hex-ink);
+    border: 1px solid var(--hex-line); border-radius: 10px;
+    font-family: inherit; font-size: 13px; font-weight: 700;
+  }
   .play {
-    flex: 1 1 116px; min-height: 52px; padding: 0 10px;
+    flex: 1 1 150px; min-height: 52px; padding: 0 10px;
     background: var(--hex-panel-2); color: var(--gold);
     border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--hex-line));
     border-radius: 10px;
     font-family: inherit; font-size: 12.5px; font-weight: 800;
     text-align: left; line-height: 1.25;
   }
+  .play.on { background: #2f3345; border-color: var(--gold); }
   .play small {
     display: block; font-weight: 400; font-size: 10.5px;
     color: var(--hex-ink-dim); letter-spacing: .02em;
   }
-  .play:active { background: #2b3040; }
   .slider { display: flex; align-items: center; gap: 10px; font-size: 12px; margin-top: 8px; }
   .slider label { flex: 0 0 74px; color: var(--hex-ink-dim); letter-spacing: .03em; }
-  .slider input { flex: 1; min-width: 0; accent-color: var(--gold); }
+  .slider input[type=range] { flex: 1; min-width: 0; accent-color: var(--gold); }
   .stepbtn {
     flex: 0 0 auto; width: 40px; min-height: 40px; padding: 0;
     background: var(--hex-panel-2); color: var(--gold);
@@ -90,21 +117,25 @@
     font-family: inherit; font-size: 18px; font-weight: 800; line-height: 1;
   }
   .val {
-    flex: 0 0 52px; text-align: right; color: var(--gold);
+    flex: 0 0 56px; text-align: right; color: var(--gold);
     font-variant-numeric: tabular-nums; font-weight: 700;
   }
+  .verdict {
+    margin-top: 10px; font-size: 13px; font-weight: 700;
+    min-height: 20px; letter-spacing: .03em;
+  }
+  .verdict.win { color: var(--gold); }
+  .verdict.lose { color: var(--hex-ink-dim); }
 
   /* PREVIEW EDIT: the phone. .lockout is `position:fixed; inset:0` in the
-     real stylesheet, which covers the whole browser window and hides the
-     controls. Here it becomes `position:absolute` against this box - the
-     only change to the rule, and the same dodge css-previews-win-confetti
-     used for .overlay. Everything else about it is untouched. */
+     real stylesheet; here it becomes `position:absolute` against this box,
+     the same dodge css-previews-win-confetti used for .overlay. The box is
+     sized in real device CSS pixels and then scaled as a whole, so the
+     layout inside it stays exactly what a phone would compute. */
+  .phone-wrap { position: relative; }
   .phone {
     position: relative; overflow: hidden;
-    width: min(390px, 92vw);
-    aspect-ratio: 390 / 780;
-    max-height: calc(100vh - 140px);
-    margin: 0 auto;
+    transform-origin: top left;
     border: 1px solid var(--hex-line); border-radius: 14px;
   }
 
@@ -172,12 +203,6 @@
   }
   .hexbtn:active { background: #2b3040; }
   #undo { margin-left: auto; }
-  #dimtoggle {
-    margin-left: auto;
-    border-color: var(--hex-accent);
-    color: var(--hex-accent);
-  }
-  #dimtoggle + #undo { margin-left: 8px; }
   #mode {
     background: var(--hex-panel-2);
     border: 1px solid var(--hex-accent);
@@ -289,21 +314,34 @@
   }
   .earn img { display: block; width: 36px; height: 36px; }
   /* PREVIEW EDIT: the real markup is <img src="assets/icon-grass.svg">. The
-     icon is inlined below instead, so this file works on its own wherever it
-     is opened rather than only from inside the repo. */
+     icon is inlined below instead, so this file works wherever it opens. */
   .earn svg { display: block; width: 36px; height: 36px; }
 
   /* ====================================================================== */
-  /* PROPOSED - none of this exists in the repo yet. [i48] golden ring.     */
+  /* PROPOSED - none of this is in the repo yet. [i48] golden hour pre-roll. */
   /* ====================================================================== */
+
+  /* THE WIN. The roll lands on an hour; 24 is the one that pays. A win puts
+     the gold on the button you tap to claim it - the ring is only the dice.
+     Same colour and the same inward glow as Falsedge's own golden hour
+     vignette, plus an outward bleed that is allowed to spill onto the
+     Aulists button below it. */
+  .lockout-card .hexbtn.gh-won {
+    border-color: var(--gold);
+    color: #fff6d8;
+    box-shadow:
+      inset 0 0 22px -2px color-mix(in srgb, var(--gold) 80%, transparent),
+      0 0 46px 6px color-mix(in srgb, var(--gold) 55%, transparent);
+    transition:
+      box-shadow 280ms ease-out,
+      border-color 280ms ease-out,
+      color 280ms ease-out;
+  }
 
   /* The ring is centred on .lockout, which is the same point .lockout-card
      is centred on: the card is the only in-flow child, since .earn and
-     .fake-ad are both absolute. So 50%/50% lands on the buttons' centre
-     without measuring anything.
-
-     Centred with negative margins rather than translate(-50%,-50%), so the
-     `transform` property stays free for the spin animation to own. */
+     .fake-ad are both absolute. Negative margins rather than a centring
+     translate, so `transform` stays free for the spin to own. */
   .gh-ring {
     position: absolute;
     left: 50%;
@@ -312,14 +350,9 @@
     height: var(--gh-d);
     margin-left: calc(var(--gh-d) / -2);
     margin-top: calc(var(--gh-d) / -2);
-    /* never eats a tap: both lockout buttons stay live underneath it, which
-       is the whole point - they are tappable from the first frame */
+    /* never eats a tap: both lockout buttons are live from the first frame */
     pointer-events: none;
-    opacity: 0;
-    transition: opacity 160ms ease-out;
   }
-  .gh-ring.on { opacity: 1; }
-  /* the ring belongs to the lockout, so peek fades it with everything else */
   .lockout.peek .gh-ring { opacity: 0.25; }
 
   .gh-face {
@@ -328,23 +361,14 @@
     border-radius: 50%;
     border: 1px solid color-mix(in srgb, var(--gold) 20%, transparent);
   }
-  /* the bloom on a win: a gold halo thrown out from the rim */
-  .gh-face.bloom {
-    border-color: var(--gold);
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--gold) 45%, transparent),
-      0 0 34px -4px color-mix(in srgb, var(--gold) 85%, transparent),
-      inset 0 0 30px -6px color-mix(in srgb, var(--gold) 70%, transparent);
-    transition: border-color 220ms ease-out, box-shadow 220ms ease-out;
-  }
 
-  /* one dial per ring of numbers: single-ring mode builds one, double-ring
-     mode builds two with different --r */
+  /* only this turns in the slot animation - the pointer sits outside it */
+  .gh-spin { position: absolute; inset: 0; }
   .gh-dial { position: absolute; inset: 0; }
 
-  /* Each mark is centred on the dial, pushed out along --r by its own angle,
-     then counter-rotated so the numeral sits upright. Same trick the real
-     .pad-* rules use for the six slide pads. */
+  /* Each mark is centred, pushed out along --r by its own angle, then
+     counter-rotated so the numeral stays upright. Same trick the six real
+     .pad-* rules use. --spin is the slot's counter-rotation. */
   .gh-mark {
     position: absolute;
     left: 50%;
@@ -370,20 +394,22 @@
     color: var(--gold);
     text-shadow: 0 0 12px color-mix(in srgb, var(--gold) 70%, transparent);
   }
-  /* the one it landed on, on a win */
+  /* landed on 24 */
   .gh-mark.won {
     color: #fff6d8;
     text-shadow:
       0 0 6px var(--gold),
       0 0 22px color-mix(in srgb, var(--gold) 90%, transparent);
   }
-  /* the one it landed on, on a loss - reads as "this one, and it's nothing" */
+  /* the loss number */
   .gh-mark.lost {
-    color: var(--hex-ink-dim);
-    text-shadow: none;
+    color: var(--c-red);
+    text-shadow:
+      0 0 8px color-mix(in srgb, var(--c-red) 70%, transparent),
+      0 0 20px color-mix(in srgb, var(--c-red) 45%, transparent);
   }
 
-  /* the sweeping hand: bottom end pinned to the ring's centre */
+
   .gh-hand {
     position: absolute;
     left: 50%;
@@ -415,7 +441,8 @@
   }
   .gh-hub.on { display: block; }
 
-  /* the fixed marker the slot variant stops a number under */
+  /* fixed marker the slot stops a number under - deliberately a sibling of
+     .gh-spin, not a child, so it does not turn with the dial */
   .gh-pointer {
     position: absolute;
     left: 50%;
@@ -430,37 +457,54 @@
     display: none;
   }
   .gh-pointer.on { display: block; }
-
-  .hint {
-    font-size: 11.5px; color: var(--hex-ink-dim);
-    margin: 10px auto 0; max-width: 560px; text-align: center;
-  }
-  .verdict {
-    margin: 8px auto 0; max-width: 560px; text-align: center;
-    font-size: 13px; font-weight: 700; min-height: 20px;
-    letter-spacing: .03em;
-  }
-  .verdict.win { color: var(--gold); }
-  .verdict.lose { color: var(--hex-ink-dim); }
 </style>
 </head>
 <body>
 
 <h1>Golden hour &mdash; the pre-roll clock</h1>
 <p class="note">The whole lockout screen, real classes out of <b>style-hex2.css</b>.
-The <code>&times;</code> is hardcoded <code>.ready</code>, so there is no countdown
-&mdash; that is the state you asked to see. Both buttons under the ring are live
-from the first frame, which is why every animation below resolves in about a
-second. Four different animations, one per play button.</p>
+The <code>&times;</code> is hardcoded <code>.ready</code>, so there is no countdown.
+The roll picks 1&ndash;24 and <b>24 is the win</b>; on a 24 the
+<code>Go to Falsedge</code> button glows gold. Changing any setting replays the
+last animation. Both buttons are live from the first frame, which is why every
+animation resolves in about a second.</p>
+
+<div class="cols">
+<div class="left">
 
 <div class="panel">
   <div class="plabel">outcome</div>
   <div class="row" id="outcome">
-    <button class="opt on" data-o="win">Win</button>
-    <button class="opt" data-o="lose">Lose</button>
-    <button class="opt" data-o="real">Real odds (1 in 24)</button>
+    <button class="opt on" data-o="win">Force 24</button>
+    <button class="opt" data-o="lose">Force not-24</button>
+    <button class="opt" data-o="real">Honest, 1 in 24</button>
   </div>
 
+  <div class="plabel">play</div>
+  <div class="row">
+    <button class="play on" data-anim="sweep">1 &middot; Sweep
+      <small>a hand runs round and settles on an hour</small></button>
+    <button class="play" data-anim="cascade">2 &middot; Cascade
+      <small>a comet head and tail, two laps, decelerating</small></button>
+    <button class="play" data-anim="slot">3 &middot; Slot
+      <small>the dial spins and stops under a fixed pointer</small></button>
+    <button class="play" data-anim="converge">4 &middot; Converge
+      <small>two heads flipping marks, resolving onto the hour</small></button>
+    <button class="play" data-anim="roulette">5 &middot; Roulette
+      <small>hours flash out of order, then stop</small></button>
+    <button class="play" data-anim="counter">6 &middot; Counter-spin
+      <small>wheel one way, hand the other, meeting on the hour</small></button>
+    <button class="play" data-anim="collide">7 &middot; Collide
+      <small>two heads closing in from opposite sides</small></button>
+    <button class="play" data-anim="marquee">8 &middot; Marquee
+      <small>a dark gap laps the lit rim, then empties it</small></button>
+    <button class="play" data-anim="swarm">9 &middot; Swarm
+      <small>four comets, two each way, collapsing onto the hour</small></button>
+  </div>
+  <div class="verdict" id="verdict"></div>
+</div>
+
+<div class="panel">
   <div class="plabel">layout</div>
   <div class="row" id="layout">
     <button class="opt on" data-l="single">One ring, 1&ndash;24</button>
@@ -473,36 +517,68 @@ second. Four different animations, one per play button.</p>
     <button class="opt" data-n="roman">I II III</button>
   </div>
 
-  <div class="plabel">font</div>
+  <div class="plabel">font &mdash; each button is set in its own face</div>
   <div class="row" id="font">
-    <button class="opt on" data-f="Cinzel">Cinzel</button>
-    <button class="opt" data-f="Marcellus">Marcellus</button>
-    <button class="opt" data-f="Cormorant Garamond">Cormorant</button>
-    <button class="opt" data-f="Italiana">Italiana</button>
-    <button class="opt" data-f="ui-sans-serif">app default</button>
+    <button class="opt" data-f="ui-sans-serif">app default 24</button>
+    <button class="opt" data-f="Marcellus" style="font-family:'Marcellus',serif">Marcellus 24</button>
+    <button class="opt on" data-f="Cinzel Decorative" style="font-family:'Cinzel Decorative',serif">Cinzel Deco 24</button>
+    <button class="opt" data-f="Bodoni Moda" style="font-family:'Bodoni Moda',serif">Bodoni 24</button>
+    <button class="opt" data-f="Eagle Lake" style="font-family:'Eagle Lake',serif">Eagle Lake 24</button>
+    <button class="opt" data-f="Uncial Antiqua" style="font-family:'Uncial Antiqua',serif">Uncial 24</button>
+    <button class="opt" data-f="MedievalSharp" style="font-family:'MedievalSharp',serif">Medieval 24</button>
+    <button class="opt" data-f="UnifrakturMaguntia" style="font-family:'UnifrakturMaguntia',serif">Unifraktur 24</button>
+    <button class="opt" data-f="Orbitron" style="font-family:'Orbitron',sans-serif">Orbitron 24</button>
+    <button class="opt" data-f="Audiowide" style="font-family:'Audiowide',sans-serif">Audiowide 24</button>
+    <button class="opt" data-f="Rye" style="font-family:'Rye',serif">Rye 24</button>
+    <button class="opt" data-f="Silkscreen" style="font-family:'Silkscreen',monospace">Silkscreen 24</button>
+    <button class="opt" data-f="Della Respira" style="font-family:'Della Respira',serif">Della Respira 24</button>
+    <button class="opt" data-f="Metamorphous" style="font-family:'Metamorphous',serif">Metamorphous 24</button>
+    <button class="opt" data-f="Pinyon Script" style="font-family:'Pinyon Script',cursive">Pinyon 24</button>
+    <button class="opt" data-f="Iceberg" style="font-family:'Iceberg',sans-serif">Iceberg 24</button>
+    <button class="opt" data-f="Prata" style="font-family:'Prata',serif">Prata 24</button>
+    <button class="opt" data-f="Abril Fatface" style="font-family:'Abril Fatface',serif">Abril 24</button>
+    <button class="opt" data-f="Yeseva One" style="font-family:'Yeseva One',serif">Yeseva 24</button>
+    <button class="opt" data-f="Limelight" style="font-family:'Limelight',sans-serif">Limelight 24</button>
+    <button class="opt" data-f="Philosopher" style="font-family:'Philosopher',sans-serif">Philosopher 24</button>
+    <button class="opt" data-f="Special Elite" style="font-family:'Special Elite',monospace">Special Elite 24</button>
+    <button class="opt" data-f="Share Tech Mono" style="font-family:'Share Tech Mono',monospace">Share Tech 24</button>
+    <button class="opt" data-f="Syncopate" style="font-family:'Syncopate',sans-serif">Syncopate 24</button>
+    <button class="opt" data-f="Gloock" style="font-family:'Gloock',serif">Gloock 24</button>
+    <button class="opt" data-f="Rozha One" style="font-family:'Rozha One',serif">Rozha 24</button>
+    <button class="opt" data-f="Modern Antiqua" style="font-family:'Modern Antiqua',serif">Modern Antiqua 24</button>
+    <button class="opt" data-f="Archivo Black" style="font-family:'Archivo Black',sans-serif">Archivo Black 24</button>
+    <button class="opt" data-f="Rampart One" style="font-family:'Rampart One',sans-serif">Rampart 24</button>
+    <button class="opt" data-f="Bruno Ace SC" style="font-family:'Bruno Ace SC',sans-serif">Bruno Ace 24</button>
+    <button class="opt" data-f="Tourney" style="font-family:'Tourney',sans-serif">Tourney 24</button>
+    <button class="opt" data-f="Tenor Sans" style="font-family:'Tenor Sans',sans-serif">Tenor Sans 24</button>
+    <button class="opt" data-f="Kings" style="font-family:'Kings',cursive">Kings 24</button>
+    <button class="opt" data-f="Trade Winds" style="font-family:'Trade Winds',sans-serif">Trade Winds 24</button>
+    <button class="opt" data-f="Vast Shadow" style="font-family:'Vast Shadow',serif">Vast Shadow 24</button>
+    <button class="opt" data-f="Zen Dots" style="font-family:'Zen Dots',sans-serif">Zen Dots 24</button>
+    <button class="opt" data-f="Ribeye" style="font-family:'Ribeye',serif">Ribeye 24</button>
   </div>
 
-  <div class="plabel">tuning</div>
-  <div class="slider">
-    <label for="sD">diameter</label>
-    <button class="stepbtn" data-t="sD" data-dir="-1">&minus;</button>
-    <input type="range" id="sD" min="180" max="380" step="2" value="252">
-    <button class="stepbtn" data-t="sD" data-dir="1">+</button>
-    <span class="val" id="vD">252</span>
-  </div>
+  <div class="plabel">ring &mdash; diameter is fixed at 300</div>
   <div class="slider">
     <label for="sGap">ring gap</label>
     <button class="stepbtn" data-t="sGap" data-dir="-1">&minus;</button>
-    <input type="range" id="sGap" min="24" max="70" step="1" value="40">
+    <input type="range" id="sGap" min="24" max="80" step="1" value="40">
     <button class="stepbtn" data-t="sGap" data-dir="1">+</button>
     <span class="val" id="vGap">40</span>
   </div>
   <div class="slider">
     <label for="sFs">numerals</label>
     <button class="stepbtn" data-t="sFs" data-dir="-1">&minus;</button>
-    <input type="range" id="sFs" min="8" max="24" step="1" value="13">
+    <input type="range" id="sFs" min="8" max="32" step="1" value="16">
     <button class="stepbtn" data-t="sFs" data-dir="1">+</button>
-    <span class="val" id="vFs">13</span>
+    <span class="val" id="vFs">16</span>
+  </div>
+  <div class="slider">
+    <label for="sRamp">slow-down</label>
+    <button class="stepbtn" data-t="sRamp" data-dir="-1">&minus;</button>
+    <input type="range" id="sRamp" min="0" max="100" step="5" value="45">
+    <button class="stepbtn" data-t="sRamp" data-dir="1">+</button>
+    <span class="val" id="vRamp">45</span>
   </div>
   <div class="slider">
     <label for="sSpd">speed</label>
@@ -511,64 +587,78 @@ second. Four different animations, one per play button.</p>
     <button class="stepbtn" data-t="sSpd" data-dir="1">+</button>
     <span class="val" id="vSpd">100</span>
   </div>
-  <div class="slider">
-    <label>fps</label>
-    <span class="val" id="fps" style="flex:0 0 auto">&ndash;</span>
-  </div>
+</div>
 
-  <div class="plabel">play</div>
-  <div class="row">
-    <button class="play" data-anim="sweep">1 &middot; Sweep
-      <small>a hand runs round and settles on an hour</small></button>
-    <button class="play" data-anim="cascade">2 &middot; Cascade
-      <small>the marks light one after another, round the dial</small></button>
-    <button class="play" data-anim="slot">3 &middot; Slot
-      <small>the whole dial spins and stops under a pointer</small></button>
-    <button class="play" data-anim="converge">4 &middot; Converge
-      <small>all 24 light, then go out until one is left</small></button>
+<div class="panel">
+  <div class="plabel">device &mdash; CSS pixels, the viewport a phone reports</div>
+  <div class="row" id="device">
+    <button class="opt" data-w="360" data-h="800">360 &times; 800</button>
+    <button class="opt" data-w="390" data-h="844">390 &times; 844</button>
+    <button class="opt on" data-w="412" data-h="915">412 &times; 915</button>
   </div>
+  <div class="row" style="margin-top:8px">
+    <input class="num" type="number" id="cw" value="412" min="240" max="900">
+    <span style="color:var(--hex-ink-dim);font-size:12px">&times;</span>
+    <input class="num" type="number" id="ch" value="915" min="320" max="1400">
+    <button class="opt" id="applyWH">Use</button>
+  </div>
+  <div class="slider">
+    <label for="sZoom">zoom</label>
+    <button class="stepbtn" data-t="sZoom" data-dir="-1">&minus;</button>
+    <input type="range" id="sZoom" min="40" max="130" step="1" value="100">
+    <button class="stepbtn" data-t="sZoom" data-dir="1">+</button>
+    <span class="val" id="vZoom">100%</span>
+  </div>
+  <p class="note" style="margin:8px 0 0">412 CSS px is about 2.9in wide on the
+  real phone and about 4.3in on a desktop monitor, so pull zoom down to roughly
+  <b>67%</b> to judge legibility at true physical size. Leave it at 100% to
+  judge whether things fit.</p>
 
   <div class="plabel">state</div>
   <div class="row">
     <button class="opt" id="peek">Hold to peek</button>
     <button class="opt" id="clear">Clear ring</button>
+    <span class="val" id="fps" style="flex:0 0 auto">&ndash;</span>
   </div>
 </div>
 
-<div class="phone" id="phone">
-  <div class="screen">
+</div>
+<div class="right">
+  <div class="phone-wrap" id="phoneWrap">
+    <div class="phone" id="phone">
+      <div class="screen">
 
-    <a class="hexbtn page-nav-top" href="#">&larr;&nbsp;Go to Falsedge&nbsp;&larr;</a>
+        <a class="hexbtn page-nav-top" href="#">&larr;&nbsp;Go to Falsedge&nbsp;&larr;</a>
 
-    <header>
-      <div class="brand">
-        <h1>Hex 2^</h1>
-        <small>shamelessly vibecoded</small>
-        <small>normal mode</small>
-      </div>
-      <div class="scores">
-        <div class="score"><div class="k">Score</div><div class="v">1284</div></div>
-        <div class="score"><div class="k">Best</div><div class="v">9012</div></div>
-      </div>
-      <div class="row-break"></div>
-      <button class="hexbtn" id="undo">&#8630;&nbsp;Undo</button>
-      <div class="row-break"></div>
-      <button class="hexbtn">New game</button>
-      <select id="mode"><option>Normal</option></select>
-      <button class="hexbtn" id="padtoggle">Click pads on</button>
-    </header>
+        <header>
+          <div class="brand">
+            <h1>Hex 2^</h1>
+            <small>shamelessly vibecoded</small>
+            <small>normal mode</small>
+          </div>
+          <div class="scores">
+            <div class="score"><div class="k">Score</div><div class="v">1284</div></div>
+            <div class="score"><div class="k">Best</div><div class="v">9012</div></div>
+          </div>
+          <div class="row-break"></div>
+          <button class="hexbtn" id="undo">&#8630;&nbsp;Undo</button>
+          <div class="row-break"></div>
+          <button class="hexbtn">New game</button>
+          <select id="mode"><option>Normal</option></select>
+          <button class="hexbtn" id="padtoggle">Click pads on</button>
+        </header>
 
-    <div class="stage">
-      <canvas id="board"></canvas>
-    </div>
+        <div class="stage">
+          <canvas id="board"></canvas>
+        </div>
 
-    <footer>
-      Swipe up/down, along <b>/</b>, and along <b>\</b> to slide the board.
-    </footer>
+        <footer>
+          Swipe up/down, along <b>/</b>, and along <b>\</b> to slide the board.
+        </footer>
 
-    <!-- the real lockout markup out of hex2.html, plus the proposed ring -->
-    <div class="lockout show" id="lockout">
-      <span class="earn"><span>+1</span> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="grass">
+        <!-- the real lockout markup out of hex2.html, plus the proposed ring -->
+        <div class="lockout show" id="lockout">
+          <span class="earn"><span>+1</span> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="grass">
 <path fill="#0e4a34" d="M1.23 44 L1.23 42 Q1.23 29.45 -0.13 22.7 Q4.69 29.45 4.69 42 L4.69 44 Z"/>
 <path fill="#157a52" d="M3.89 44 L3.89 42 Q3.89 27.83 2.87 20.2 Q7.34 27.83 7.34 42 L7.34 44 Z"/>
 <path fill="#157a52" d="M6.68 44 L6.68 42 Q6.68 35.67 6.13 32.26 Q10.14 35.67 10.14 42 L10.14 44 Z"/>
@@ -604,29 +694,27 @@ second. Four different animations, one per play button.</p>
 <path fill="#1fae72" d="M35.9 44 L35.9 42 Q35.9 22.3 44.21 11.7 Q41.65 22.3 41.65 42 L41.65 44 Z"/>
 <path fill="#34d566" d="M40.85 44 L40.85 42 Q40.85 20.68 47.21 9.2 Q46.6 20.68 46.6 42 L46.6 44 Z"/>
 </svg></span>
-      <button class="fake-ad ready"><span>&times;</span></button>
+          <button class="fake-ad ready"><span>&times;</span></button>
 
-      <div class="gh-ring" id="ring">
-        <div class="gh-face" id="face"></div>
-        <div class="gh-pointer" id="pointer"></div>
-        <div class="gh-hand" id="hand"></div>
-        <div class="gh-hub" id="hub"></div>
-      </div>
+          <div class="gh-ring" id="ring">
+            <div class="gh-face"></div>
+            <div class="gh-spin" id="spin"></div>
+            <div class="gh-pointer" id="pointer"></div>
+            <div class="gh-hand" id="hand"></div>
+            <div class="gh-hub" id="hub"></div>
+          </div>
 
-      <div class="lockout-card">
-        <a class="hexbtn" href="#">Go to Falsedge</a>
-        <a class="hexbtn" href="#">Go to Aulists</a>
+          <div class="lockout-card">
+            <a class="hexbtn" id="toFalsedge" href="#">Go to Falsedge</a>
+            <a class="hexbtn" href="#">Go to Aulists</a>
+          </div>
+        </div>
+
       </div>
     </div>
-
   </div>
 </div>
-
-<div class="verdict" id="verdict"></div>
-<p class="hint">Ring diameter has to clear the button stack, which is
-180 &times; 102 &mdash; so a circle around it needs at least
-&radic;(180&sup2;+102&sup2;) &asymp; 207. Below that the numerals start
-crossing the buttons.</p>
+</div>
 
 <script>
 (function () {
@@ -634,8 +722,7 @@ crossing the buttons.</p>
 
   // ------------------------------------------------------------------
   // the board behind the lockout, so the dim and the blur have something
-  // real to sit on. Geometry and palette are ported from hex2-core.js
-  // rather than invented: cube coords, flat-top hexes, TILE_HSL.
+  // real to sit on. Geometry and palette ported from hex2-core.js.
   // ------------------------------------------------------------------
   var SQRT3 = Math.sqrt(3);
   var R = 2;
@@ -658,7 +745,6 @@ crossing the buttons.</p>
     }
   })();
 
-  // a plausible mid-game board
   var TILES = {
     "-2,0,2": 4, "-2,1,1": 2, "-1,-1,2": 16, "-1,1,0": 64,
     "0,-2,2": 8, "0,0,0": 256, "0,1,-1": 32, "1,-2,1": 2,
@@ -722,8 +808,9 @@ crossing the buttons.</p>
 
   function drawBoard() {
     var host = canvas.parentElement.getBoundingClientRect();
-    var cssW = Math.max(160, host.width);
-    var cssH = Math.max(160, host.height);
+    var z = opts.zoom / 100;
+    var cssW = Math.max(160, host.width / z);
+    var cssH = Math.max(160, host.height / z);
     var dpr = Math.min(window.devicePixelRatio || 1, 3);
     canvas.width = Math.round(cssW * dpr);
     canvas.height = Math.round(cssH * dpr);
@@ -776,33 +863,42 @@ crossing the buttons.</p>
   }
 
   // ------------------------------------------------------------------
-  // the ring
+  // the ring. 24 is the winning hour; everything else pays nothing.
   // ------------------------------------------------------------------
+  var WIN_HOUR = 24;
+  var DIAMETER = 300;
   var ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
     "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX",
     "XXI", "XXII", "XXIII", "XXIV"];
 
   var ring = document.getElementById("ring");
-  var face = document.getElementById("face");
+  var spin = document.getElementById("spin");
   var hand = document.getElementById("hand");
   var hub = document.getElementById("hub");
   var pointer = document.getElementById("pointer");
   var lockout = document.getElementById("lockout");
   var verdict = document.getElementById("verdict");
+  var toFalsedge = document.getElementById("toFalsedge");
+  var phone = document.getElementById("phone");
+  var phoneWrap = document.getElementById("phoneWrap");
 
   var opts = {
     outcome: "win",
     layout: "single",
     numerals: "arabic",
-    font: "Cinzel",
-    d: 252,
+    font: "Cinzel Decorative",
     gap: 40,
-    fs: 13,
-    speed: 100
+    fs: 16,
+    ramp: 45,
+    speed: 100,
+    w: 412,
+    h: 915,
+    zoom: 100
   };
 
   var marks = [];          // index 0 is hour 1, index 23 is hour 24
   var raf = 0;
+  var lastAnim = "sweep";
 
   function label(hour) {
     if (opts.numerals === "roman") {
@@ -812,19 +908,18 @@ crossing the buttons.</p>
   }
 
   // 24 at the top, running clockwise. One dial: 15deg per hour. Two dials:
-  // 30deg per hour, and hour h sits directly outside hour h+12, so the pair
-  // reads as one clock stacked on itself.
+  // 30deg per hour, hour h sitting directly outside hour h+12.
   function buildMarks() {
     var i;
-    ring.querySelectorAll(".gh-dial").forEach(function (d) { d.remove(); });
+    spin.innerHTML = "";
     marks = [];
 
     var outer = document.createElement("div");
     outer.className = "gh-dial";
-    ring.insertBefore(outer, face.nextSibling);
+    spin.appendChild(outer);
 
     if (opts.layout === "single") {
-      outer.style.setProperty("--r", (opts.d / 2 - opts.gap / 2) + "px");
+      outer.style.setProperty("--r", (DIAMETER / 2 - opts.gap / 2) + "px");
       for (i = 1; i <= 24; i++) {
         marks[i - 1] = mark(outer, i, i * 15);
       }
@@ -833,9 +928,9 @@ crossing the buttons.</p>
 
     var inner = document.createElement("div");
     inner.className = "gh-dial";
-    ring.insertBefore(inner, outer.nextSibling);
-    outer.style.setProperty("--r", (opts.d / 2 - opts.gap / 2) + "px");
-    inner.style.setProperty("--r", (opts.d / 2 - opts.gap * 1.6) + "px");
+    spin.appendChild(inner);
+    outer.style.setProperty("--r", (DIAMETER / 2 - opts.gap / 2) + "px");
+    inner.style.setProperty("--r", (DIAMETER / 2 - opts.gap * 1.6) + "px");
     for (i = 1; i <= 12; i++) {
       marks[i - 1] = mark(outer, i, i * 30);
     }
@@ -853,16 +948,25 @@ crossing the buttons.</p>
     return m;
   }
 
-  function applyOpts() {
-    ring.style.setProperty("--gh-d", opts.d + "px");
+  function applyVars() {
+    ring.style.setProperty("--gh-d", DIAMETER + "px");
     ring.style.setProperty("--gh-fs", opts.fs + "px");
-    ring.style.setProperty("--gh-hand", (opts.d / 2 - opts.gap) + "px");
+    ring.style.setProperty("--gh-hand", (DIAMETER / 2 - opts.gap) + "px");
     var stack = '"' + opts.font + '", ui-sans-serif, system-ui, serif';
     if (opts.font === "ui-sans-serif") {
       stack = 'ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif';
     }
     ring.style.setProperty("--gh-font", stack);
-    buildMarks();
+  }
+
+  function applyDevice() {
+    var z = opts.zoom / 100;
+    phone.style.width = opts.w + "px";
+    phone.style.height = opts.h + "px";
+    phone.style.transform = "scale(" + z + ")";
+    phoneWrap.style.width = Math.round(opts.w * z) + "px";
+    phoneWrap.style.height = Math.round(opts.h * z) + "px";
+    drawBoard();
   }
 
   function reset() {
@@ -873,35 +977,43 @@ crossing the buttons.</p>
     marks.forEach(function (m) {
       m.classList.remove("lit", "won", "lost");
       m.style.removeProperty("--spin");
+      m.style.opacity = "";
     });
-    face.classList.remove("bloom");
     hand.classList.remove("on");
     hub.classList.remove("on");
     pointer.classList.remove("on");
     hand.style.transform = "rotate(0deg)";
-    ring.style.transform = "";
-    ring.classList.remove("on");
+    spin.style.transform = "";
+    toFalsedge.classList.remove("gh-won");
     verdict.textContent = "";
     verdict.className = "verdict";
   }
 
-  function rolledWin() {
-    if (opts.outcome === "win") return true;
-    if (opts.outcome === "lose") return false;
-    return Math.floor(Math.random() * 24) === 0;
+  // what the roll comes up with. 24 pays; everything else does not.
+  function rollHour() {
+    if (opts.outcome === "win") {
+      return WIN_HOUR;
+    }
+    if (opts.outcome === "lose") {
+      return 1 + Math.floor(Math.random() * 23);
+    }
+    return 1 + Math.floor(Math.random() * 24);
   }
 
   function ms(n) {
     return n * 100 / opts.speed;
   }
 
-  // one rAF timeline; `step` is handed 0..1 and `done` fires once past the end
+  // `step` returning true ends the run there and then. Every animation uses
+  // it to finish the instant it has actually arrived rather than sitting on
+  // its last frame waiting for the clock to expire - which is the whole of
+  // the dead pause before the number appeared.
   function run(dur, step, done) {
     var start = performance.now();
     function frame(now) {
       var t = Math.min(1, (now - start) / dur);
-      step(t);
-      if (t < 1) {
+      var arrived = step(t);
+      if (t < 1 && !arrived) {
         raf = requestAnimationFrame(frame);
         return;
       }
@@ -911,160 +1023,387 @@ crossing the buttons.</p>
     raf = requestAnimationFrame(frame);
   }
 
-  function easeOut(t) {
-    return 1 - Math.pow(1 - t, 3);
+  // Deceleration with a floor under it. A bare power ease has zero velocity
+  // at t=1 - it does not slow down, it stops - so its last stretch is always
+  // a crawl whatever exponent it is given. Blending a straight linear term
+  // in means the speed can never fall below `ramp` of the average, however
+  // hard the curve half is decelerating. `ramp` 0 is the old crawl, 100 is
+  // no deceleration at all.
+  function easeRun(t) {
+    var b = opts.ramp / 100;
+    return (1 - b) * (1 - Math.pow(1 - t, 3)) + b * t;
   }
 
-  // heavy deceleration, the way a wheel with friction stops
-  function easeSettle(t) {
-    return 1 - Math.pow(1 - t, 4.2);
-  }
-
-  function land(hour, win) {
+  // `keepLit` leaves whatever the animation lit on the ring instead of
+  // clearing down to the hour alone.
+  function land(hour, keepLit) {
     var m = marks[hour - 1];
-    if (win) {
+    if (!keepLit) {
+      marks.forEach(function (x) {
+        x.classList.remove("lit");
+      });
+    }
+    if (hour === WIN_HOUR) {
       m.classList.add("won");
-      face.classList.add("bloom");
-      marks.forEach(function (x) { x.classList.add("lit"); });
-      verdict.textContent = "golden hour claimed — tap Go to Falsedge";
+      toFalsedge.classList.add("gh-won");
+      verdict.textContent = "24 â€” golden hour, claim it on Go to Falsedge";
       verdict.className = "verdict win";
       return;
     }
-    marks.forEach(function (x) {
-      x.classList.remove("lit");
-    });
     m.classList.add("lost");
-    verdict.textContent = "nothing this time";
+    verdict.textContent = "rolled " + hour + " â€” nothing";
     verdict.className = "verdict lose";
   }
 
   // ---- 1. sweep -----------------------------------------------------
-  // A hand starts at 24 and runs clockwise, decelerating into an hour. A
-  // win travels further than a loss, so the outcome is half-readable from
-  // the travel alone before it lands.
-  function animSweep(win) {
-    var hour = 1 + Math.floor(Math.random() * 24);
-    // where the hand has to come to rest, and where a mark lights as it
-    // passes. Single ring: one warm-up lap, then 15deg per hour. Two rings:
-    // the first lap IS the outer ring, and 13-24 land on a second lap over
-    // the inner one.
-    var end;
+  function animSweep(hour) {
+    var LEAD = 360;                 // a full warm-up lap before it counts
+    var end = LEAD;
+    // Nothing lights on the warm-up lap; the hand paints the dial on its
+    // second pass, and what it paints STAYS painted - land() is told to
+    // leave the trail alone rather than wiping the ring down to the hour.
     function litAt(i, a) {
       var h = i + 1;
       if (opts.layout === "double") {
-        if (h <= 12) return a >= h * 30;
-        return a >= 360 + (h - 12) * 30;
+        if (h <= 12) return a >= LEAD + h * 30;
+        return a >= LEAD + 360 + (h - 12) * 30;
       }
-      return a >= 360 + h * 15;
+      return a >= LEAD + h * 15;
     }
     if (opts.layout === "double") {
-      end = hour * 30;
+      end = LEAD + hour * 30;
       if (hour > 12) {
-        end = 360 + (hour - 12) * 30;
+        end = LEAD + 360 + (hour - 12) * 30;
       }
     } else {
-      end = 360 + hour * 15;
+      end = LEAD + hour * 15;
     }
     hand.classList.add("on");
     hub.classList.add("on");
-    ring.classList.add("on");
-    run(ms(950), function (t) {
-      var a = end * easeSettle(t);
+    run(ms(1000), function (t) {
+      var a = end * easeRun(t);
       hand.style.transform = "rotate(" + a.toFixed(2) + "deg)";
       marks.forEach(function (m, i) {
         m.classList.toggle("lit", litAt(i, a));
       });
+      return end - a < 0.4;
     }, function () {
-      land(hour, win);
+      hand.style.transform = "rotate(" + end.toFixed(2) + "deg)";
+      land(hour, true);
     });
   }
 
-  // ---- 2. cascade ---------------------------------------------------
-  // No hand at all. The marks light in sequence round the dial and the
-  // trail either stays lit or goes out behind itself.
-  function animCascade(win) {
-    var hour = 1 + Math.floor(Math.random() * 24);
-    ring.classList.add("on");
-    run(ms(640), function (t) {
-      var upto = Math.floor(easeOut(t) * 24);
-      marks.forEach(function (m, i) {
-        m.classList.toggle("lit", i < upto);
-      });
-    }, function () {
-      if (win) {
-        land(hour, true);
-        return;
+  // degrees of the mark for an hour, under whichever layout is showing
+  function angleOf(hour) {
+    if (opts.layout === "double") {
+      if (hour <= 12) {
+        return hour * 30;
       }
-      // the trail extinguishes in the order it lit, and leaves one behind
-      run(ms(420), function (t) {
-        var gone = Math.floor(t * 24);
-        marks.forEach(function (m, i) {
-          if (i < gone && i !== hour - 1) {
-            m.classList.remove("lit");
-          }
-        });
-      }, function () {
-        marks.forEach(function (m, i) {
-          if (i !== hour - 1) m.classList.remove("lit");
-        });
-        land(hour, false);
+      return (hour - 12) * 30;
+    }
+    return hour * 15;
+  }
+
+  // ---- 2. cascade ---------------------------------------------------
+  // A lit head with a fading tail running round the dial, two warm-up laps
+  // and then decelerating onto the hour. A travelling comet rather than a
+  // progress bar filling up.
+  function animCascade(hour) {
+    var TAIL = 6;
+    var total = 24 * 2 + hour;
+    run(ms(1150), function (t) {
+      var head = Math.floor(easeRun(t) * total);
+      var k;
+      marks.forEach(function (m) {
+        m.classList.remove("lit");
+        m.style.opacity = "";
       });
+      for (k = 0; k <= TAIL; k++) {
+        var step = head - k;
+        if (step < 1) {
+          break;
+        }
+        var m = marks[(step - 1) % 24];
+        m.classList.add("lit");
+        m.style.opacity = (1 - k / (TAIL + 1)).toFixed(2);
+      }
+      return head >= total;
+    }, function () {
+      marks.forEach(function (m) {
+        m.style.opacity = "";
+      });
+      land(hour);
     });
   }
 
   // ---- 3. slot ------------------------------------------------------
-  // The dial itself spins under a fixed pointer at the top. Reads most
-  // like a gamble, because it is the same motion a reel makes.
-  function animSlot(win) {
-    var hour = 1 + Math.floor(Math.random() * 24);
+  // .gh-spin turns; the pointer is its sibling and holds still.
+  function animSlot(hour) {
     var step = 15;
     if (opts.layout === "double") {
       step = 30;
     }
-    // land so `hour` sits under the pointer: the mark's own angle has to
-    // come back round to 0
-    var markAngle = (opts.layout === "double" && hour > 12)
-      ? (hour - 12) * 30
-      : hour * step;
-    var end = 360 * 3 - markAngle;
+    var markAngle = hour * step;
+    if (opts.layout === "double" && hour > 12) {
+      markAngle = (hour - 12) * 30;
+    }
+    var end = 360 * 5 - markAngle;
     pointer.classList.add("on");
-    ring.classList.add("on");
-    run(ms(1100), function (t) {
-      var a = end * easeSettle(t);
-      ring.style.transform = "rotate(" + a.toFixed(2) + "deg)";
+    run(ms(1200), function (t) {
+      var a = end * easeRun(t);
+      spin.style.transform = "rotate(" + a.toFixed(2) + "deg)";
       // counter-rotate the numerals so they never turn upside down
       marks.forEach(function (m) {
         m.style.setProperty("--spin", (-a).toFixed(2) + "deg");
       });
+      return end - a < 0.4;
     }, function () {
-      land(hour, win);
+      spin.style.transform = "rotate(" + end.toFixed(2) + "deg)";
+      marks.forEach(function (m) {
+        m.style.setProperty("--spin", (-end).toFixed(2) + "deg");
+      });
+      land(hour);
+    });
+  }
+
+  // ---- 5. roulette --------------------------------------------------
+  // Hours flash out of order, fast then slowing, the way a raffle board
+  // does. Stride 7 is coprime with 24, so it visits every hour before it
+  // repeats, and 7 is its own inverse mod 24 - which is what lets the
+  // scatter still land exactly where it was told to.
+  function animRoulette(hour) {
+    var STRIDE = 7;
+    var want = ((hour - 1) * STRIDE) % 24;
+    var total = 24 * 2 + want;
+    var lastIdx = -1;
+    run(ms(1300), function (t) {
+      var n = Math.floor(easeRun(t) * total);
+      var idx = (n * STRIDE) % 24;
+      if (idx === lastIdx) {
+        return n >= total;
+      }
+      lastIdx = idx;
+      marks.forEach(function (m) {
+        m.classList.remove("lit");
+      });
+      marks[idx].classList.add("lit");
+      return n >= total;
+    }, function () {
+      land(hour);
+    });
+  }
+
+  // ---- 7. counter-spin ----------------------------------------------
+  // Wheel one way, hand the other, both slowing into the same hour, the
+  // way a roulette wheel and its ball run against each other.
+  function animCounter(hour) {
+    var dialEnd = -360 * 3;
+    var handEnd = 360 * 4 + angleOf(hour) + dialEnd;
+    hand.classList.add("on");
+    hub.classList.add("on");
+    run(ms(1800), function (t) {
+      var e = easeRun(t);
+      var d = dialEnd * e;
+      var h = handEnd * e;
+      spin.style.transform = "rotate(" + d.toFixed(2) + "deg)";
+      marks.forEach(function (m) {
+        m.style.setProperty("--spin", (-d).toFixed(2) + "deg");
+      });
+      hand.style.transform = "rotate(" + h.toFixed(2) + "deg)";
+      return Math.abs(handEnd - h) < 0.4;
+    }, function () {
+      spin.style.transform = "rotate(" + dialEnd.toFixed(2) + "deg)";
+      marks.forEach(function (m) {
+        m.style.setProperty("--spin", (-dialEnd).toFixed(2) + "deg");
+      });
+      hand.style.transform = "rotate(" + handEnd.toFixed(2) + "deg)";
+      land(hour);
+    });
+  }
+
+  // ---- 8. collide ---------------------------------------------------
+  // Two heads set off together from the hour opposite the answer, run in
+  // opposite directions, and shut in on it from both sides at once.
+  function animCollide(hour) {
+    var target = hour - 1;
+    var start = (target + 12) % 24;
+    var total = 24 * 2 + 12;
+    run(ms(1700), function (t) {
+      var n = Math.floor(easeRun(t) * total);
+      var a = (start + n) % 24;
+      var b = ((start - n) % 24 + 24) % 24;
+      marks.forEach(function (m, i) {
+        m.classList.toggle("lit", i === a || i === b);
+      });
+      return n >= total;
+    }, function () {
+      land(hour);
+    });
+  }
+
+  // ---- 9. marquee ---------------------------------------------------
+  // Converge's going-out sweep, but lapping. A dark gap chases round the
+  // lit rim for three laps, and on the last one everything it passes
+  // stays dark, so the ring empties behind it onto the hour.
+  function animMarquee(hour) {
+    var GAP = 3;
+    var target = hour - 1;
+    var chase = 24 * 3;
+    var total = chase + 22;
+    function offsetFrom(i, from) {
+      return ((i - from) % 24 + 24) % 24;
+    }
+    run(ms(2100), function (t) {
+      var p = Math.floor(easeRun(t) * total);
+      var head;
+      var k;
+      if (p < chase) {
+        head = (target + 1 + p) % 24;
+        marks.forEach(function (m, i) {
+          var o = offsetFrom(i, head);
+          m.classList.toggle("lit", Math.min(o, 24 - o) >= GAP);
+        });
+        return false;
+      }
+      k = p - chase;
+      marks.forEach(function (m, i) {
+        m.classList.toggle("lit", offsetFrom(i, target + 1) > k);
+      });
+      return k >= 22;
+    }, function () {
+      land(hour);
+    });
+  }
+
+  // ---- 11. swarm ----------------------------------------------------
+  // Four comets on the ring at once, two running each way. They are given
+  // different lap counts so they stay spread out and keep crossing each
+  // other, but every one of them is timed to arrive on the hour at the
+  // same instant - so the whole swarm collapses onto it together.
+  function animSwarm(hour) {
+    var target = hour - 1;
+    var TAIL = 4;
+    var LAPS = 3;
+    var comets = [3, 9, 15, 21].map(function (off, j) {
+      var s = (target + off) % 24;
+      var d = 1;
+      if (j % 2 === 1) {
+        d = -1;
+      }
+      var base = ((((target - s) * d) % 24) + 24) % 24;
+      return { s: s, d: d, n: base + 24 * LAPS };
+    });
+    run(ms(2200), function (t) {
+      var e = easeRun(t);
+      var alpha = new Array(24).fill(0);
+      var done = true;
+      comets.forEach(function (c) {
+        var step = Math.floor(e * c.n);
+        var k;
+        if (step < c.n) {
+          done = false;
+        }
+        for (k = 0; k <= TAIL; k++) {
+          var st = step - k;
+          if (st < 0) {
+            break;
+          }
+          var idx = (((c.s + c.d * st) % 24) + 24) % 24;
+          var a = 1 - k / (TAIL + 1);
+          if (a > alpha[idx]) {
+            alpha[idx] = a;
+          }
+        }
+      });
+      marks.forEach(function (m, i) {
+        if (alpha[i] > 0) {
+          m.classList.add("lit");
+          m.style.opacity = alpha[i].toFixed(2);
+          return;
+        }
+        m.classList.remove("lit");
+        m.style.opacity = "";
+      });
+      return done;
+    }, function () {
+      marks.forEach(function (m) {
+        m.style.opacity = "";
+      });
+      land(hour);
     });
   }
 
   // ---- 4. converge --------------------------------------------------
-  // All 24 light at once, then go out one at a time from both ends until
-  // a single hour is left standing. A countdown narrowing to an answer.
-  function animConverge(win) {
-    var hour = 1 + Math.floor(Math.random() * 24);
-    var order = [];
-    var i;
-    for (i = 0; i < 24; i++) {
-      if (i !== hour - 1) order.push(i);
+  // Collide's two heads, except they do not light a mark, they FLIP it.
+  // Two states. Lit or dark. No head highlight, no partial opacity, no
+  // third anything - a flip between two values that are almost the same
+  // is not a flip.
+  //
+  // The ring starts dark, so a mark ends lit only if it was flipped an
+  // ODD number of times. The ending is therefore chosen by arranging the
+  // flip counts rather than corrected afterwards, which is why the laps
+  // of noise and a clean finish are not in conflict.
+  //
+  // Each head runs whole laps - which flip every mark once each - and then
+  // a partial run that finishes on the answer. Two conditions land it:
+  //
+  //   rA + rB = 25        the two partial arcs meet only on the answer and
+  //                       cover the whole ring between them, so no mark is
+  //                       missed and none but the answer sits in both
+  //   lapsA + lapsB odd
+  //
+  // Every mark then comes out even except the answer, which comes out odd.
+  // Unequal laps are also what makes the two heads different speeds, and
+  // rA is rolled fresh every play, so no two runs draw the same pattern.
+  function animConverge(hour) {
+    var target = hour - 1;
+    var rA = 2 + Math.floor(Math.random() * 21);
+    var rB = 25 - rA;
+    var lapsA = 2;
+    var lapsB = 1;
+    if (Math.random() < 0.5) {
+      lapsA = 1;
+      lapsB = 2;
     }
-    // out from the far side inwards, so the survivor is last by construction
-    order.sort(function (a, b) {
-      return Math.abs(b - (hour - 1)) - Math.abs(a - (hour - 1));
-    });
-    ring.classList.add("on");
-    marks.forEach(function (m) { m.classList.add("lit"); });
-    run(ms(880), function (t) {
-      var gone = Math.floor(easeOut(t) * order.length);
-      order.forEach(function (idx, n) {
-        marks[idx].classList.toggle("lit", n >= gone);
+    var heads = [
+      {
+        s: (((target - rA) % 24) + 24) % 24,
+        dir: 1,
+        n: 24 * lapsA + rA,
+        last: 0
+      },
+      {
+        s: (target + rB) % 24,
+        dir: -1,
+        n: 24 * lapsB + rB,
+        last: 0
+      }
+    ];
+    var state = new Array(24).fill(false);
+    run(ms(1800), function (t) {
+      var e = easeRun(t);
+      var done = true;
+      heads.forEach(function (h) {
+        var step = Math.floor(e * h.n);
+        var k;
+        var idx;
+        if (step < h.n) {
+          done = false;
+        }
+        // every whole step has to be applied, even ones a dropped frame
+        // skipped over, or the parity comes out wrong
+        for (k = h.last + 1; k <= step; k++) {
+          idx = (((h.s + h.dir * k) % 24) + 24) % 24;
+          state[idx] = !state[idx];
+        }
+        h.last = step;
       });
+      marks.forEach(function (m, i) {
+        m.classList.toggle("lit", state[i]);
+      });
+      return done;
     }, function () {
-      order.forEach(function (idx) { marks[idx].classList.remove("lit"); });
-      land(hour, win);
+      land(hour);
     });
   }
 
@@ -1072,12 +1411,29 @@ crossing the buttons.</p>
     sweep: animSweep,
     cascade: animCascade,
     slot: animSlot,
-    converge: animConverge
+    converge: animConverge,
+    roulette: animRoulette,
+    counter: animCounter,
+    collide: animCollide,
+    marquee: animMarquee,
+    swarm: animSwarm
   };
 
   function play(name) {
+    lastAnim = name;
+    document.querySelectorAll(".play").forEach(function (b) {
+      b.classList.toggle("on", b.getAttribute("data-anim") === name);
+    });
     reset();
-    ANIMS[name](rolledWin());
+    ANIMS[name](rollHour());
+  }
+
+  // any change that rebuilds the marks replays, so the ring is never left
+  // blank while a setting is being looked at
+  function replay() {
+    buildMarks();
+    applyVars();
+    play(lastAnim);
   }
 
   // ------------------------------------------------------------------
@@ -1092,31 +1448,53 @@ crossing the buttons.</p>
         x.classList.remove("on");
       });
       b.classList.add("on");
-      opts[key] = b.getAttribute(attr);
-      if (after) after();
+      if (key) {
+        opts[key] = b.getAttribute(attr);
+      }
+      if (after) after(b);
     });
   }
 
-  group("outcome", "outcome", "data-o");
-  group("layout", "layout", "data-l", function () { reset(); applyOpts(); });
-  group("numerals", "numerals", "data-n", function () { reset(); applyOpts(); });
-  group("font", "font", "data-f", function () { reset(); applyOpts(); });
+  group("outcome", "outcome", "data-o", replay);
+  group("layout", "layout", "data-l", replay);
+  group("numerals", "numerals", "data-n", replay);
+  group("font", "font", "data-f", replay);
+  group("device", null, null, function (b) {
+    opts.w = parseInt(b.getAttribute("data-w"), 10);
+    opts.h = parseInt(b.getAttribute("data-h"), 10);
+    document.getElementById("cw").value = opts.w;
+    document.getElementById("ch").value = opts.h;
+    applyDevice();
+  });
 
-  function bind(id, valId, key, after) {
+  document.getElementById("applyWH").addEventListener("click", function () {
+    opts.w = parseInt(document.getElementById("cw").value, 10) || 412;
+    opts.h = parseInt(document.getElementById("ch").value, 10) || 915;
+    document.querySelectorAll("#device .opt").forEach(function (x) {
+      x.classList.remove("on");
+    });
+    applyDevice();
+  });
+
+  function bind(id, valId, key, suffix, after) {
     var el = document.getElementById(id);
     function apply() {
       opts[key] = parseInt(el.value, 10);
-      document.getElementById(valId).textContent = el.value;
+      document.getElementById(valId).textContent = el.value + (suffix || "");
       if (after) after();
     }
     el.addEventListener("input", apply);
     apply();
   }
 
-  bind("sD", "vD", "d", function () { reset(); applyOpts(); });
-  bind("sGap", "vGap", "gap", function () { reset(); applyOpts(); });
-  bind("sFs", "vFs", "fs", function () { reset(); applyOpts(); });
+  bind("sGap", "vGap", "gap", "", function () {
+    buildMarks();
+    applyVars();
+  });
+  bind("sFs", "vFs", "fs", "", applyVars);
+  bind("sRamp", "vRamp", "ramp");
   bind("sSpd", "vSpd", "speed");
+  bind("sZoom", "vZoom", "zoom", "%", applyDevice);
 
   document.querySelectorAll(".stepbtn").forEach(function (b) {
     b.addEventListener("click", function () {
@@ -1138,10 +1516,8 @@ crossing the buttons.</p>
   document.getElementById("clear").addEventListener("click", reset);
 
   var peekBtn = document.getElementById("peek");
-  ["pointerdown"].forEach(function (ev) {
-    peekBtn.addEventListener(ev, function () {
-      lockout.classList.add("peek");
-    });
+  peekBtn.addEventListener("pointerdown", function () {
+    lockout.classList.add("peek");
   });
   ["pointerup", "pointercancel", "pointerleave"].forEach(function (ev) {
     peekBtn.addEventListener(ev, function () {
@@ -1166,9 +1542,10 @@ crossing the buttons.</p>
     requestAnimationFrame(tick);
   })();
 
-  window.addEventListener("resize", drawBoard);
-  applyOpts();
-  drawBoard();
+  buildMarks();
+  applyVars();
+  applyDevice();
+  play("sweep");
 })();
 </script>
 

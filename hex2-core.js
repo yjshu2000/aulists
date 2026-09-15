@@ -33,6 +33,20 @@ window.Hex2 = (function () {
   const GOLDEN_KEY = "golden.end";
   const GOLDEN_MS = 60 * 60 * 1000;
   const GOLDEN_ODDS = 24;
+  const GOLDEN_SWEEP_MS = 1000;
+  // linear ramp down for no stupid slowness grrr
+  const GOLDEN_RAMP = 0.25;
+  // random fonts wheee
+  const GOLDEN_FONTS = [
+    "Marcellus", "Cinzel Decorative", "Bodoni Moda", "Eagle Lake",
+    "Uncial Antiqua", "MedievalSharp", "UnifrakturMaguntia", "Orbitron",
+    "Audiowide", "Rye", "Silkscreen", "Della Respira", "Metamorphous",
+    "Pinyon Script", "Iceberg", "Prata", "Abril Fatface", "Yeseva One",
+    "Limelight", "Philosopher", "Special Elite", "Share Tech Mono",
+    "Syncopate", "Gloock", "Rozha One", "Modern Antiqua", "Archivo Black",
+    "Rampart One", "Bruno Ace SC", "Tourney", "Tenor Sans", "Kings",
+    "Trade Winds", "Vast Shadow", "Zen Dots", "Ribeye"
+  ];
   const UNDO_DEPTH = 6;
   const START_HEARTS = 3;
   const MAX_HEARTS = 5;
@@ -1420,16 +1434,131 @@ window.Hex2 = (function () {
   let fakeAdRaf = 0;
 
   // absent on the standalone public build, which is never timed
+  // ----------------------- golden hour pre-roll -----------------------
+  const ghRing = document.getElementById("gh-ring");
+  const ghDial = document.getElementById("gh-dial");
+  const ghHand = document.getElementById("gh-hand");
+  let goldenPending = false;
+  let ghRaf = 0;
+
+  // an hour running, or still inside the invisible hour after it ended
+  function goldenBlocked() {
+    const raw = store.get(GOLDEN_KEY);
+    let end = 0;
+    if (raw) {
+      end = new Date(raw).getTime();
+      if (isNaN(end)) {
+        end = 0;
+      }
+    }
+    return Date.now() < end + GOLDEN_MS;
+  }
+
+  // 24 marks, 15 degrees apart, 24 at the top
+  function buildGoldenDial() {
+    if (!ghDial || ghDial.childElementCount) {
+      return;
+    }
+    for (let h = 1; h <= GOLDEN_ODDS; h++) {
+      const m = document.createElement("span");
+      m.className = "gh-mark";
+      m.style.setProperty("--a", (h * 15) + "deg");
+      m.textContent = String(h);
+      ghDial.appendChild(m);
+    }
+  }
+
+  // Decelerates, but never below GOLDEN_RAMP of its average speed.
+  function goldenEase(t) {
+    return (1 - GOLDEN_RAMP) * (1 - Math.pow(1 - t, 3)) + GOLDEN_RAMP * t;
+  }
+
+  function clearGolden() {
+    if (ghRaf) {
+      cancelAnimationFrame(ghRaf);
+      ghRaf = 0;
+    }
+    if (!ghRing) {
+      return;
+    }
+    ghRing.classList.remove("show");
+    ghDial.querySelectorAll(".gh-mark").forEach(function (m) {
+      m.classList.remove("lit", "won", "lost");
+    });
+    const claim = document.getElementById("go-falsedge");
+    if (claim) {
+      claim.classList.remove("gh-won");
+    }
+  }
+
+  // One lap to wind up, then a second that lights each mark as the hand
+  // passes it. What it lights stays lit.
+  function sweepGolden(hour) {
+    const marks = ghDial.querySelectorAll(".gh-mark");
+    const end = 360 + hour * 15;
+    const start = performance.now();
+    ghRing.classList.add("show");
+    function frame(now) {
+      const t = Math.min(1, (now - start) / GOLDEN_SWEEP_MS);
+      const a = end * goldenEase(t);
+      ghHand.style.transform = "rotate(" + a.toFixed(2) + "deg)";
+      marks.forEach(function (m, i) {
+        m.classList.toggle("lit", a >= 360 + (i + 1) * 15);
+      });
+      if (t < 1 && end - a >= 0.4) {
+        ghRaf = requestAnimationFrame(frame);
+        return;
+      }
+      ghRaf = 0;
+      ghHand.style.transform = "rotate(" + end.toFixed(2) + "deg)";
+      if (hour !== GOLDEN_ODDS) {
+        marks[hour - 1].classList.add("lost");
+        return;
+      }
+      marks[hour - 1].classList.add("won");
+      goldenPending = true;
+      const claim = document.getElementById("go-falsedge");
+      if (claim) {
+        claim.classList.add("gh-won");
+      }
+    }
+    ghRaf = requestAnimationFrame(frame);
+  }
+
+  // Lockout looks normal while an hour is running or cooling down
+  function preRollGolden() {
+    clearGolden();
+    goldenPending = false;
+    if (!ghRing || goldenBlocked()) {
+      return;
+    }
+    buildGoldenDial();
+    const face = GOLDEN_FONTS[
+      Math.floor(Math.random() * GOLDEN_FONTS.length)];
+    ghDial.style.setProperty("--gh-font", '"' + face + '"');
+    sweepGolden(1 + Math.floor(Math.random() * GOLDEN_ODDS));
+  }
+
+  // Cashes an unclaimed win. Only the lockout's Go to Falsedge does this.
+  function claimGolden() {
+    if (!goldenPending) {
+      return;
+    }
+    goldenPending = false;
+    store.set(GOLDEN_KEY, new Date(Date.now() + GOLDEN_MS).toISOString());
+  }
+
+  // absent on the standalone public build, which is never timed
   function showLockout() {
     if (!lockout) {
       return;
     }
-    // every wait opens on the promise again, not on the last payout's total
     if (earnNum) {
       earnNum.textContent = "+1";
     }
     lockout.classList.add("show");
     startFakeAd();
+    preRollGolden();
   }
 
   function startFakeAd() {
@@ -1495,6 +1624,9 @@ window.Hex2 = (function () {
       cancelAnimationFrame(fakeAdRaf);
       fakeAdRaf = 0;
     }
+    // staying in the game throws an unclaimed golden hour away
+    goldenPending = false;
+    clearGolden();
     payGrass();
     // the pop plays over the lockout, so the break's 30s starts after it
     setTimeout(function () {
@@ -1710,15 +1842,7 @@ window.Hex2 = (function () {
     }
 
     function rollGolden() {
-      const raw = store.get(GOLDEN_KEY);
-      let end = 0;
-      if (raw) {
-        end = new Date(raw).getTime();
-        if (isNaN(end)) {
-          end = 0;
-        }
-      }
-      if (Date.now() < end + GOLDEN_MS) {
+      if (goldenBlocked()) {
         return;
       }
       if (Math.floor(Math.random() * GOLDEN_ODDS) !== 0) {
@@ -1732,7 +1856,13 @@ window.Hex2 = (function () {
     for (const link of exits) {
       link.addEventListener("click", function () {
         store.set(BREAK_KEY, "0");
-        rollGolden();
+        if (link.classList.contains("page-nav-top")) {
+          rollGolden();
+          return;
+        }
+        if (link.id === "go-falsedge") {
+          claimGolden();
+        }
       });
     }
 
