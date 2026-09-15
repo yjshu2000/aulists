@@ -633,12 +633,12 @@
   }
   .time-select {
     min-height: 40px;
-    padding: 0 8px;
+    padding: 0 1px;
   }
   .time-pair {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 1px;
   }
   .time-colon {
     font-size: 13px;
@@ -647,6 +647,13 @@
   .date-input {
     min-height: 40px;
     padding: 0 8px;
+  }
+  .row-nonrec {
+    display: inline-block;
+    transform: scaleX(-1);
+    color: var(--c-red);
+    font-size: 17px;
+    line-height: 1;
   }
   .row-oncooldown {
     background: color-mix(in srgb, var(--c-red) 8%, var(--panel-2));

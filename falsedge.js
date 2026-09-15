@@ -1575,6 +1575,10 @@
    * on a cancel that was activated with a date. A cancel never stamps
    * `lastDone`, and a source row that has since been deleted takes neither
    * stamp.
+   *
+   * A non-recurring row is the exception: completing it deletes the row
+   * outright, and cancelling it takes the cooldown whether it carried a date
+   * or not.
    * @param {string} id - the task id.
    * @param {Date} when - the effective completion time.
    * @param {number} award - points awarded (0 for failed and cancelled).
@@ -1595,9 +1599,14 @@
     state.scr = newScr;
     state.pts = oldPts + delta;
     var row = sourceRowOf(task);
-    if (row && kind === "complete") {
+    if (row && kind === "complete" && row.nonRecurring) {
+      var rowAt = indexOfRow("others", row.id);
+      if (rowAt !== -1) {
+        state.others.splice(rowAt, 1);
+      }
+    } else if (row && kind === "complete") {
       row.lastDone = when.toISOString();
-    } else if (row && task.hadDate) {
+    } else if (row && (task.hadDate || row.nonRecurring)) {
       row.cooldownUntil =
         new Date(getNow().getTime() + COOLDOWN_MS).toISOString();
     }
@@ -2022,6 +2031,20 @@
     pushUndo("clear datetime");
     row.time = "";
     row.date = "";
+    save();
+    render();
+  }
+
+  /**
+   * Flips an `others` row between recurring and non-recurring. Recurring is
+   * the default, so a row with no flag is recurring.
+   * @param {string} id - the row id.
+   */
+  function toggleRecurring(id) {
+    var row = findRow("others", id);
+    if (!row) return;
+    pushUndo("mark row");
+    row.nonRecurring = !row.nonRecurring;
     save();
     render();
   }
@@ -3189,6 +3212,34 @@
       menuOpenBtn = btn;
       var menu = el("div", "item-menu");
 
+      if (kind === "others") {
+        var rec = el("button", "", "Mark non-recurring");
+        if (findRow("others", id).nonRecurring) {
+          rec.textContent = "Mark recurring";
+        }
+        rec.addEventListener("click", function () {
+          closeAllMenus();
+          toggleRecurring(id);
+        });
+        menu.appendChild(rec);
+
+        var clr = el("button", "", "Clear datetime");
+        clr.addEventListener("click", function () {
+          closeAllMenus();
+          clearRowDatetime(id);
+        });
+        menu.appendChild(clr);
+
+        [["Shift up", -1], ["Shift down", 1]].forEach(function (spec) {
+          var s = el("button", "", spec[0]);
+          s.addEventListener("click", function () {
+            closeAllMenus();
+            moveRow(id, spec[1]);
+          });
+          menu.appendChild(s);
+        });
+      }
+
       var act = el("button", "", "Activate");
       act.addEventListener("click", function () {
         closeAllMenus();
@@ -3202,24 +3253,6 @@
         prefillFromRow(kind, id);
       });
       menu.appendChild(pre);
-
-      if (kind === "others") {
-        [["Shift up", -1], ["Shift down", 1]].forEach(function (spec) {
-          var s = el("button", "", spec[0]);
-          s.addEventListener("click", function () {
-            closeAllMenus();
-            moveRow(id, spec[1]);
-          });
-          menu.appendChild(s);
-        });
-
-        var clr = el("button", "", "Clear datetime");
-        clr.addEventListener("click", function () {
-          closeAllMenus();
-          clearRowDatetime(id);
-        });
-        menu.appendChild(clr);
-      }
 
       var edit = el("button", "", "Edit");
       edit.addEventListener("click", function () {
@@ -3318,6 +3351,9 @@
       controls.appendChild(buildDateInput(r.date || "", now, function (v) {
         editRow(kind, id, "date", v);
       }));
+      if (r.nonRecurring) {
+        controls.appendChild(el("span", "row-nonrec", "⊫"));
+      }
       row.appendChild(controls);
       if (r.lastDone) {
         var done = new Date(r.lastDone);
