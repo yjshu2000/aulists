@@ -17,9 +17,12 @@
     - [\[i21\] Daily score chart ⬜ 🟡](#i21-daily-score-chart--)
     - [\[i26\] Export all app data ⚪ 🔴](#i26-export-all-app-data--)
     - [\[i33\] Rename the failed path ⚪](#i33-rename-the-failed-path-)
+      - [\[i33.1\] Late completion pays 0.1 ▫️](#i331-late-completion-pays-01-️)
     - [\[i35\] Custom tasks (CL) ⬜](#i35-custom-tasks-cl-)
     - [\[i45\] Queue ⬜ 🔴](#i45-queue--)
     - [\[i47\] late completion backdateable (yellow)](#i47-late-completion-backdateable-yellow)
+    - [\[i49\] Lock the deadline editor once the deadline passes ⚪](#i49-lock-the-deadline-editor-once-the-deadline-passes-)
+    - [\[i50\] Tap row text to edit it ⚪ 🟡](#i50-tap-row-text-to-edit-it--)
   - [Aulists](#aulists)
     - [\[i15\] Tear down and rebuild Aulists ⬜ 🟢](#i15-tear-down-and-rebuild-aulists--)
   - [Hex 2^](#hex-2)
@@ -55,7 +58,7 @@
 
 **D6. The bracketed `iN` labels are IDs and nothing else.** Not priority, not chronological, not an ordering — nothing carries any of that, much less the ID. An ID is assigned once and never changes: items keep theirs when reordered or moved between sections, and a deleted item's ID is retired rather than reused. Gaps in the sequence are normal and expected. Sub-items are `iN.1`, `iN.2`, … numbered from `.1`, as `####` headings under their parent, and follow the same rules.
 ```
-LAST USED ID: i48
+LAST USED ID: i50
 (update this with every new item)
 ```
 
@@ -216,6 +219,8 @@ The square is inert once the day's promotion is spent or the concurrent cap is m
 
 Negative awards have never run through `resolveTask()`. `taskEntryText()` branches on `award > 0 && ptsDelta === 0` and has no case for a negative, so the ledger line for a `-6` is unwritten.
 
+UPDATE 26-09-18:  
+THIS HAS LARGELY BEEN ABANDONED. user is no longer sure if DOLI will ever be implemented. ignore factoring this into account for any new features.
 
 ### [i14] Complex tasks ⬜
 
@@ -316,6 +321,15 @@ last consolidated: none
 update 26-09-11:  
 changed from kill to rename. bcuz "failed" doesn't sound right but "late completion" needs better distinguishing from "late but within the leniency" vs "late and outside leniency" and we can't just call it "late and outside leniency" OBVIOUSLY we need an actual TERM HERE.
 
+#### [i33.1] Late completion pays 0.1 ▫️
+last consolidated: 26-09-17
+
+Completing a task after its final leniency tier has passed awards **0.1**. Cancelling still awards nothing. That difference is the whole point: the task was done, just too late to score properly.
+
+The 0.1 lands on `scr`, which is a float. `pts` is an integer, so ten of them have to stack before a whole point surfaces — the same carry `awardGoldenSet` already does.
+
+Completing within **24h past the deadline** awards the 0.1. Past 24h, nothing.
+
 ### [i35] Custom tasks (CL) ⬜
 last consolidated: 26-08-22
 
@@ -384,6 +398,25 @@ Update 26-09-12:
 
 update 26-09-12  
 I just want this for more accurate backdating smh. tapping the small "completed before" text opens a date and time picker.
+
+### [i49] Lock the deadline editor once the deadline passes ⚪
+last consolidated: 26-09-17
+
+An active task's deadline/leniency editor is reachable only **before that task's first deadline** — the instant it was set to when it was created. After that it cannot be opened at all.
+
+**The first deadline is stored separately.** `task.deadline` moves every time the editor is used, so the lock cannot key off it or every edit would push the lock along with it. The task keeps the deadline it was created with, and that is what the lock reads.
+
+**The refusal is loud, not silent.** The `edit time?` overlay still appears on tapping the tier rows. Tapping the overlay toasts instead of opening the editor. Same shape as `[Delete exported]`, which is greyed by class rather than `disabled` so that a tap still has to answer.
+
+Only the time and date editor locks. The task's text stays editable.
+
+**Undecided:**
+- The toast's wording.
+
+### [i50] Tap row text to edit it ⚪ 🟡
+last consolidated: 26-09-20
+
+An ACTIVATE row's text is edited the same way an active task's is: tap the text for an `edit?` overlay, tap the overlay for the inline editor. Both sections, dailies and others.
 
 ## Aulists
 

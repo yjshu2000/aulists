@@ -28,10 +28,14 @@
   // Leniency: minutes past the deadline that still score, one entry per tier.
   // WL = whole leniency
   // HL = half leniency
-  // NL = no leniency (not built yet)
-  // ML = mega leniency (not built yet)
+  // MT = micro task
   var WL_OFFSETS = [0, 10, 30, 60];
   var HL_OFFSETS = [0, 5, 15, 30];
+  var MT_OFFSETS = [0, 60];
+  var MT_POINTS = [2, 1];
+  var MODES = ["WL", "HL", "MT"];
+  // completing past the last tier but within 24h of the deadline pays this
+  var DAYLATE_AWARD = 0.1;
   var DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   // the active-task stack walks the page ramp's blue stretch backwards
@@ -286,6 +290,15 @@
   }
 
   /**
+   * Rounds `scr` to one decimal, since ten float 0.1s sum to 0.9999...
+   * @param {number} n - the raw sum.
+   * @returns {number} the rounded sum.
+   */
+  function roundScr(n) {
+    return Math.round(n * 10) / 10;
+  }
+
+  /**
    * Tests whether a raw input value is a positive whole number.
    * @param {*} v - the raw value (typically an input's string value).
    * @returns {boolean} true if it parses as an integer of 1 or more.
@@ -312,6 +325,14 @@
    */
   function isLine(r) {
     return !!r && r.line === true;
+  }
+
+  /**
+   * @param {*} m - a stored or proposed mode.
+   * @returns {boolean} true for "WL", "HL" or "MT".
+   */
+  function isMode(m) {
+    return MODES.indexOf(m) !== -1;
   }
 
   /**
@@ -418,7 +439,7 @@
       if (typeof raw.setDraft.time === "string") {
         s.setDraft.time = raw.setDraft.time;
       }
-      if (raw.setDraft.mode === "WL" || raw.setDraft.mode === "HL") {
+      if (isMode(raw.setDraft.mode)) {
         s.setDraft.mode = raw.setDraft.mode;
       }
       if (typeof raw.setDraft.date === "string") {
@@ -887,18 +908,22 @@
   }
 
   /**
-   * Builds a task's four leniency tiers from its stored deadline.
+   * Builds a task's leniency tiers from its stored deadline
    * @param {Object} task - the active task.
    * @returns {{at: Date, pts: number}[]} the tiers, soonest first.
    */
   function tierList(task) {
     var offsets = WL_OFFSETS;
+    var points = TIER_POINTS;
     if (task.mode === "HL") {
       offsets = HL_OFFSETS;
+    } else if (task.mode === "MT") {
+      offsets = MT_OFFSETS;
+      points = MT_POINTS;
     }
     var base = new Date(task.deadline).getTime();
     return offsets.map(function (off, i) {
-      return { at: new Date(base + off * 60000), pts: TIER_POINTS[i] };
+      return { at: new Date(base + off * 60000), pts: points[i] };
     });
   }
 
@@ -917,6 +942,25 @@
       if (tiers[i].at.getTime() >= floored.getTime()) return i;
     }
     return -1;
+  }
+
+  /**
+   * Whether a task's deadline has passed, which shuts its time editor.
+   * @param {Object} task - the active task.
+   * @param {Date} now - the reference moment.
+   * @returns {boolean} true once the deadline is behind `now`.
+   */
+  function deadlinePassed(task, now) {
+    return new Date(task.deadline).getTime() <= now.getTime();
+  }
+
+  /**
+   * Answers a tap on a shut time editor, closing it if it was open.
+   */
+  function refuseTimeEdit() {
+    toast("too late >:p");
+    timeEditId = null;
+    render();
   }
 
   /**
@@ -1529,7 +1573,8 @@
    * or not.
    * @param {string} id - the task id.
    * @param {Date} when - the effective completion time.
-   * @param {number} award - points awarded (0 for failed and cancelled).
+   * @param {number} award - points awarded (0 for cancelled, and for
+   *   anything more than 24h late).
    * @param {string} byText - what the "completed by:" line reads.
    * @param {string} kind - "complete" or "cancel".
    * @param {string} label - the undo label.
@@ -1540,7 +1585,7 @@
     pushUndo(label);
     var oldPts = state.pts;
     var oldScr = state.scr;
-    var newScr = oldScr + award;
+    var newScr = roundScr(oldScr + award);
     var delta = Math.floor(newScr) - Math.floor(oldScr);
     state.ledger.push(
       taskEntryText(task, byText, oldPts, delta, oldScr, award));
@@ -1599,7 +1644,7 @@
 
   /**
    * Completes a task at the present moment, awarding whatever tier is live
-   * right now - including 0 once every tier has passed.
+   * right now. Past every tier it still pays 0.1 within 24h of the deadline.
    * @param {string} id - the task id.
    */
   function completeNow(id) {
@@ -1610,9 +1655,13 @@
     var idx = liveTierIndex(tiers, now);
     var award = 0;
     var byText = "none (failed)";
+    var late = now.getTime() - new Date(task.deadline).getTime();
     if (idx !== -1) {
       award = tiers[idx].pts + earlyBonus(task, now);
       byText = completedByText(task, now);
+    } else if (late <= DAY_MS) {
+      award = DAYLATE_AWARD;
+      byText = formatDateTime(now);
     }
     resolveTask(id, now, award, byText, "complete", "complete now");
   }
@@ -1664,13 +1713,6 @@
   }
 
   /**
-   * Moves an active task's deadline to a new day, keeping its clock time. An
-   * empty date re-resolves to the clock time's next occurrence, which is how
-   * a further task is pulled back inside 24h.
-   * @param {string} id - the task id.
-   * @param {string} date - a day key, "YYYY-MM-DD", or "" for none.
-   */
-  /**
    * The furthest day a task's deadline may be moved to: one day past where it
    * already sits, and never beyond the picker's own week.
    * @param {Object} task - the active task.
@@ -1688,6 +1730,13 @@
     return key;
   }
 
+  /**
+   * Moves an active task's deadline to a new day, keeping its clock time. An
+   * empty date re-resolves to the clock time's next occurrence, which is how
+   * a further task is pulled back inside 24h.
+   * @param {string} id - the task id.
+   * @param {string} date - a day key, "YYYY-MM-DD", or "" for none.
+   */
   function editTaskDate(id, date) {
     var task = findTask(id);
     if (!task) return;
@@ -1731,7 +1780,8 @@
   /**
    * Holds a proposed deadline to the 20-minute floor and the overlap rule,
    * then commits it. The task's own deadline is excluded from the overlap
-   * check, since a task can hardly clash with itself.
+   * check, since a task can hardly clash with itself. Refused outright once
+   * that deadline has passed.
    * @param {string} id - the task id.
    * @param {Date} deadline - the proposed replacement.
    * @param {Date} now - the reference moment.
@@ -1741,6 +1791,10 @@
   function commitTaskDeadline(id, deadline, now, label, tooSoon) {
     var task = findTask(id);
     if (!task) return;
+    if (deadlinePassed(task, now)) {
+      refuseTimeEdit();
+      return;
+    }
     if (deadline.getTime() - now.getTime() < MIN_LEAD_MS) {
       toast(tooSoon);
       render();
@@ -1759,20 +1813,27 @@
     pushUndo(label);
     task.deadline = iso;
     save();
+    // re-sorting under an open editor would move the block mid-edit
+    if (timeEditId === id) return;
     render();
   }
 
   /**
    * Switches an active task's leniency, which reshapes its tier rows. Unlike
    * SET's toggles this one can't clear back to unset - an active task always
-   * has a mode, so tapping the lit one is a no-op.
+   * has a mode, so tapping the lit one is a no-op. Refused once the deadline
+   * has passed.
    * @param {string} id - the task id.
-   * @param {string} mode - "WL" or "HL".
+   * @param {string} mode - "WL", "HL" or "MT".
    */
   function editTaskMode(id, mode) {
     var task = findTask(id);
     if (!task) return;
     if (task.mode === mode) return;
+    if (deadlinePassed(task, getNow())) {
+      refuseTimeEdit();
+      return;
+    }
     pushUndo("edit task mode");
     task.mode = mode;
     save();
@@ -1864,7 +1925,7 @@
   function awardGoldenSet(now) {
     if (!goldenActive(now)) return;
     var before = Math.floor(state.scr);
-    state.scr = state.scr + GOLDEN_SET_AWARD;
+    state.scr = roundScr(state.scr + GOLDEN_SET_AWARD);
     state.pts = state.pts + (Math.floor(state.scr) - before);
   }
 
@@ -1883,8 +1944,8 @@
       return;
     }
     var mode = state.setDraft.mode;
-    if (mode !== "WL" && mode !== "HL") {
-      toast("Pick WL or HL");
+    if (!isMode(mode)) {
+      toast("Pick leniency mode");
       return;
     }
     var date = state.setDraft.date;
@@ -2100,7 +2161,7 @@
     state.setDraft.text = row.text;
     state.setDraft.time = row.time;
     state.setDraft.date = row.date || "";
-    if (row.mode === "WL" || row.mode === "HL") {
+    if (isMode(row.mode)) {
       state.setDraft.mode = row.mode;
     }
     save();
@@ -2127,8 +2188,8 @@
       toast("Task needs text");
       return;
     }
-    if (row.mode !== "WL" && row.mode !== "HL") {
-      toast("Pick WL or HL");
+    if (!isMode(row.mode)) {
+      toast("Pick WL, HL or MT");
       return;
     }
     if (!row.time) {
@@ -2620,15 +2681,16 @@
   }
 
   /**
-   * Wires the `edit?` overlay onto an active task's text: tapping the text
-   * shows the overlay, tapping the overlay enters edit mode, tapping anywhere
-   * else dismisses it.
-   * @param {Element} row - the task's text row (the overlay's positioning
-   *   parent).
-   * @param {string} id - the task id.
+   * Wires the `edit?` overlay onto a piece of text: tapping the text shows the
+   * overlay, tapping the overlay swaps it for an inline editor, and tapping
+   * anywhere else dismisses it.
+   * @param {Element} host - the text's positioning parent, which the overlay
+   *   is appended to.
+   * @param {string} sel - selector for the text element inside `host`.
+   * @param {Function} onCommit - called once with the raw edited value.
    */
-  function attachTextEdit(row, id) {
-    var textEl = row.querySelector(".task-text");
+  function attachTextEdit(host, sel, onCommit) {
+    var textEl = host.querySelector(sel);
     textEl.addEventListener("click", function (e) {
       e.stopPropagation();
       closeEditOverlays();
@@ -2636,13 +2698,11 @@
       overlay.addEventListener("click", function (ev) {
         ev.stopPropagation();
         closeEditOverlays();
-        var live = row.querySelector(".task-text");
+        var live = host.querySelector(sel);
         if (!live) return;
-        inlineEdit(live, live.textContent, function (value) {
-          editTaskText(id, value);
-        });
+        inlineEdit(live, live.textContent, onCommit);
       });
-      row.appendChild(overlay);
+      host.appendChild(overlay);
     });
   }
 
@@ -2666,7 +2726,8 @@
 
   /**
    * Wires the `edit time?` overlay onto a task's tier rows, the same shape as
-   * the `edit?` overlay on its text.
+   * the `edit?` overlay on its text. Once the deadline has passed, tapping it
+   * toasts instead of opening the editor.
    * @param {Element} wrap - the tier-row wrapper (the positioning parent).
    * @param {string} id - the task id.
    */
@@ -2678,6 +2739,12 @@
       overlay.addEventListener("click", function (ev) {
         ev.stopPropagation();
         closeEditOverlays();
+        var task = findTask(id);
+        if (!task) return;
+        if (deadlinePassed(task, getNow())) {
+          refuseTimeEdit();
+          return;
+        }
         timeEditId = id;
         render();
       });
@@ -2747,7 +2814,9 @@
 
     var textRow = el("div", "task-text-row");
     textRow.appendChild(el("span", "task-text", task.text));
-    attachTextEdit(textRow, id);
+    attachTextEdit(textRow, ".task-text", function (value) {
+      editTaskText(id, value);
+    });
     block.appendChild(textRow);
 
     var now = getNow();
@@ -2757,7 +2826,7 @@
     }
     var tiers = tierList(task);
     var live = liveTierIndex(tiers, now);
-    if (timeEditId === id) {
+    if (timeEditId === id && !deadlinePassed(task, now)) {
       block.appendChild(buildTaskTimeEditor(id, now));
     } else {
       var tierWrap = el("div", "tier-rows");
@@ -3036,15 +3105,15 @@
   }
 
   /**
-   * Builds a WL/HL toggle pair. Tapping the lit one deselects it back to
-   * unset; unset is neither being lit. 
+   * Builds the WL/HL/MT toggle row. Tapping the lit one deselects it back to
+   * unset; unset is none being lit.
    * @param {Function} getMode - returns the currently selected mode, or null.
    * @param {Function} onPick - called with the new mode (or null).
    * @returns {Element} the toggle row.
    */
   function buildModeToggles(getMode, onPick) {
     var row = el("div", "mode-row");
-    ["WL", "HL"].forEach(function (m) {
+    MODES.forEach(function (m) {
       var b = el("button", "mode-btn", m);
       if (getMode() === m) {
         b.classList.add("on");
@@ -3277,7 +3346,17 @@
         row.classList.add("row-queued");
       }
     }
-    row.appendChild(el("div", "tpl-text", r.text));
+    var textRow = el("div", "tpl-text-row");
+    textRow.appendChild(el("div", "tpl-text", r.text));
+    attachTextEdit(textRow, ".tpl-text", function (value) {
+      var v = value.trim();
+      if (v === "") {
+        render();
+        return;
+      }
+      editRow(kind, id, "text", v);
+    });
+    row.appendChild(textRow);
     if (kind === "others") {
       var left = cooldownLeft(r, now);
       if (left > 0) {
@@ -3364,7 +3443,7 @@
       }
       addBtn.disabled = !ok;
     }
-    ["WL", "HL"].forEach(function (m) {
+    MODES.forEach(function (m) {
       var b = el("button", "mode-btn", m);
       if (draft.mode === m) {
         b.classList.add("on");
@@ -3420,8 +3499,8 @@
   }
 
   /**
-   * Builds the ACTIVATE (others) box: persistent records, most recently
-   * completed first, plus the pinned adder.
+   * Builds the ACTIVATE (others) box: persistent records, rows currently out as
+   * tasks first, the rest in manual order, plus the pinned adder.
    * @returns {Element} the section.
    */
   function buildOthers() {
@@ -3533,6 +3612,7 @@
       closeAllMenus();
     }
     if (!e.target.closest(".task-text-row")
+      && !e.target.closest(".tpl-text-row")
       && !e.target.closest(".tier-rows")) {
       closeEditOverlays();
     }

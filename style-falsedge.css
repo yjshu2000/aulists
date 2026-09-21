@@ -608,10 +608,14 @@
   /* the gap has to clear the inline editor's border too, not just the text -
      editing is where the two rows used to visibly collide */
   .tpl-text,
-  .tpl-row > .inline-edit {
+  .tpl-text-row > .inline-edit {
     font-size: 14px;
     margin-bottom: 14px;
     word-break: break-word;
+  }
+  /* the overlay covers the text, not the whole row */
+  .tpl-text-row {
+    position: relative;
   }
   .tpl-controls {
     display: flex;
