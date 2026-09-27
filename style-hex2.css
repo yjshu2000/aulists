@@ -592,7 +592,7 @@
     color: color-mix(in srgb, var(--hex-green) 26%, transparent);
     transform:
       rotate(var(--a))
-      translateY(-130px)
+      translateY(-140px)
       rotate(calc(var(--a) * -1));
   }
   .gh-mark.lit {
