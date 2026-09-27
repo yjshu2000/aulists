@@ -18,10 +18,9 @@
   var STREAK_WINDOW_MS = 48 * 60 * 60 * 1000;
   var STREAK_LOCKDOWN_MS = 36 * 60 * 60 * 1000;
   var STREAK_GRACE_MS = 12 * 60 * 60 * 1000;
-  // Combo: stored under its own key so undo can't affect it.
-  // Setting a task adds +4h to the combo window, capping at +20h.
-  // Pays +0.1 pts per calendar day of active combo, capping at +1.0 (day 10).
-  var COMBO_KEY = "falsedge.combo";
+  // Combo: lives in `state`, so undo rewinds it with everything else. Setting
+  // a task adds +4h to the combo window, capping at +20h. Pays +0.1 pts per
+  // calendar day of active combo, capping at +1.0 (day 10).
   var COMBO_STEP_MS = 4 * 60 * 60 * 1000;
   var COMBO_MAX_MS = 20 * 60 * 60 * 1000;
   var COMBO_DAY_AWARD = 0.1;
@@ -392,7 +391,8 @@
       lastCopyAt: null,
       ledgerCollapsed: true,
       lastDoneAt: null,
-      lockdownEnd: null
+      lockdownEnd: null,
+      combo: null
     };
   }
 
@@ -479,6 +479,11 @@
       if (typeof raw.lockdownEnd === "string") {
         s.lockdownEnd = raw.lockdownEnd;
       }
+    }
+    if (raw.combo && typeof raw.combo === "object" &&
+      typeof raw.combo.startDay === "string" &&
+      typeof raw.combo.end === "number") {
+      s.combo = { startDay: raw.combo.startDay, end: raw.combo.end };
     }
     return s;
   }
@@ -1884,52 +1889,12 @@
 
   // --------------------------------- combo -----------------------------------
   /**
-   * Loads the current combo state from localStorage.
-   * @returns {{startDay: string, end: number}|null}
-   */
-  function loadCombo() {
-    try {
-      var raw = localStorage.getItem(COMBO_KEY);
-      if (!raw) return null;
-      var obj = JSON.parse(raw);
-      if (typeof obj.startDay === "string" &&
-        typeof obj.end === "number") {
-        return obj;
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /**
-   * Persists combo state to localStorage.
-   * @param {{startDay: string, end: number}} c
-   */
-  function saveCombo(c) {
-    try {
-      localStorage.setItem(COMBO_KEY, JSON.stringify(c));
-    } catch (e) {}
-  }
-
-  /**
-   * Tests whether a combo window is currently active.
-   * @param {Date} now - the reference moment.
-   * @returns {boolean}
-   */
-  function comboActive(now) {
-    var c = loadCombo();
-    if (!c) return false;
-    return now.getTime() < c.end;
-  }
-
-  /**
    * Calendar day count of the active combo (1–10).
    * @param {Date} now - the reference moment.
    * @returns {number}
    */
   function comboDays(now) {
-    var c = loadCombo();
+    var c = state.combo;
     if (!c || now.getTime() >= c.end) return 1;
     var startD = new Date(c.startDay + "T00:00:00");
     var todayD = new Date(dayKey(now) + "T00:00:00");
@@ -1951,25 +1916,26 @@
   }
 
   /**
-   * Advances the combo window on task set: +4h (capped at +12h), updates the
-   * calendar start day, awards the bonus.
+   * Advances the combo window on task set: +4h (capped at +20h), updates the
+   * calendar start day, awards the bonus. Rides the caller's undo entry.
    * @param {Date} now - the reference moment.
    */
   function awardComboSet(now) {
-    var today = dayKey(now);
-    var c = loadCombo();
-    var award = 0.1;
+    var c = state.combo;
+    var award = COMBO_DAY_AWARD;
     if (c && now.getTime() < c.end) {
       award = comboAward(now);
-      var nextEnd = Math.min(
-        c.end + COMBO_STEP_MS,
-        now.getTime() + COMBO_MAX_MS);
-      saveCombo({ startDay: c.startDay, end: nextEnd });
+      state.combo = {
+        startDay: c.startDay,
+        end: Math.min(
+          c.end + COMBO_STEP_MS,
+          now.getTime() + COMBO_MAX_MS)
+      };
     } else {
-      saveCombo({
-        startDay: today,
+      state.combo = {
+        startDay: dayKey(now),
         end: now.getTime() + COMBO_STEP_MS
-      });
+      };
     }
     var before = Math.floor(state.scr);
     state.scr = roundScr(state.scr + award);
@@ -1984,7 +1950,7 @@
    * @returns {Element|null} null if no combo has ever been set.
    */
   function buildComboRow(now) {
-    var c = loadCombo();
+    var c = state.combo;
     if (!c) return null;
     var leftMs = c.end - now.getTime();
     var endD = new Date(c.end);
