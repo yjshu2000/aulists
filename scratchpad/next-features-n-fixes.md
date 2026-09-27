@@ -1,8 +1,6 @@
 - [Next features \& fixes](#next-features--fixes)
   - [Doc rules](#doc-rules)
     - [Block 1: Replace foo.js line 42](#block-1-replace-foojs-line-42)
-    - [Block 2: Remove foo.js lines 55-57](#block-2-remove-foojs-lines-55-57)
-    - [Block 3: Add at foo.js line 88](#block-3-add-at-foojs-line-88)
     - [Block 4: Replace bar.md line 12](#block-4-replace-barmd-line-12)
     - [Block 5: changelog](#block-5-changelog)
   - [Falsedge](#falsedge)
@@ -98,52 +96,24 @@ LAST USED ID: i50
 - The file and line range are always a markdown link.
 - Source code goes in code blocks; markdown content goes in quote blocks.
 
-Three block shapes:
+Use the replace format, including enough context before AND after any insertions, changes, or deletions:
 
 ---
 
 ### Block 1: Replace [foo.js line 42](../foo.js#L42)
 
 ```js
+  var foo = 5;
   var LIMIT = 10;
+  var bar = 10;
 ```
 
 With:
 
 ```js
+  var foo = 5;
   var LIMIT = 20;
-```
-
----
-
-### Block 2: Remove [foo.js lines 55-57](../foo.js#L55-L57)
-
-```js
-  if (!widget) {
-    return null;
-  }
-```
-
----
-
-### Block 3: Add at [foo.js line 88](../foo.js#L88)
-
-Just prior:
-
-```js
-  save();
-```
-
-Added:
-
-```js
-  render();
-```
-
-Just after:
-
-```js
-  toast("done");
+  var bar = 10;
 ```
 
 ---

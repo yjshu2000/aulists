@@ -18,12 +18,14 @@
   var STREAK_WINDOW_MS = 48 * 60 * 60 * 1000;
   var STREAK_LOCKDOWN_MS = 36 * 60 * 60 * 1000;
   var STREAK_GRACE_MS = 12 * 60 * 60 * 1000;
-  // Golden hour: stored under its own key so undo can't affect it. 1h cooldown.
-  // Grants 0.1 pts bonus on setting tasks for its duration. Random chance to
-  // trigger from navigating to Falsedge from hex2 game.
-  var GOLDEN_KEY = "golden.end";
-  var GOLDEN_MS = 60 * 60 * 1000;
-  var GOLDEN_SET_AWARD = 0.1;
+  // Combo: stored under its own key so undo can't affect it.
+  // Setting a task adds +4h to the combo window, capping at +12h.
+  // Pays +0.1 pts per calendar day of active combo, capping at +1.0 (day 10).
+  var COMBO_KEY = "falsedge.combo";
+  var COMBO_STEP_MS = 4 * 60 * 60 * 1000;
+  var COMBO_MAX_MS = 12 * 60 * 60 * 1000;
+  var COMBO_DAY_AWARD = 0.1;
+  var COMBO_MAX_AWARD = 1.0;
   var TIER_POINTS = [6, 3, 2, 1];
   // Leniency: minutes past the deadline that still score, one entry per tier.
   // WL = whole leniency
@@ -1880,53 +1882,142 @@
     render();
   }
 
+  // --------------------------------- combo -----------------------------------
   /**
-   * When the running golden hour ends. Hex 2^ stamps this; Falsedge reads it.
-   * @returns {number} the end time in ms, or 0 when there has never been one.
+   * Loads the current combo state from localStorage.
+   * @returns {{startDay: string, end: number}|null}
    */
-  function goldenEnd() {
-    var raw = null;
+  function loadCombo() {
     try {
-      raw = localStorage.getItem(GOLDEN_KEY);
-    } catch (e) {}
-    if (!raw) return 0;
-    var t = new Date(raw).getTime();
-    if (isNaN(t)) return 0;
-    return t;
-  }
-
-  /**
-   * @param {Date} now - the reference moment.
-   * @returns {boolean} true while a golden hour is running.
-   */
-  function goldenActive(now) {
-    return now.getTime() < goldenEnd();
-  }
-
-  /**
-   * The golden hour banner's text.
-   * @param {Date} now - the reference moment.
-   * @returns {string} the text, or "" when none is running.
-   */
-  function goldenLineText(now) {
-    if (!goldenActive(now)) {
-      return "";
+      var raw = localStorage.getItem(COMBO_KEY);
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      if (typeof obj.startDay === "string" &&
+        typeof obj.end === "number") {
+        return obj;
+      }
+      return null;
+    } catch (e) {
+      return null;
     }
-    var end = new Date(goldenEnd());
-    return "golden hour : ends " + hhmm(end) +
-      " (" + DAY_ABBR[end.getDay()] + ")";
   }
 
   /**
-   * Pays for creating a task during a golden hour, carrying `scr` into `pts`
-   * at whole numbers the way a tier award does. Rides the caller's undo entry.
+   * Persists combo state to localStorage.
+   * @param {{startDay: string, end: number}} c
+   */
+  function saveCombo(c) {
+    try {
+      localStorage.setItem(COMBO_KEY, JSON.stringify(c));
+    } catch (e) {}
+  }
+
+  /**
+   * Tests whether a combo window is currently active.
+   * @param {Date} now - the reference moment.
+   * @returns {boolean}
+   */
+  function comboActive(now) {
+    var c = loadCombo();
+    if (!c) return false;
+    return now.getTime() < c.end;
+  }
+
+  /**
+   * Calendar day count of the active combo (1–10).
+   * @param {Date} now - the reference moment.
+   * @returns {number}
+   */
+  function comboDays(now) {
+    var c = loadCombo();
+    if (!c || now.getTime() >= c.end) return 1;
+    var startD = new Date(c.startDay + "T00:00:00");
+    var todayD = new Date(dayKey(now) + "T00:00:00");
+    var diff = Math.round(
+      (todayD.getTime() - startD.getTime()) / DAY_MS);
+    if (diff < 0) diff = 0;
+    return Math.min(10, Math.max(1, diff + 1));
+  }
+
+  /**
+   * Bonus points for setting a task right now.
+   * @param {Date} now - the reference moment.
+   * @returns {number} 0.1 on day 1, up to 1.0 on day 10.
+   */
+  function comboAward(now) {
+    return roundScr(
+      Math.min(COMBO_MAX_AWARD,
+        comboDays(now) * COMBO_DAY_AWARD));
+  }
+
+  /**
+   * Advances the combo window on task set: +4h (capped at +12h), updates the
+   * calendar start day, awards the bonus.
    * @param {Date} now - the reference moment.
    */
-  function awardGoldenSet(now) {
-    if (!goldenActive(now)) return;
+  function awardComboSet(now) {
+    var today = dayKey(now);
+    var c = loadCombo();
+    var award = 0.1;
+    if (c && now.getTime() < c.end) {
+      award = comboAward(now);
+      var nextEnd = Math.min(
+        c.end + COMBO_STEP_MS,
+        now.getTime() + COMBO_MAX_MS);
+      saveCombo({ startDay: c.startDay, end: nextEnd });
+    } else {
+      saveCombo({
+        startDay: today,
+        end: now.getTime() + COMBO_STEP_MS
+      });
+    }
     var before = Math.floor(state.scr);
-    state.scr = roundScr(state.scr + GOLDEN_SET_AWARD);
-    state.pts = state.pts + (Math.floor(state.scr) - before);
+    state.scr = roundScr(state.scr + award);
+    state.pts =
+      state.pts + (Math.floor(state.scr) - before);
+  }
+
+  /**
+   * Builds the combo indicator above the active tasks card.
+   * Shows countdown while active, elapsed time after expiry.
+   * @param {Date} now - the reference moment.
+   * @returns {Element|null} null if no combo has ever been set.
+   */
+  function buildComboRow(now) {
+    var c = loadCombo();
+    if (!c) return null;
+    var leftMs = c.end - now.getTime();
+    var endD = new Date(c.end);
+    var text;
+    if (leftMs > 0) {
+      var h = Math.floor(leftMs / (60 * 60 * 1000));
+      var m = Math.floor(
+        (leftMs % (60 * 60 * 1000)) / (60 * 1000));
+      text = "CE: in " + h + "h" + pad2(m) +
+        "m at " + hhmm(endD);
+    } else {
+      var ago = -leftMs;
+      var agoD = Math.floor(ago / (24 * 60 * 60 * 1000));
+      if (agoD > 99) {
+        text = "CE: very long ago";
+      } else if (agoD >= 1) {
+        var agoH = Math.floor((ago % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+        text = "CE: " + agoD + "d" + pad2(agoH) + "h ago at " + hhmm(endD);
+      } else {
+        var aH = Math.floor(ago / (60 * 60 * 1000));
+        var aM = Math.floor((ago % (60 * 60 * 1000)) / (60 * 1000));
+        text = "CE: " + aH + "h" + pad2(aM) + "m ago at " + hhmm(endD);
+      }
+    }
+    var row = el("div", "combo-row");
+    if (leftMs > 0) {
+      var bar = el("div", "combo-bar");
+      var p = Math.min(1, leftMs / COMBO_MAX_MS);
+      bar.style.width = (p * 100).toFixed(1) + "%";
+      row.appendChild(bar);
+    }
+    row.appendChild(el("span", "combo-text", text));
+    return row;
   }
 
   /**
@@ -1961,7 +2052,7 @@
     }
     if (!deadlineClear(deadline, now)) return;
     pushUndo("set task");
-    awardGoldenSet(now);
+    awardComboSet(now);
     state.activeTasks.push({
       id: uid(),
       text: text,
@@ -2221,7 +2312,7 @@
     if (!deadlineClear(deadline, now)) return;
     var iso = deadline.toISOString();
     pushUndo("activate row");
-    awardGoldenSet(now);
+    awardComboSet(now);
     var task = {
       id: uid(),
       text: text,
@@ -2636,11 +2727,8 @@
     wrap.appendChild(scrBox);
     var indicator = streakIndicatorText(getNow());
     if (indicator) {
-      wrap.appendChild(el("div", "streak-indicator", indicator));
-    }
-    var golden = goldenLineText(getNow());
-    if (golden) {
-      wrap.appendChild(el("div", "golden-line", golden));
+      wrap.appendChild(
+        el("div", "streak-indicator", indicator));
     }
     return wrap;
   }
@@ -2907,6 +2995,10 @@
     var now = getNow();
     var section = buildSection("ACTIVE TASKS", "tasksCard", "sec-tasks",
       buildStreakLeft(now));
+    var combo = buildComboRow(now);
+    if (combo) {
+      section.wrap.insertBefore(combo, section.card);
+    }
     var wrap = el("div", "tasks");
     section.card.appendChild(wrap);
     if (!state.activeTasks.length) {
@@ -3535,7 +3627,6 @@
       n.remove();
     });
     appEl.innerHTML = "";
-    document.body.classList.toggle("golden", goldenActive(getNow()));
     appEl.appendChild(buildScores());
     appEl.appendChild(buildTasks());
     appEl.appendChild(buildDailies());
@@ -3552,6 +3643,18 @@
     // scrollHeight only reads true once the element is in the document, so
     // every textarea is sized after the tree is built rather than on creation
     appEl.querySelectorAll("textarea").forEach(autoGrow);
+    var ct = appEl.querySelector(".combo-text");
+    if (ct) {
+      var cr = ct.closest(".combo-row");
+      var cb = cr ? cr.querySelector(".combo-bar") : null;
+      if (cb) {
+        var barR = cb.getBoundingClientRect().right;
+        var ctR = ct.getBoundingClientRect();
+        var covered = Math.max(0, barR - ctR.left);
+        var uncov = Math.max(0, ctR.width - covered);
+        ct.style.setProperty("--combo-clip-r", uncov.toFixed(1) + "px");
+      }
+    }
   }
 
   // ---------------------------------- toast ----------------------------------

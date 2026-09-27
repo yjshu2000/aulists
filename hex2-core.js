@@ -27,12 +27,8 @@ window.Hex2 = (function () {
   const MODE_KEY = "hex2.mode";
   const BREAK_KEY = "hex2.break.start";
   const GRASS_KEY = "grass.count";
-  // Falsedge's golden hour, rolled here because leaving the game is the only
-  // way in. One key: while `now` is under it the hour runs, for an hour after
-  // that it cannot be rolled again.
-  const GOLDEN_KEY = "golden.end";
-  const GOLDEN_MS = 60 * 60 * 1000;
-  const GOLDEN_ODDS = 24;
+  // Lockout dial: 12-hour face, 1/12 odds for +2 grass.
+  const GOLDEN_ODDS = 12;
   const GOLDEN_SWEEP_MS = 1000;
   // linear ramp down for no stupid slowness grrr
   const GOLDEN_RAMP = 0.25;
@@ -1441,20 +1437,7 @@ window.Hex2 = (function () {
   let goldenPending = false;
   let ghRaf = 0;
 
-  // an hour running, or still inside the invisible hour after it ended
-  function goldenBlocked() {
-    const raw = store.get(GOLDEN_KEY);
-    let end = 0;
-    if (raw) {
-      end = new Date(raw).getTime();
-      if (isNaN(end)) {
-        end = 0;
-      }
-    }
-    return Date.now() < end + GOLDEN_MS;
-  }
-
-  // 24 marks, 15 degrees apart, 24 at the top
+  // 12 marks, 30 degrees apart, 12 at the top
   function buildGoldenDial() {
     if (!ghDial || ghDial.childElementCount) {
       return;
@@ -1462,7 +1445,7 @@ window.Hex2 = (function () {
     for (let h = 1; h <= GOLDEN_ODDS; h++) {
       const m = document.createElement("span");
       m.className = "gh-mark";
-      m.style.setProperty("--a", (h * 15) + "deg");
+      m.style.setProperty("--a", (h * 30) + "deg");
       m.textContent = String(h);
       ghDial.appendChild(m);
     }
@@ -1485,25 +1468,23 @@ window.Hex2 = (function () {
     ghDial.querySelectorAll(".gh-mark").forEach(function (m) {
       m.classList.remove("lit", "won", "lost");
     });
-    const claim = document.getElementById("go-falsedge");
-    if (claim) {
-      claim.classList.remove("gh-won");
-    }
   }
 
   // One lap to wind up, then a second that lights each mark as the hand
   // passes it. What it lights stays lit.
   function sweepGolden(hour) {
     const marks = ghDial.querySelectorAll(".gh-mark");
-    const end = 360 + hour * 15;
+    const end = 360 + hour * 30;
     const start = performance.now();
     ghRing.classList.add("show");
     function frame(now) {
       const t = Math.min(1, (now - start) / GOLDEN_SWEEP_MS);
       const a = end * goldenEase(t);
-      ghHand.style.transform = "rotate(" + a.toFixed(2) + "deg)";
+      ghHand.style.transform =
+        "rotate(" + a.toFixed(2) + "deg)";
       marks.forEach(function (m, i) {
-        m.classList.toggle("lit", a >= 360 + (i + 1) * 15);
+        m.classList.toggle(
+          "lit", a >= 360 + (i + 1) * 30);
       });
       if (t < 1 && end - a >= 0.4) {
         ghRaf = requestAnimationFrame(frame);
@@ -1517,19 +1498,18 @@ window.Hex2 = (function () {
       }
       marks[hour - 1].classList.add("won");
       goldenPending = true;
-      const claim = document.getElementById("go-falsedge");
-      if (claim) {
-        claim.classList.add("gh-won");
+      if (earnNum) {
+        earnNum.textContent = "+2";
       }
     }
     ghRaf = requestAnimationFrame(frame);
   }
 
-  // Lockout looks normal while an hour is running or cooling down
+  // Reset and roll the lockout dial animation
   function preRollGolden() {
     clearGolden();
     goldenPending = false;
-    if (!ghRing || goldenBlocked()) {
+    if (!ghRing) {
       return;
     }
     buildGoldenDial();
@@ -1537,15 +1517,6 @@ window.Hex2 = (function () {
       Math.floor(Math.random() * GOLDEN_FONTS.length)];
     ghDial.style.setProperty("--gh-font", '"' + face + '"');
     sweepGolden(1 + Math.floor(Math.random() * GOLDEN_ODDS));
-  }
-
-  // Cashes an unclaimed win. Only the lockout's Go to Falsedge does this.
-  function claimGolden() {
-    if (!goldenPending) {
-      return;
-    }
-    goldenPending = false;
-    store.set(GOLDEN_KEY, new Date(Date.now() + GOLDEN_MS).toISOString());
   }
 
   // absent on the standalone public build, which is never timed
@@ -1599,12 +1570,16 @@ window.Hex2 = (function () {
     fakeAdRaf = requestAnimationFrame(tickFakeAd);
   }
 
-  // One grass per wait actually sat through - closeFakeAd is already gated on
-  // fakeAdReady, so there is no partial credit. It lives under its own key
-  // rather than inside either app's save blob, so neither can rewind it.
+  // Grass award per fake ad: normally 1, doubled to 2 when the dial landed on
+  // 12. Has its own key so neither app can rewind it.
   function payGrass() {
-    let n = parseInt(store.get(GRASS_KEY) || "0", 10) || 0;
-    n += 1;
+    let n = parseInt(
+      store.get(GRASS_KEY) || "0", 10) || 0;
+    let award = 1;
+    if (goldenPending) {
+      award = 2;
+    }
+    n += award;
     store.set(GRASS_KEY, String(n));
     if (!earn) {
       return;
@@ -1624,10 +1599,9 @@ window.Hex2 = (function () {
       cancelAnimationFrame(fakeAdRaf);
       fakeAdRaf = 0;
     }
-    // staying in the game throws an unclaimed golden hour away
+    payGrass();
     goldenPending = false;
     clearGolden();
-    payGrass();
     // the pop plays over the lockout, so the break's 30s starts after it
     setTimeout(function () {
       if (earn) {
@@ -1841,28 +1815,11 @@ window.Hex2 = (function () {
       applyDim();
     }
 
-    function rollGolden() {
-      if (goldenBlocked()) {
-        return;
-      }
-      if (Math.floor(Math.random() * GOLDEN_ODDS) !== 0) {
-        return;
-      }
-      store.set(GOLDEN_KEY,
-        new Date(Date.now() + GOLDEN_MS).toISOString());
-    }
-
     const exits = document.querySelectorAll(".navaway");
     for (const link of exits) {
       link.addEventListener("click", function () {
         store.set(BREAK_KEY, "0");
-        if (link.classList.contains("page-nav-top")) {
-          rollGolden();
-          return;
-        }
-        if (link.id === "go-falsedge") {
-          claimGolden();
-        }
+        goldenPending = false;
       });
     }
 
