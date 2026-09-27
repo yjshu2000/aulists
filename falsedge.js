@@ -19,11 +19,11 @@
   var STREAK_LOCKDOWN_MS = 36 * 60 * 60 * 1000;
   var STREAK_GRACE_MS = 12 * 60 * 60 * 1000;
   // Combo: stored under its own key so undo can't affect it.
-  // Setting a task adds +4h to the combo window, capping at +12h.
+  // Setting a task adds +4h to the combo window, capping at +20h.
   // Pays +0.1 pts per calendar day of active combo, capping at +1.0 (day 10).
   var COMBO_KEY = "falsedge.combo";
   var COMBO_STEP_MS = 4 * 60 * 60 * 1000;
-  var COMBO_MAX_MS = 12 * 60 * 60 * 1000;
+  var COMBO_MAX_MS = 20 * 60 * 60 * 1000;
   var COMBO_DAY_AWARD = 0.1;
   var COMBO_MAX_AWARD = 1.0;
   var TIER_POINTS = [6, 3, 2, 1];
