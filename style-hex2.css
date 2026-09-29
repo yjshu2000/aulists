@@ -569,6 +569,11 @@
     border-radius: 50%;
     border: 1px solid color-mix(in srgb, var(--hex-green) 20%, transparent);
   }
+  .gh-ring.won .gh-face {
+    box-shadow:
+      0 0 6px var(--hex-green),
+      0 0 22px color-mix(in srgb, var(--hex-green) 90%, transparent);
+  }
   .gh-dial {
     position: absolute;
     inset: 0;

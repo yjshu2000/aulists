@@ -28,6 +28,16 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v2.25.1 <span class="changelog-date">2026-09-29 03H</span></h3>
+    <ul>
+      <li>Combo window step now tapers: +4h while under 16h remaining, +1h once 16h or over, capped at +24h (previously a flat +4h capped at +12h).</li>
+      <li>Combo state now lives in <code>state</code>, so undo rewinds it along with everything else.</li>
+      <li>Bumped the Hex 2^ lockout dial to 320px, pushing the tick marks out to match.</li>
+      <li>Hex 2^ lockout ring now glows green the moment it lands on 12, matching the existing per-digit win glow.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v2.25 <span class="changelog-date">2026-09-27 03H</span></h3>
     <ul>
       <li>Replaced Golden Hour with Task Setting Combo: setting tasks extends combo by +4h (up to 12h), awarding +0.1 pts per active calendar day (caps at +1.0 at day 10).</li>

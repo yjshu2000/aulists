@@ -19,10 +19,13 @@
   var STREAK_LOCKDOWN_MS = 36 * 60 * 60 * 1000;
   var STREAK_GRACE_MS = 12 * 60 * 60 * 1000;
   // Combo: lives in `state`, so undo rewinds it with everything else. Setting
-  // a task adds +4h to the combo window, capping at +20h. Pays +0.1 pts per
-  // calendar day of active combo, capping at +1.0 (day 10).
+  // a task adds +4h to the combo window while under 16h remaining, +1h once
+  // 16h or over, capping at +24h. Pays +0.1 pts per calendar day of active
+  // combo, capping at +1.0 (day 10).
   var COMBO_STEP_MS = 4 * 60 * 60 * 1000;
-  var COMBO_MAX_MS = 20 * 60 * 60 * 1000;
+  var COMBO_SLOW_STEP_MS = 1 * 60 * 60 * 1000;
+  var COMBO_SLOW_THRESHOLD_MS = 16 * 60 * 60 * 1000;
+  var COMBO_MAX_MS = 24 * 60 * 60 * 1000;
   var COMBO_DAY_AWARD = 0.1;
   var COMBO_MAX_AWARD = 1.0;
   var TIER_POINTS = [6, 3, 2, 1];
@@ -1916,8 +1919,9 @@
   }
 
   /**
-   * Advances the combo window on task set: +4h (capped at +20h), updates the
-   * calendar start day, awards the bonus. Rides the caller's undo entry.
+   * Advances the combo window on task set: +4h while under 16h remaining,
+   * +1h once 16h or over, capped at +24h. Updates the calendar start day,
+   * awards the bonus. Rides the caller's undo entry.
    * @param {Date} now - the reference moment.
    */
   function awardComboSet(now) {
@@ -1925,10 +1929,15 @@
     var award = COMBO_DAY_AWARD;
     if (c && now.getTime() < c.end) {
       award = comboAward(now);
+      var remainingMs = c.end - now.getTime();
+      var step = COMBO_STEP_MS;
+      if (remainingMs >= COMBO_SLOW_THRESHOLD_MS) {
+        step = COMBO_SLOW_STEP_MS;
+      }
       state.combo = {
         startDay: c.startDay,
         end: Math.min(
-          c.end + COMBO_STEP_MS,
+          c.end + step,
           now.getTime() + COMBO_MAX_MS)
       };
     } else {

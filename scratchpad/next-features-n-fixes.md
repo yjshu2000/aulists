@@ -535,6 +535,18 @@ Use `assets/icon-grass.svg`, already drawn: overlapping blades in five emerald g
 - **Lockdown reduction**, an unset amount of grass per hour taken off. Applies to any lockdown, not one in particular: the 36h streak-break lockdown, the 36h cancel cooldown on a dated `others` row, and whatever else grows one later.
 - More exchanges, not yet decided.
 
+Update 26-09-27
+
+grass shop:
+- 60 grass -> 1pt
+- 60 grass -> bypass a lockdown or cooldown to set 1 task
+- 4 grass -> modify existing task's deadline
+
+note on grass sources:  
+- 'watch' 1 fake-ad, 11/12: +1 grass
+- 'watch' 1 fake-ad, 1/12: +2 grass
+- reach any 16384 tile: +16 grass
+
 ### [i48] Golden Hour pre-roll ⬜
 last consolidated: 26-09-13
 

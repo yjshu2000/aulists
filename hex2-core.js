@@ -1464,7 +1464,7 @@ window.Hex2 = (function () {
     if (!ghRing) {
       return;
     }
-    ghRing.classList.remove("show");
+    ghRing.classList.remove("show", "won");
     ghDial.querySelectorAll(".gh-mark").forEach(function (m) {
       m.classList.remove("lit", "won", "lost");
     });
@@ -1497,6 +1497,7 @@ window.Hex2 = (function () {
         return;
       }
       marks[hour - 1].classList.add("won");
+      ghRing.classList.add("won");
       goldenPending = true;
       if (earnNum) {
         earnNum.textContent = "+2";
