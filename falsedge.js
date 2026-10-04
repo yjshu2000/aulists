@@ -9,7 +9,6 @@
   var UNDO_BYTE_BUDGET = 2 * 1024 * 1024;
   var EXPORT_LIMIT = 2000;
   var COPY_WINDOW_MS = 10 * 60 * 1000;
-  var MIN_LEAD_MS = 20 * 60 * 1000;
   var DAY_MS = 24 * 60 * 60 * 1000;
   var WEEK_MS = 7 * DAY_MS;
   // cancelling a dated `others` activation locks that row out this long
@@ -183,7 +182,7 @@
 
   /**
    * Resolves a bare "HH:MM" clock time to its next settable occurrence -
-   * today's if it still clears the 20-minute lead, tomorrow's otherwise.
+   * today's if it is still ahead of now, tomorrow's otherwise.
    * @param {string} t - a clock time, "HH:MM".
    * @param {Date} now - the reference moment.
    * @returns {Date} the resolved absolute instant.
@@ -192,7 +191,7 @@
     var parts = String(t).split(":");
     var d = new Date(now.getTime());
     d.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
-    if (d.getTime() < now.getTime() + MIN_LEAD_MS) {
+    if (d.getTime() <= now.getTime()) {
       d.setDate(d.getDate() + 1);
     }
     return d;
@@ -1763,8 +1762,8 @@
 
   /**
    * Moves an active task's deadline. Validated exactly as SET validates a new
-   * one - resolved from `getNow()` at tap time, held to the same 20-minute
-   * floor, and refused if another active task already holds that instant. The
+   * one - resolved from `getNow()` at tap time, refused if it is not in the
+   * future, and refused if another active task already holds that instant. The
    * task's own deadline is excluded from the overlap check, since a task can
    * hardly clash with itself.
    *
@@ -1788,15 +1787,15 @@
   }
 
   /**
-   * Holds a proposed deadline to the 20-minute floor and the overlap rule,
-   * then commits it. The task's own deadline is excluded from the overlap
-   * check, since a task can hardly clash with itself. Refused outright once
-   * that deadline has passed.
+   * Refuses a proposed deadline that is not in the future, or that overlaps
+   * another task, then commits it. The task's own deadline is excluded from the
+   * overlap check, since a task can hardly clash with itself. Refused outright
+   * once that deadline has passed.
    * @param {string} id - the task id.
    * @param {Date} deadline - the proposed replacement.
    * @param {Date} now - the reference moment.
    * @param {string} label - the undo label.
-   * @param {string} tooSoon - toast for a deadline under the floor.
+   * @param {string} tooSoon - toast for a deadline not in the future.
    */
   function commitTaskDeadline(id, deadline, now, label, tooSoon) {
     var task = findTask(id);
@@ -1805,7 +1804,7 @@
       refuseTimeEdit();
       return;
     }
-    if (deadline.getTime() - now.getTime() < MIN_LEAD_MS) {
+    if (deadline.getTime() <= now.getTime()) {
       toast(tooSoon);
       render();
       return;
@@ -2020,7 +2019,7 @@
       return;
     }
     var deadline = resolveDeadline(setChosenTime(now), date, now);
-    if (deadline.getTime() - now.getTime() < MIN_LEAD_MS) {
+    if (deadline.getTime() <= now.getTime()) {
       toast("refreshed");
       render();
       return;
@@ -2280,7 +2279,7 @@
       }
     }
     var deadline = resolveDeadline(row.time, date, now);
-    if (deadline.getTime() - now.getTime() < MIN_LEAD_MS) {
+    if (deadline.getTime() <= now.getTime()) {
       toast("invalid time");
       return;
     }
@@ -3124,20 +3123,14 @@
 
   /**
    * The clock time SET is working with: the draft's, or the next 10-minute mark
-   * past the 20-minute floor. Both the dropdown and the submit read this.
+   * 20 minutes out. Both the dropdown and the submit read this.
    * @param {Date} now - the reference moment.
    * @returns {string} a clock time, "HH:MM".
    */
   function setChosenTime(now) {
     var held = state.setDraft.time;
     if (held) {
-      if (state.setDraft.date) {
-        return held;
-      }
-      var lead = resolveClockTime(held, now).getTime() - now.getTime();
-      if (lead >= MIN_LEAD_MS) {
-        return held;
-      }
+      return held;
     }
     return hhmm(ceil10(addMinutes(now, 20)));
   }

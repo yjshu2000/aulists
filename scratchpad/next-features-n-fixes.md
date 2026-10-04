@@ -4,23 +4,14 @@
     - [Block 4: Replace bar.md line 12](#block-4-replace-barmd-line-12)
     - [Block 5: changelog](#block-5-changelog)
   - [Falsedge](#falsedge)
-    - [\[i5\] DOLI (Double Or Lose It) mechanism ⬜ 🟢](#i5-doli-double-or-lose-it-mechanism--)
-    - [\[i14\] Complex tasks ⬜](#i14-complex-tasks-)
-      - [\[i14.1\] Multipliers and bonuses (exploratory) ⬜ 🟢](#i141-multipliers-and-bonuses-exploratory--)
-      - [\[i14.2\] Event-anchored deadlines ⬜ 🟡](#i142-event-anchored-deadlines--)
-      - [\[i14.3\] Micro tasks (NL) ⬜ 🟠](#i143-micro-tasks-nl--)
-        - [\[i14.3.1\] Micro tasks - beta/simplified version](#i1431-micro-tasks---betasimplified-version)
-      - [\[i14.4\] Tasks with secondary/minor (name/vocab uncertain) tasks ⬜](#i144-tasks-with-secondaryminor-namevocab-uncertain-tasks-)
     - [\[i19\] Delete individual ledger entries ⚪ 🟡](#i19-delete-individual-ledger-entries--)
     - [\[i21\] Daily score chart ⬜ 🟡](#i21-daily-score-chart--)
     - [\[i26\] Export all app data ⚪ 🔴](#i26-export-all-app-data--)
+    - [\[i26.1\] Rename Activate (daily and others) properly ▫️](#i261-rename-activate-daily-and-others-properly-️)
     - [\[i33\] Rename the failed path ⚪](#i33-rename-the-failed-path-)
       - [\[i33.1\] Late completion pays 0.1 ▫️](#i331-late-completion-pays-01-️)
     - [\[i35\] Custom tasks (CL) ⬜](#i35-custom-tasks-cl-)
-    - [\[i45\] Queue ⬜ 🔴](#i45-queue--)
     - [\[i47\] late completion backdateable (yellow)](#i47-late-completion-backdateable-yellow)
-    - [\[i49\] Lock the deadline editor once the deadline passes ⚪](#i49-lock-the-deadline-editor-once-the-deadline-passes-)
-    - [\[i50\] Tap row text to edit it ⚪ 🟡](#i50-tap-row-text-to-edit-it--)
   - [Aulists](#aulists)
     - [\[i15\] Tear down and rebuild Aulists ⬜ 🟢](#i15-tear-down-and-rebuild-aulists--)
   - [Hex 2^](#hex-2)
@@ -32,9 +23,7 @@
     - [\[i40\] Fake ad timer freezes on return from Falsedge ⚪ 🐞](#i40-fake-ad-timer-freezes-on-return-from-falsedge--)
     - [\[i43\] Challenge mode has bug due to outline ⚪ 🐞 🟢](#i43-challenge-mode-has-bug-due-to-outline---)
   - [Multi-page items](#multi-page-items)
-    - [\[i41\] Cooldown on the Go to Hex 2^ button ⚪](#i41-cooldown-on-the-go-to-hex-2-button-)
     - [\[i46\] Grass shop ⬜](#i46-grass-shop-)
-    - [\[i48\] Golden Hour pre-roll ⬜](#i48-golden-hour-pre-roll-)
     - [\[i27\] (low priority/far future) - Server side ⬜⬜⬜ 🔵](#i27-low-priorityfar-future---server-side--)
   - [Colourcaln?](#colourcaln)
     - [\[i42\] Revive Colourcaln as a vibes tracker ⬜](#i42-revive-colourcaln-as-a-vibes-tracker-)
@@ -146,122 +135,6 @@ increment: +0.0.1
 
 ## Falsedge
 
-### [i5] DOLI (Double Or Lose It) mechanism ⬜ 🟢
-last consolidated: 26-08-22
-
-Ships complete: state schema, scoring curve, limits, and the promotion control itself.
-
-**Scoring.** WL/HL is a general ½-scale state, not two fixed unrelated arrays (`HL_OFFSETS` is `WL_OFFSETS` halved: `[0,10,30,60]` → `[0,5,15,30]`). DOLI defines its own whole (WL) schedule, and the same halving rule applies when a DOLI task is set to HL:
-
-```
-WL  minutes past deadline:  0   10   30   60   120   >120
-HL  minutes past deadline:  0    5   15   30    60    >60
-    points:                12    6    3    2     0     -6
-```
-
-(0 means completed on time / within deadline.) The key difference from a normal task: instead of just becoming 0, there's only a 1-hour window at 0 before it drops straight to -6.
-
-**Early bonus.** A DOLI task completed early awards **+1** per whole 24h ahead of its deadline, against a normal task's +2. The base 12 is high enough that the normal rate compounds too fast on top of it.
-
-**Visual.** A promoted task shows a 64px Aventurine chibi in its own block, in the empty space to the right of the `by X for X pts` lines, vertically centred against that whole group of rows. Four images, one picked at random per page load and stable through re-renders until an actual reload: `assets/aven-play-cards.png`, `assets/aven-cool.png`, `assets/aven-cheers.png`, `assets/aven-throw-money.png`.
-
-**Promotion control.** A 32px rounded square, 10px radius, containing `assets/arrow-promo.svg` at 20px. It exists exactly once on the page, in the `ACTIVE TASKS` wrapper header (`#tasksCard`).
-
-
-The square carries no CSS border. Its outline is an SVG rounded rect drawn twice: a flat grey base ring, and a glowing ring over it carrying `pathLength="100"` with a `stroke-dasharray` driven by cooldown progress, so the outline traces itself clockwise from the top-left corner as the cooldown elapses. The glowing stroke takes the wrapper's `--glow`, which is `var(--c-green)`. A closed loop means ready, a partial arc means still cooling, and there is no interior fill at any point.
-
-Tapping the square enters pick mode: every active task block gets a full-block overlay reading `select` — the existing `.edit-overlay` treatment reparented to `.task-block`, which is already `position: relative` and so needs no other change. Tapping a block promotes it. Tapping the square again, or anywhere that isn't a task block, leaves pick mode without promoting anything.
-
-Promotion is irreversible. Undo is the only way back, and otherwise the only exit is cancelling the task outright — the mechanic is a gamble on commitment, so there is no un-promote.
-
-A promoted task is frozen. Neither edit overlay is attached to it: not `edit time?` on `.tier-rows`, which also carries the date row, and not the text editor on `.task-text-row`. Text, clock time, date and WL/HL are all fixed at the moment of promotion. Without that, a promoted task could have its deadline pushed out and collect 12 points for nothing.
-
-**Limits.** Promoting costs nothing at the moment of promotion. Two limiters instead:
-
-- **One per calendar day.** At most one task may be promoted per calendar day. What becomes of it afterwards does not matter — completing, cancelling or failing it does not buy the day back.
-- **Concurrent cap.** At most `floor(doliLimit)` DOLI tasks may be active at once. `doliLimit` starts at `1`, floors at `1`, and has no ceiling. A completed DOLI adds `+0.2`; a cancelled or failed one subtracts `-0.5`.
-
-A DOLI task cancelled from a dated `others` row still takes the existing 36h `COOLDOWN_MS` lock on that row. Different scope — the row lock stops re-activating that row, the daily limit stops promoting anything at all.
-
-The square is inert once the day's promotion is spent or the concurrent cap is met.
-
-**Undecided:** the tier system only has four rungs. `tierList()` zips `WL_OFFSETS`/`HL_OFFSETS` against `TIER_POINTS`, all length four, and `liveTierIndex()` returns `-1` past the last one, which every caller reads as "failed, award 0". DOLI's table needs six rungs and a `-6`, so both functions need a second shape and `-1` stops meaning what it means today.
-
-Negative awards have never run through `resolveTask()`. `taskEntryText()` branches on `award > 0 && ptsDelta === 0` and has no case for a negative, so the ledger line for a `-6` is unwritten.
-
-UPDATE 26-09-18:  
-THIS HAS LARGELY BEEN ABANDONED. user is no longer sure if DOLI will ever be implemented. ignore factoring this into account for any new features.
-
-### [i14] Complex tasks ⬜
-
-#### [i14.1] Multipliers and bonuses (exploratory) ⬜ 🟢
-last consolidated: 26-08-15
-
-Vague idea — support for multipliers on tasks, conditional on something unspecified. Not fleshed out.
-
-#### [i14.2] Event-anchored deadlines ⬜ 🟡
-last consolidated: 26-08-16
-
-A task can be set whose deadline isn't known at set time, because it hangs off an event that hasn't happened yet — "within 1h of check phone after wake", "within 1h of getting home (chimer resumes)". The event's real time is entered manually later, and the deadline is computed from it: enter `19:37` and the deadline resolves to `20:40`.
-
-**Undecided:** nearly all of it. The `19:37` → `20:40` example is +1h and then rounded up to the next 10-minute mark, which matches the app's existing 10-minute offset granularity, but that rounding rule was never stated outright. Also open: where the anchor phrase is authored, what the task displays before its event time is entered, whether the offset is fixed at 1h or configurable per task, whether scoring runs from the resolved deadline exactly as a normal task's does, and what happens if the event time is never entered at all.
-
-#### [i14.3] Micro tasks (NL) ⬜ 🟠
-last consolidated: 26-08-15
-
-A second, smaller class of task. `NL` (no leniency) *is* the micro-task marker — tagging an item NL hands it the whole package rather than only switching leniency off, so there is no separate "micro" toggle to set.
-
-- Worth +1 point, flat.
-- One hard deadline. No WL/HL ladder, no offsets, no partial credit: on time or 0.
-- Can come as a set sharing a single deadline, each member checked off individually.
-- Can live in templates, dailies and others alike.
-- Can be attached to another item. Swiping that item into an active task activates its whole micro-task set alongside it — and that is the *only* link between them. Cancelling or editing the parent afterwards does nothing to the set; the attachment is a swiping convenience, not a dependency.
-- Cancelling works at either granularity: one micro task on its own, or the whole set at once.
-- DOLI does not apply to micro tasks — a +1 task is not worth a gamble slot.
-
-##### [i14.3.1] Micro tasks - beta/simplified version
-
-update 26-08-30
-
-Keeping only the "NL" and 1 pt part, the rest of the task looks exactly the same as other tasks. Thus, selecting "NL" (with the buttons being WL | HL | NL) would simply have a task with only 1 deadline (no leniency) and 1 pt score.
-
-...actually no wait now I can't decide if I want this to be "2 pts / 1 pts leniency" but idk what I'd call that... ugh.
-
-update 26-09-01
-
-2 pts at deadline. 1 pts for 1h late. the button is changed from NL to MT (micro task). also, is there still a comment somewhere about ML (mega leniency)? get rid of that... delete that and update with the new MT.
-
-#### [i14.4] Tasks with secondary/minor (name/vocab uncertain) tasks ⬜
-last consolidated: 26-08-26
-
-Completing the second task of a main task within the deadline awards 4pts. does not stack with completing the main task. the second task must always be a subset of the main task: eg, if the main task is "vacuum and mop the floors" the 2nd task would be "vacuumed floor" or smth. I don't know if "second" makes sense as a name though.
-
-2nd task completion has no leniency. The main task still has regular leniency, whatever was selected (WL, HL, etc). eg, just vacuumed floor but later than deadline -> no pts. vacuumed and mopped later than deadline but within leniency -> some pts. only vacuumed floor but before deadline and then ALSO didn't mop (or forfeiting/giving up on that) before the final leniency time -> 4pts.
-
-**Undecided: the scoring does not hold together yet.** `TIER_POINTS` is `[6, 3, 2, 1]`, so a flat 4 for the second task sits above three of the four tiers. Once the 4 is banked, finishing the main task late pays *less* than not finishing it at all — vacuum on time, mop ten minutes late, and 4 points becomes 3. The rule that has to hold is that **every main-task tier must be worth more than the second task's award**, and no arrangement of "which one you get" can deliver that while the numbers stay as they are. Either the award comes down or the ladder goes up.
-
-Two families of fix, neither chosen:
-
-**Additive.** The second task's award stacks on top of whatever the main task scores, and `TIER_POINTS` is left alone. Finishing then always adds the tier, so doing more is always worth more at every point on the clock. This drops the "does not stack" rule above, which is the price of the pull it buys.
-
-```
-                    +2   +3   +4
-second task only     2    3    4
-full, on time        8    9   10
-full, +10           5    6    7
-full, +30           4    5    6
-full, +60           3    4    5
-```
-
-**A dedicated ladder.** Two-objective tasks get their own `TIER_POINTS` whose lowest rung clears the second task's award — `[10, 8, 6, 5]` against an award of 4, for instance. "Does not stack" survives, and the higher pay justifies itself on the grounds that a two-objective task is more work. The difficulty is shape rather than arithmetic: `[6, 3, 2, 1]` halves and then crawls, so any scalar multiple of it inherits that cliff, and candidates like `[8, 4, 3, 2]` or `[9, 6, 4, 3]` scale unevenly rung to rung.
-
-**This collides with [i5].** A promoted DOLI task is worth 12 on time. An additive `+4` puts a two-objective task at 10 with no gamble and no downside, which leaves DOLI very little room; `+2` tops out at 8 and does not.
-
-**Also undecided:** when the 4 is actually awarded, given nothing in Falsedge resolves on its own — whether `cancel task` pays it out once the second task is ticked, or a separate forfeit control is needed. How the second task is ticked off and whether that tick is timestamped, since "before the deadline" has to be judged later and a task resolved at 23:00 cannot otherwise prove the vacuuming happened at 19:00. Whether a second task can be authored on dailies and `others` rows or only in SET. Whether there can be more than one. And the name: **sub-task**, **partial**, **minimum**, **fallback** and **milestone** are all candidates, with "minimum" reading closest to the mechanic.
-
-update 26-08-27:  
-just realized omg. we don't need separate custom tasks. *every* task can have option to become custom task. which is basically just an option of "complete now for x pts". in fact those fields can be hidden normally unless you tap the space next to the button or smth... anyway this isn't concrete or anything yet idk.
-
 ### [i19] Delete individual ledger entries ⚪ 🟡
 last consolidated: 26-08-16
 
@@ -285,6 +158,11 @@ A full Falsedge state export — templates, ledger, points, scores, the lot — 
 
 Aulists already has exactly this and is the model to copy: `exportJSON()` (`JSON.stringify(state, null, 2)`), an export-to-textarea button, an export-to-file button, `importFromText()` behind a confirm that replaces state wholesale, and a `lastExported` stamp with a "last exported" note. Falsedge gets the same set, running through its own `normalise()` on import for the same reason Aulists does.
 
+### [i26.1] Rename Activate (daily and others) properly ▫️
+
+26-10-02  
+Right now the storage variables can't be renamed or it will orphan the data. once the export is available, we can modify the data directly, then change the current variables "templates" and "others to "dailies" and "queueds"
+
 ### [i33] Rename the failed path ⚪
 last consolidated: none
 
@@ -306,87 +184,16 @@ last consolidated: 26-08-22
 A third leniency setting beside WL and HL, on the same row: **CL**, custom leniency. Choosing it creates a *custom task*, which structurally is just the existing Set block with the deadline and leniency requirements dropped.
 
 - The body is a single multiline free-text field. Nothing else is required.
-- While active, `complete now` reads **`complete now for X pts`**. X is a suggest field — typed or picked — offering `1 2 3 4 5 6 8 10 12`.
-- X defaults to blank. Completing with it blank awards 0. That is almost always a mistake, and undo covers it.
+- While active, `complete now` reads **`complete now for [__] pts`**. __ is a suggest field — typed or picked — offering `1 2 3 4 5 6 8 10 12`.
+- the [__] defaults to blank. Completing with it blank awards 0. That is almost always a mistake, and undo covers it.
 - Cancel behaves normally.
 - A date may still be set, but it is **ordering only**: it places the task among the active tasks and drives nothing else. No deadline, no tiers, no scoring. This replaces the earlier pin-to-top / pin-to-bottom idea, which is dropped as strictly more work for the same result.
-- `CL` joins the leniency legend comment in `falsedge.js` beside WL, HL, NL and ML.
-
-**Undecided:** CL strictly dominates DOLI. DOLI's 12 points cost a deadline and a -6 downside; CL's 12 points cost typing `12`. More broadly it is an unbounded self-award available on any task, so it undercuts the whole scoring economy rather than just DOLI. No limiter has been chosen.
-
-### [i45] Queue ⬜ 🔴
-last consolidated: 26-09-05
-
-**ACTIVATE (others) becomes ACTIVATE (QUEUE).** No new section is added — the existing one is repurposed. Manual ordering was the only thing a separate Queue would have had that others lacked, and others has it now.
-
-**The line.** A divider inside the section. Rows above it are the **active queue**; rows below it are the **inactive queue**, greyed the way a `further` active task is. The greying is purely visual — every action still works on an inactive-queue row. Moving a row across the line is how it joins or leaves the active queue.
-
-**Row colours.** A row in the queue takes a red border. A row currently out as a task keeps its blue text. The section's own border stays indigo.
-
-**Ordering is by drag.** The ▲▼ chevrons are replaced by a `Move ↕` handle — touching it starts a vertical drag, and the rest of the row keeps its swipe actions. **Long-pressing the handle** opens a position picker: a native `<select>` of positions 1 to n, which renders as a popup on mobile.
-
-**Every row carries its position number**, always shown, to the left of the row and **outside** its box, so the boxes' left border shifts right slightly. Small, vertically centred against the row, sized and coloured like the `by` / `on` labels.
-
-**Rows are marked recurring or not**, shown by an icon on the row.
-- **Recurring** — completing sends it to the inactive queue. Cancelling returns it to the position it came from.
-- **Not recurring** — completing **deletes it outright**. Cancelling returns it to the position it came from *and* applies the 36h cooldown; tracking one-shots in the queue is largely what buys that.
-
-**A new row is added at the bottom of the active queue.**
-
-**The section is collapsible.**
-
-**"Fail" is a misnomer and needs renaming.** It means *completed, too late to score* — the item was done. It therefore belongs on the complete path, and [i33]'s plan to collapse it into cancel is wrong.
-
-**Undecided:**
-- Whether the section reads **QUEUE** or **QUEUED**.
-- Whether a completed **recurring** row lands at the **top or the bottom** of the inactive queue.
-- **What the recurring icon is.**
-- **What replaces the word "fail".**
-- **How the line is stored.** Either an index — `state.others` stays a clean array of rows, but the count is a second source of truth every mutation has to maintain — or a sentinel object sitting in the array at the divide, which makes position the only source of truth and gives a draggable line for free, at the cost of a skip in `sortedOthers`, `buildOthers`, `addRow`, and a `normalise()` rule guaranteeing exactly one. A per-row boolean is **not** an option: it breaks the premise, since position is what defines membership and a flag lets `false` rows sit above `true` ones with no line to draw.
-
-
-Update 26-09-06:  
-- nvm on several features
-- nvm the numbers 
-- nvm the jump to position thing (can't decide how to UI anyway)
-- queue is just anything above the line is red and anything below isnt. 
-- actually no wait. there's the Move | button, but also 1 chevron to the left of it, ...oh gods im not sure if there will be room for it TwT we're so running out of space.... y'know what, the WL/HL buttons can afford to be smaller!! there's a heckton of margin on those things! 
-- anyway. so eventually it will look like 
-[WL] [HL] [MT] (<left vs right align>) [^/v] [Move |] [hambugu]
-- the chevron button is only 1 bcuz it either moves it into or out of queue. 
-- actually I'm debating on the move dragger... maybe we only need "move to top of queue" or "move to bottom of queue"...? idk
-- wait no just, let's go with just like, simplest path... repurpose existing chevron buttons. now there's essentially two hamburger menus but the other one is specifically for queue positions. so the chevron buttons become. [X][Y] where X is either up or down depending on whether item is in queue (point down for move out of queue) or vice versa. Y is the queue position menu but I'm not sure of the symbol yet... honestly might just use literal Q lol. opens a menu that says "move to top of queue" "move to bottom of queue" "..... wait no that's not the idea. hold on. what am I doing. no.
-- no we need to keep both chevron buttons for fine positioning (I don't want the drag anymore) and then we're bringing back the numbers but also the menu thing is actually gonna  just be from long press on the chevron buttons and... 
-- OH MY GODS FORGET ALL OF THAT CAN WE ADD LIKE. PURE CSS LOGIC. ZERO BUTTON CHANGES. JUST THE DIVIDER LINE AND THE LOGIC OF "ABOVE LINE IS RED, BELOW LINE IS GREY"
-
-Update 26-09-12:  
-- the icon to indicate a non-recurring task is a mirrored ⊫ (ie, smth like =||). badge visible only in queue (not in ACTIVE TASKS) and it's ...beside the date..? (tentative) (the buttons on that row are kinda big... maybe we should shrink them a bit... like the time ones are massive wtf. margins too big. gap between : could shrink a bit too. make room)
-- toggle recurring/non-recurring in hamburger menu eg "Mark recurring" or "Mark non-recurring" (recurring is default and has no icon)
-- the term "non-recurring" is NOT FINAL. might change to "singular" or "one-off" or smth- not sure yet.
+- `CL` joins the leniency legend comment in `falsedge.js` beside WL, HL, NL.
 
 ### [i47] late completion backdateable (yellow)
 
 update 26-09-12  
 I just want this for more accurate backdating smh. tapping the small "completed before" text opens a date and time picker.
-
-### [i49] Lock the deadline editor once the deadline passes ⚪
-last consolidated: 26-09-17
-
-An active task's deadline/leniency editor is reachable only **before that task's first deadline** — the instant it was set to when it was created. After that it cannot be opened at all.
-
-**The first deadline is stored separately.** `task.deadline` moves every time the editor is used, so the lock cannot key off it or every edit would push the lock along with it. The task keeps the deadline it was created with, and that is what the lock reads.
-
-**The refusal is loud, not silent.** The `edit time?` overlay still appears on tapping the tier rows. Tapping the overlay toasts instead of opening the editor. Same shape as `[Delete exported]`, which is greyed by class rather than `disabled` so that a tap still has to answer.
-
-Only the time and date editor locks. The task's text stays editable.
-
-**Undecided:**
-- The toast's wording.
-
-### [i50] Tap row text to edit it ⚪ 🟡
-last consolidated: 26-09-20
-
-An ACTIVATE row's text is edited the same way an active task's is: tap the text for an `edit?` overlay, tap the overlay for the inline editor. Both sections, dailies and others.
 
 ## Aulists
 
@@ -509,15 +316,6 @@ sent the game to a friend who reported that the challenge mode is broken; tiles 
 
 ## Multi-page items
 
-### [i41] Cooldown on the Go to Hex 2^ button ⚪
-last consolidated: 26-08-22
-
-Falsedge's "Go to Hex 2^" button is inert for **10 seconds** after the page loads. Long enough to force a pause, far shorter than the minimums for staying inside the game.
-
-Shown as a filling bar, never as numbers. Ticking once a second is acceptable; a smooth fill is preferred only if it costs nothing structurally — this is one small bar, not a reason to restructure how the page draws.
-
-The clock runs from page load, so it applies once per visit and cannot be banked.
-
 ### [i46] Grass shop ⬜
 last consolidated: 26-09-01
 
@@ -540,31 +338,12 @@ Update 26-09-27
 grass shop:
 - 60 grass -> 1pt
 - 60 grass -> bypass a lockdown or cooldown to set 1 task
-- 4 grass -> modify existing task's deadline
+- (n = 1; for each edit, n++) grass -> modify existing task's deadline or text. (as in, initial edit cost is 1; for each edit, the cost increases by 1, so the cost each time would be 1, then 2, then 3, etc.)
 
 note on grass sources:  
 - 'watch' 1 fake-ad, 11/12: +1 grass
 - 'watch' 1 fake-ad, 1/12: +2 grass
 - reach any 16384 tile: +16 grass
-
-### [i48] Golden Hour pre-roll ⬜
-last consolidated: 26-09-13
-
-`rollGolden()` and its 1-in-24 odds are unchanged. What changes is that the outcome becomes visible on the **lockout screen** before you decide whether to leave — the top-of-page `← Go to Falsedge ←` link keeps rolling silently on click, exactly as today.
-
-**The win is a pending flag.** It is set the instant it rolls, not written straight to `golden.end`. Tapping `Go to Falsedge` claims it and starts the hour; tapping the × forfeits it.
-
-**Nothing visible spins while a golden hour is already running, or during its 1h cooldown.** The lockout looks exactly as it does today in both cases.
-
-**The roll resolves at lockout-open, essentially instantly.**
-
-**Visual concept.** A ring around both lockout buttons — sized to clear the pair of them, not just one — styled as a fancy analog clock face: 24 hour-marks instead of 12, a nicer display font for the numbers than the app's usual monospace/sans stack.
-
-**Undecided:**
-- Whether 24 marks fit legibly on one ring, or it needs two concentric rings (1-12 outer, 13-24 inner, arrangement TBD).
-- The actual animation — what plays when it rolls (a hand sweeping round, marks lighting in sequence, something else).
-- The font.
-
 
 ### [i27] (low priority/far future) - Server side ⬜⬜⬜ 🔵
 last consolidated: none
