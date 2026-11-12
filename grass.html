@@ -29,15 +29,21 @@
 
 <script>
 // Grass lives under its own key rather than inside falsedge.data, so
-// Falsedge's undo ring can never rewind grass earned in Hex 2^.
+// Falsedge's undo ring can never rewind grass earned in Hex 2^. What Falsedge
+// spends on edits is kept in falsedge.data instead, so its undo can refund it;
+// the balance on hand is the one less the other.
 (function () {
   "use strict";
   var GRASS_KEY = "grass.count";
   var n = 0;
   try {
     n = parseInt(localStorage.getItem(GRASS_KEY) || "0", 10) || 0;
+    var data = JSON.parse(localStorage.getItem("falsedge.data"));
+    if (data && typeof data.grassSpent === "number") {
+      n -= data.grassSpent;
+    }
   } catch (e) {
-    // storage blocked; the count falls back to zero
+    // storage blocked or unreadable; the count stays at what was read
   }
   document.getElementById("grassCount").textContent = n;
 })();

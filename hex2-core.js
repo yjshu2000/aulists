@@ -27,6 +27,17 @@ window.Hex2 = (function () {
   const MODE_KEY = "hex2.mode";
   const BREAK_KEY = "hex2.break.start";
   const GRASS_KEY = "grass.count";
+  // every merge that makes a 2048 pays this much grass, once per tile
+  const GRASS_TILE = 2048;
+  const GRASS_PER_TILE = 2;
+  // set once the 2048s already on the boards have been paid for
+  const RETRO_KEY = "grass.retro2048";
+  const SAVE_KEYS = [
+    "hex2.base.save", "hex2.jiggly.save",
+    "hex2.challenge.save", "hex2.cascading.save"
+  ];
+  // Falsedge's spending is subtracted from GRASS_KEY, never written to it
+  const FALSEDGE_KEY = "falsedge.data";
   // Lockout dial: 12-hour face, 1/12 odds for +2 grass.
   const GOLDEN_ODDS = 12;
   const GOLDEN_SWEEP_MS = 1000;
@@ -160,6 +171,9 @@ window.Hex2 = (function () {
   let saveKey = "";
   // challenge only, and outside the snapshot so undo cannot refund its cost
   let hearts = START_HEARTS;
+  // ids of tiles already paid grass for reaching 2048, outside the snapshot so
+  // undoing and replaying a merge can't pay twice
+  let paidTiles = new Set();
   // switching modes reloads the page, so this is fixed for the session
   let isChallenge = false;
 
@@ -325,6 +339,14 @@ window.Hex2 = (function () {
         if (t && t.value === HEART_TILE) {
           grantHeart();
         }
+      }
+    }
+    for (const key of res.mergedDests) {
+      const t = board.get(key);
+      if (t && t.value === GRASS_TILE && !paidTiles.has(t.id)) {
+        paidTiles.add(t.id);
+        addGrass(GRASS_PER_TILE);
+        popTileGrass(key);
       }
     }
     updateScores();
@@ -1322,6 +1344,7 @@ window.Hex2 = (function () {
       rng: rng,
       history: history,
       hearts: hearts,
+      paidTiles: Array.from(paidTiles),
     }));
   }
 
@@ -1355,6 +1378,10 @@ window.Hex2 = (function () {
       if (typeof data.hearts === "number") {
         hearts = Math.min(MAX_HEARTS, Math.max(0, data.hearts));
       }
+      paidTiles = new Set();
+      if (Array.isArray(data.paidTiles)) {
+        paidTiles = new Set(data.paidTiles);
+      }
       return board.size > 0;
     } catch (e) {
       return false;
@@ -1369,6 +1396,7 @@ window.Hex2 = (function () {
     history = [];
     idCounter = 1;
     hearts = START_HEARTS;
+    paidTiles = new Set();
     seedRng();
     if (mode.onReset) {
       mode.onReset();
@@ -1571,25 +1599,113 @@ window.Hex2 = (function () {
     fakeAdRaf = requestAnimationFrame(tickFakeAd);
   }
 
+  // Grass on hand: the stored count less what Falsedge has spent on edits,
+  // which Falsedge keeps in its own data so its undo can refund it.
+  function grassBalance() {
+    let spent = 0;
+    try {
+      const data = JSON.parse(store.get(FALSEDGE_KEY));
+      if (data && typeof data.grassSpent === "number") {
+        spent = data.grassSpent;
+      }
+    } catch (e) {
+      // unreadable Falsedge data has spent nothing
+    }
+    return (parseInt(store.get(GRASS_KEY) || "0", 10) || 0) - spent;
+  }
+
+  function addGrass(award) {
+    const n = parseInt(store.get(GRASS_KEY) || "0", 10) || 0;
+    store.set(GRASS_KEY, String(n + award));
+  }
+
   // Grass award per fake ad: normally 1, doubled to 2 when the dial landed on
   // 12. Has its own key so neither app can rewind it.
   function payGrass() {
-    let n = parseInt(
-      store.get(GRASS_KEY) || "0", 10) || 0;
     let award = 1;
     if (goldenPending) {
       award = 2;
     }
-    n += award;
-    store.set(GRASS_KEY, String(n));
+    addGrass(award);
     if (!earn) {
       return;
     }
-    earnNum.textContent = String(n);
+    earnNum.textContent = String(grassBalance());
     earn.classList.remove("pop");
     // reflow, so a second payout restarts the animation instead of ignoring it
     void earn.offsetWidth;
     earn.classList.add("pop");
+  }
+
+  // Floats "+2 [grass]" up off a tile that just reached 2048. The board is one
+  // canvas, so the tag is its own element laid over the tile's spot.
+  function popTileGrass(key) {
+    const p = posOf(key);
+    if (!p) {
+      return;
+    }
+    const tag = document.createElement("span");
+    tag.className = "tile-earn";
+    tag.style.left = p.x + "px";
+    tag.style.top = p.y + "px";
+    tag.innerHTML = "+" + GRASS_PER_TILE +
+      ' <img src="assets/icon-grass.svg" alt="grass">';
+    canvas.parentElement.appendChild(tag);
+    tag.addEventListener("animationend", function () {
+      tag.remove();
+    });
+  }
+
+  const hexToastEl = document.getElementById("hex-toast");
+  let hexToastTimer = 0;
+
+  function hexToast(msg) {
+    if (!hexToastEl) {
+      return;
+    }
+    hexToastEl.textContent = msg;
+    hexToastEl.classList.add("show");
+    clearTimeout(hexToastTimer);
+    hexToastTimer = setTimeout(function () {
+      hexToastEl.classList.remove("show");
+    }, 3200);
+  }
+
+  // One-off: pays for the 2048s already on every saved board, counting a bigger
+  // tile as the 2048s it was built from, and marks those tiles paid so their
+  // undo history can't pay for them again.
+  function payRetroGrass() {
+    if (store.get(RETRO_KEY)) {
+      return;
+    }
+    store.set(RETRO_KEY, "1");
+    let count = 0;
+    for (const key of SAVE_KEYS) {
+      let data = null;
+      try {
+        data = JSON.parse(store.get(key));
+      } catch (e) {
+        continue;
+      }
+      if (!data || !Array.isArray(data.tiles)) {
+        continue;
+      }
+      const paid = [];
+      for (const row of data.tiles) {
+        if (row[1] >= GRASS_TILE) {
+          count += row[1] / GRASS_TILE;
+          paid.push(row[2]);
+        }
+      }
+      data.paidTiles = paid;
+      store.set(key, JSON.stringify(data));
+    }
+    if (!count) {
+      return;
+    }
+    const award = count * GRASS_PER_TILE;
+    addGrass(award);
+    hexToast("+" + award + " grass for your 2048s 🌱");
   }
 
   function closeFakeAd() {
@@ -1851,6 +1967,8 @@ window.Hex2 = (function () {
 
     computeLayout();
     updateScores();
+    // before load(), so this mode's board loads with its tiles marked paid
+    payRetroGrass();
     if (!load()) {
       spawn();
       spawn();

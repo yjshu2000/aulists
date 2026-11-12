@@ -28,6 +28,20 @@
   <h2>Change logs</h2>
 
   <div class="changelog-entry">
+    <h3>v2.26 <span class="changelog-date">2026-11-11 23H</span></h3>
+    <ul>
+      <li>Streak and combo are one thing now, called the streak. Setting a task extends it: +6h while under 24h left, +2h once 24h or over, capped at 36h. Still pays +0.1 pts per day of streak, up to +1.0.</li>
+      <li>The streak breaks when its window runs out: score banked and zeroed, 36h lockout. No streak, no break, so after a lockout nothing can break again until you set a task.</li>
+      <li>Removed the old 48h completion window, its <code>x/48h</code> counter and the <code>streak broke?</code> warning.</li>
+      <li>The indicator reads <code>SE:</code> instead of <code>CE:</code>.</li>
+      <li>Editing an active task now costs grass: 1 for the first edit, 2 for the next, and so on. The <code>edit?</code> and <code>edit time?</code> overlays show the price. Time, date and mode changes in one go count as one edit, saved when the editor closes. Undo refunds it.</li>
+      <li>Hex 2^: every 2048 made pays +2 grass, popping up over the tile. Undo can't farm it. 2048s already sitting on saved boards pay out once, retroactively.</li>
+      <li>New leniency mode: <strong>DL</strong>, double leniency (20/60/120 min tiers). Mode buttons are slimmer to fit four.</li>
+      <li>Grass Shop shows the balance after edit spending.</li>
+    </ul>
+  </div>
+
+  <div class="changelog-entry">
     <h3>v2.25.2 <span class="changelog-date">2026-10-03 23H</span></h3>
     <ul>
       <li>STUPID 20 MINUTE MINIMUM BUFFER ON DEADLINES IS REMOVED!!! SET DEADLINES FREELY!!! DUE IN 2 MINUTES! 6 MINUTES! WHATEVER! GO GO GO</li>

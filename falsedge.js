@@ -13,30 +13,32 @@
   var WEEK_MS = 7 * DAY_MS;
   // cancelling a dated `others` activation locks that row out this long
   var COOLDOWN_MS = 36 * 60 * 60 * 1000;
-  // auto streak breakers + lockdown
-  var STREAK_WINDOW_MS = 48 * 60 * 60 * 1000;
+  // Streak: lives in `state`, so undo rewinds it with everything else. Setting
+  // a task adds +6h to the streak window while under 24h remaining, +2h once
+  // 24h or over, capping at +36h. Pays +0.1 pts per calendar day of active
+  // streak, capping at +1.0 (day 10). Running out breaks the streak.
+  var STREAK_STEP_MS = 6 * 60 * 60 * 1000;
+  var STREAK_SLOW_STEP_MS = 2 * 60 * 60 * 1000;
+  var STREAK_SLOW_THRESHOLD_MS = 24 * 60 * 60 * 1000;
+  var STREAK_MAX_MS = 36 * 60 * 60 * 1000;
+  var STREAK_DAY_AWARD = 0.1;
+  var STREAK_MAX_AWARD = 1.0;
+  // a broken streak locks task setting out this long
   var STREAK_LOCKDOWN_MS = 36 * 60 * 60 * 1000;
-  var STREAK_GRACE_MS = 12 * 60 * 60 * 1000;
-  // Combo: lives in `state`, so undo rewinds it with everything else. Setting
-  // a task adds +4h to the combo window while under 16h remaining, +1h once
-  // 16h or over, capping at +24h. Pays +0.1 pts per calendar day of active
-  // combo, capping at +1.0 (day 10).
-  var COMBO_STEP_MS = 4 * 60 * 60 * 1000;
-  var COMBO_SLOW_STEP_MS = 1 * 60 * 60 * 1000;
-  var COMBO_SLOW_THRESHOLD_MS = 16 * 60 * 60 * 1000;
-  var COMBO_MAX_MS = 24 * 60 * 60 * 1000;
-  var COMBO_DAY_AWARD = 0.1;
-  var COMBO_MAX_AWARD = 1.0;
+  // grass on hand is this stored count less `state.grassSpent`
+  var GRASS_KEY = "grass.count";
   var TIER_POINTS = [6, 3, 2, 1];
   // Leniency: minutes past the deadline that still score, one entry per tier.
+  // DL = double leniency
   // WL = whole leniency
   // HL = half leniency
   // MT = micro task
+  var DL_OFFSETS = [0, 20, 60, 120];
   var WL_OFFSETS = [0, 10, 30, 60];
   var HL_OFFSETS = [0, 5, 15, 30];
   var MT_OFFSETS = [0, 60];
   var MT_POINTS = [2, 1];
-  var MODES = ["WL", "HL", "MT"];
+  var MODES = ["DL", "WL", "HL", "MT"];
   // completing past the last tier but within 24h of the deadline pays this
   var DAYLATE_AWARD = 0.1;
   var DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -67,8 +69,10 @@
   // and never survives an actual page load.
   var spendOpen = false;
   var scoresOpen = false;
-  // id of the active task whose deadline/mode editor is open, if any
+  // id of the active task whose deadline/mode editor is open, if any, and the
+  // unsaved {clock, date, heldDate, mode} it holds until it closes
   var timeEditId = null;
+  var timeEditDraft = null;
   // neither ACTIVATE adder is draft-backed in storage, but both do have to
   // survive a re-render triggered from elsewhere on the page.
   var adderDrafts = {
@@ -332,7 +336,7 @@
 
   /**
    * @param {*} m - a stored or proposed mode.
-   * @returns {boolean} true for "WL", "HL" or "MT".
+   * @returns {boolean} true for "DL", "WL", "HL" or "MT".
    */
   function isMode(m) {
     return MODES.indexOf(m) !== -1;
@@ -361,7 +365,7 @@
    * Builds a brand-new, empty state object - the baseline used on first run,
    * and the starting point `normalise` fills in from parsed JSON.
    *
-   * Three things about the shape that the fields themselves don't record:
+   * A few things about the shape that the fields themselves don't record:
    *
    * `templates` holds the ACTIVATE (dailies) rows - disposable presets, {id,
    * text, time, mode}. It's called templates bcuz that's what it used to be 
@@ -370,10 +374,14 @@
    * `others` holds the ACTIVATE (others) rows - persistent records where the
    * row *is* the item, {id, text, time, mode, date, lastDone, cooldownUntil}.
    *
-   * An active task is {id, text, deadline, mode, sourceRowId, hadDate}, and
-   * `sourceRowId` points at the `others` row it was spawned from. Deleting that
-   * row is deliberately never blocked, so the id may point at nothing; a miss
-   * is the documented case, not a bug to guard against.
+   * An active task is {id, text, deadline, mode, edits, sourceRowId, hadDate},
+   * and `sourceRowId` points at the `others` row it was spawned from. Deleting
+   * that row is deliberately never blocked, so the id may point at nothing; a
+   * miss is the documented case, not a bug to guard against.
+   *
+   * `edits` counts an active task's paid edits; the next one costs edits + 1
+   * grass. `grassSpent` totals every such payment, inside `state` so that undo
+   * refunds it.
    *
    * @returns {Object} an empty-but-well-formed state object.
    */
@@ -392,9 +400,9 @@
       spendCostCounts: {},
       lastCopyAt: null,
       ledgerCollapsed: true,
-      lastDoneAt: null,
       lockdownEnd: null,
-      combo: null
+      streak: null,
+      grassSpent: 0
     };
   }
 
@@ -476,16 +484,16 @@
     if (typeof raw.ledgerCollapsed === "boolean") {
       s.ledgerCollapsed = raw.ledgerCollapsed;
     }
-    if (typeof raw.lastDoneAt === "string") {
-      s.lastDoneAt = raw.lastDoneAt;
-      if (typeof raw.lockdownEnd === "string") {
-        s.lockdownEnd = raw.lockdownEnd;
-      }
+    if (typeof raw.lockdownEnd === "string") {
+      s.lockdownEnd = raw.lockdownEnd;
     }
-    if (raw.combo && typeof raw.combo === "object" &&
-      typeof raw.combo.startDay === "string" &&
-      typeof raw.combo.end === "number") {
-      s.combo = { startDay: raw.combo.startDay, end: raw.combo.end };
+    if (raw.streak && typeof raw.streak === "object" &&
+      typeof raw.streak.startDay === "string" &&
+      typeof raw.streak.end === "number") {
+      s.streak = { startDay: raw.streak.startDay, end: raw.streak.end };
+    }
+    if (typeof raw.grassSpent === "number") {
+      s.grassSpent = raw.grassSpent;
     }
     return s;
   }
@@ -724,6 +732,9 @@
     state = JSON.parse(JSON.stringify(target));
     save();
     undoWriteWithRetry(writeUndoIndex);
+    // an open time editor's draft belongs to the state just left
+    timeEditId = null;
+    timeEditDraft = null;
     confirmStreakBreak();
     render();
     refreshUndoRedoButtons();
@@ -924,7 +935,9 @@
   function tierList(task) {
     var offsets = WL_OFFSETS;
     var points = TIER_POINTS;
-    if (task.mode === "HL") {
+    if (task.mode === "DL") {
+      offsets = DL_OFFSETS;
+    } else if (task.mode === "HL") {
       offsets = HL_OFFSETS;
     } else if (task.mode === "MT") {
       offsets = MT_OFFSETS;
@@ -969,6 +982,7 @@
   function refuseTimeEdit() {
     toast("too late >:p");
     timeEditId = null;
+    timeEditDraft = null;
     render();
   }
 
@@ -1192,8 +1206,8 @@
   }
 
   // ---------------------------------- streak ---------------------------------
-  /* Auto streak breaker. Minimum 1 task of any kind in the last 48h. Time
-   * checks last completion or last lockdown end.
+  /* Auto streak breaker. A streak window (see the streak window section) that
+   * runs out breaks the streak and locks task setting for 36h.
 
   THE TERM "STREAK BREAK" REFERS TO THIS SECTION AND ONLY THE FULL TERM —
   *STREAK BREAK*. ABSOLUTELY NEVER USE JUST "BREAK" TO REFER TO ANYTHING 
@@ -1201,38 +1215,6 @@
   ANY FCKING SENSE YOU ASININE BOT
   */
 
-
-  /**
-   * Stamps a completion onto the streak window.
-   * @param {Date} when - the effective completion time, which for a backdated
-   *   "completed before" is that tier's clock time rather than now.
-   */
-  function recordCompletion(when) {
-    var held = new Date(state.lastDoneAt || 0).getTime();
-    if (isNaN(held) || when.getTime() > held) {
-      state.lastDoneAt = when.toISOString();
-    }
-  }
-
-  /**
-   * Parses one stored completion stamp.
-   * @param {string|null} raw - an ISO string, or null.
-   * @returns {number} its time in ms, or 0 when absent or unparseable.
-   */
-  function stampTime(raw) {
-    if (!raw) return 0;
-    var t = new Date(raw).getTime();
-    if (isNaN(t)) return 0;
-    return t;
-  }
-
-  /**
-   * When anything was last completed.
-   * @returns {number} its time in ms, or 0 if there has never been one.
-   */
-  function lastCompletionAt() {
-    return stampTime(state.lastDoneAt);
-  }
 
   /**
    * Milliseconds left on the lockdown a streak break started.
@@ -1262,61 +1244,19 @@
   }
 
   /**
-   * Where one streak window starts: its own last completion, or the end of a
-   * lockdown plus its grace, whichever is later.
-   * @returns {number} that moment in ms, or 0 when there is nothing to start
-   *   it from at all.
-   */
-  function streakWindowStart() {
-    var from = lastCompletionAt();
-    if (state.lockdownEnd) {
-      var resume = new Date(state.lockdownEnd).getTime() + STREAK_GRACE_MS;
-      if (!isNaN(resume) && resume > from) {
-        from = resume;
-      }
-    }
-    return from;
-  }
-
-  /**
-   * The streak window as two absolute times, which is what decides whether a
-   * backdated completion could still land inside it.
-   * @returns {{from: number, to: number}|null} the window, or null when there
-   *   is nothing to start it from.
-   */
-  function streakWindow() {
-    var from = streakWindowStart();
-    if (!from) return null;
-    return { from: from, to: from + STREAK_WINDOW_MS };
-  }
-
-  /**
-   * Whether an unresolved task could still be backdated into the lapsed
-   * window. Any task will do.
-   * @param {{from: number, to: number}} win - the lapsed window.
-   * @returns {boolean} true while the streak break is only provisional.
-   */
-  function windowCoverable(win) {
-    return state.activeTasks.some(function (t) {
-      var at = new Date(t.deadline).getTime();
-      return at >= win.from && at <= win.to;
-    });
-  }
-
-  /**
-   * Whether the streak window has run out.
+   * Whether the streak window has run out. With no streak nothing can, so a
+   * lockdown can never chain into another one on its own.
    * @param {Date} now - the reference moment.
-   * @returns {boolean} true once nothing has been completed inside it.
+   * @returns {boolean} true once a streak exists and its end has passed.
    */
   function streakLapsed(now) {
-    var win = streakWindow();
-    if (!win) return false;
-    return now.getTime() > win.to;
+    if (!state.streak) return false;
+    return now.getTime() >= state.streak.end;
   }
 
   /**
-   * Breaks the streak: banks the run, zeroes `scr`, starts the lockdown.
-   * Pushes no undo entry because that'd be stupid.
+   * Breaks the streak: banks the run, zeroes `scr`, ends the streak, starts the
+   * lockdown. Pushes no undo entry because that'd be stupid.
    * @param {Date} now - the moment it happens.
    */
   function breakStreak(now) {
@@ -1324,6 +1264,7 @@
       insertHighScore(state.scr, dayKey(now));
     }
     state.scr = 0;
+    state.streak = null;
     state.lockdownEnd =
       new Date(now.getTime() + STREAK_LOCKDOWN_MS).toISOString();
     save();
@@ -1331,57 +1272,26 @@
   }
 
   /**
-   * The streak window's standing, pure so the renderer can ask freely.
-   * @param {Date} now - the reference moment.
-   * @param {{when: Date}} [cover] - a completion being recorded; the window
-   *   is dropped if that completion lands inside it.
-   * @returns {string} "ok", "tentative" while an unresolved task could still
-   *   cover the lapse, or "confirmed" once none can.
-   */
-  function streakStatus(now, cover) {
-    if (!streakLapsed(now)) {
-      return "ok";
-    }
-    var win = streakWindow();
-    if (cover) {
-      var t = cover.when.getTime();
-      if (t >= win.from && t <= win.to) {
-        return "ok";
-      }
-    }
-    if (windowCoverable(win)) {
-      return "tentative";
-    }
-    return "confirmed";
-  }
-
-  /**
    * The red indicator's text, worked out fresh at every draw.
    * @param {Date} now - the reference moment.
-   * @returns {string} the text, or "" when the streak is neither broken nor
-   *   provisionally lapsed.
+   * @returns {string} the lockdown countdown, or "" when none is running.
    */
   function streakIndicatorText(now) {
     var left = lockdownLeft(now);
     if (left > 0) {
       return "streak broken. (" + Math.floor(left / (60 * 60 * 1000)) + "h)";
     }
-    if (streakStatus(now) !== "tentative") {
-      return "";
-    }
-    return "streak broke?";
+    return "";
   }
 
   /**
-   * Breaks the streak if a lapsed window is past covering.
+   * Breaks the streak if its window has run out.
    * No undo OBVIOUSLY because tIME ISN'T UNDOABLE. this line is only here
    * bcuz claude is a fCKING IDIOT WHO THINKS UNDO CAN MEAN TIME TRAVELING.
-   * @param {{when: Date}} [cover] - a completion being recorded, whose stamp
-   *   has not moved the window yet.
    */
-  function confirmStreakBreak(cover) {
+  function confirmStreakBreak() {
     var now = getNow();
-    if (streakStatus(now, cover) === "confirmed") {
+    if (streakLapsed(now)) {
       breakStreak(now);
     }
   }
@@ -1616,12 +1526,7 @@
     if (at !== -1) {
       state.activeTasks.splice(at, 1);
     }
-    if (kind === "complete") {
-      confirmStreakBreak({ when: when });
-      recordCompletion(when);
-    }
     save();
-    confirmStreakBreak();
     render();
   }
 
@@ -1702,8 +1607,8 @@
   }
 
   /**
-   * Renames an active task. An empty value cancels rather than saving an empty
-   * name.
+   * Renames an active task, for grass. An empty or unchanged value cancels
+   * rather than saving, and costs nothing.
    * @param {string} id - the task id.
    * @param {string} raw - the proposed replacement text, untrimmed.
    */
@@ -1711,11 +1616,16 @@
     var task = findTask(id);
     if (!task) return;
     var v = raw.trim();
-    if (v === "") {
+    if (v === "" || v === task.text) {
+      render();
+      return;
+    }
+    if (!canAffordEdit(task)) {
       render();
       return;
     }
     pushUndo("edit task text");
+    chargeEdit(task);
     task.text = v;
     save();
     render();
@@ -1740,111 +1650,100 @@
   }
 
   /**
-   * Moves an active task's deadline to a new day, keeping its clock time. An
-   * empty date re-resolves to the clock time's next occurrence, which is how
-   * a further task is pulled back inside 24h.
-   * @param {string} id - the task id.
-   * @param {string} date - a day key, "YYYY-MM-DD", or "" for none.
+   * Opens a task's deadline/leniency editor, holding its current values as an
+   * unsaved draft.
+   * @param {Object} task - the active task.
+   * @param {Date} now - the reference moment.
    */
-  function editTaskDate(id, date) {
-    var task = findTask(id);
-    if (!task) return;
-    var now = getNow();
-    if (date && !dateInRange(date, now)) {
-      toast("invalid date");
+  function openTimeEdit(task, now) {
+    // an overdue deadline sits outside the picker's bounds, so it holds empty
+    var held = dayKey(new Date(task.deadline));
+    if (!dateInRange(held, now)) {
+      held = "";
+    }
+    timeEditId = task.id;
+    timeEditDraft = {
+      clock: hhmm(new Date(task.deadline)),
+      date: held,
+      heldDate: held,
+      mode: task.mode
+    };
+  }
+
+  /**
+   * Resolves the draft's clock and date into a deadline. An untouched date
+   * keeps the task's own day if it's further, since re-resolving a clock time
+   * against `now` would drag it back inside 24h. Otherwise the clock takes its
+   * next occurrence, and a changed date pairs with it directly.
+   * @param {Object} task - the active task.
+   * @param {Object} draft - the editor's draft.
+   * @param {Date} now - the reference moment.
+   * @returns {Date} the proposed deadline.
+   */
+  function draftDeadline(task, draft, now) {
+    if (draft.date !== draft.heldDate) {
+      return resolveDeadline(draft.clock, draft.date, now);
+    }
+    if (isFurther(task.deadline, now)) {
+      return resolveDeadline(draft.clock,
+        dayKey(new Date(task.deadline)), now);
+    }
+    return resolveClockTime(draft.clock, now);
+  }
+
+  /**
+   * Closes the time editor and commits its draft as one paid edit. A draft that
+   * changes nothing closes for free; one that's invalid toasts why and is
+   * thrown away, also for free.
+   */
+  function closeTimeEdit() {
+    var task = findTask(timeEditId);
+    var draft = timeEditDraft;
+    timeEditId = null;
+    timeEditDraft = null;
+    if (!task || !draft) {
       render();
       return;
     }
-    var clock = hhmm(new Date(task.deadline));
-    commitTaskDeadline(id, resolveDeadline(clock, date, now), now,
-      "edit task date", "invalid datetime");
-  }
-
-  /**
-   * Moves an active task's deadline. Validated exactly as SET validates a new
-   * one - resolved from `getNow()` at tap time, refused if it is not in the
-   * future, and refused if another active task already holds that instant. The
-   * task's own deadline is excluded from the overlap check, since a task can
-   * hardly clash with itself.
-   *
-   * A further task keeps its day. The editor only offers clock times, so
-   * re-resolving one against `now` would silently drag it back inside 24h and
-   * strip the very thing that made it further.
-   * @param {string} id - the task id.
-   * @param {string} clock - the chosen clock time, "HH:MM".
-   */
-  function editTaskTime(id, clock) {
-    var task = findTask(id);
-    if (!task) return;
     var now = getNow();
-    var deadline;
-    if (isFurther(task.deadline, now)) {
-      deadline = resolveDeadline(clock, dayKey(new Date(task.deadline)), now);
-    } else {
-      deadline = resolveClockTime(clock, now);
+    var deadline = draftDeadline(task, draft, now);
+    var iso = deadline.toISOString();
+    if (iso === task.deadline && draft.mode === task.mode) {
+      render();
+      return;
     }
-    commitTaskDeadline(id, deadline, now, "edit task time", "refreshed");
-  }
-
-  /**
-   * Refuses a proposed deadline that is not in the future, or that overlaps
-   * another task, then commits it. The task's own deadline is excluded from the
-   * overlap check, since a task can hardly clash with itself. Refused outright
-   * once that deadline has passed.
-   * @param {string} id - the task id.
-   * @param {Date} deadline - the proposed replacement.
-   * @param {Date} now - the reference moment.
-   * @param {string} label - the undo label.
-   * @param {string} tooSoon - toast for a deadline not in the future.
-   */
-  function commitTaskDeadline(id, deadline, now, label, tooSoon) {
-    var task = findTask(id);
-    if (!task) return;
     if (deadlinePassed(task, now)) {
       refuseTimeEdit();
       return;
     }
-    if (deadline.getTime() <= now.getTime()) {
-      toast(tooSoon);
+    if (draft.date && !dateInRange(draft.date, now)) {
+      toast("invalid date");
       render();
       return;
     }
+    if (deadline.getTime() <= now.getTime()) {
+      toast("invalid datetime");
+      render();
+      return;
+    }
+    // a task can hardly clash with itself, so its own deadline is skipped
     var clash = state.activeTasks.some(function (t) {
-      return t.id !== id &&
+      return t.id !== task.id &&
         new Date(t.deadline).getTime() === deadline.getTime();
     });
     if (clash) {
       toast(hhmm(deadline) + " overlaps");
+      render();
       return;
     }
-    var iso = deadline.toISOString();
-    if (task.deadline === iso) return;
-    pushUndo(label);
+    if (!canAffordEdit(task)) {
+      render();
+      return;
+    }
+    pushUndo("edit task time");
+    chargeEdit(task);
     task.deadline = iso;
-    save();
-    // re-sorting under an open editor would move the block mid-edit
-    if (timeEditId === id) return;
-    render();
-  }
-
-  /**
-   * Switches an active task's leniency, which reshapes its tier rows. Unlike
-   * SET's toggles this one can't clear back to unset - an active task always
-   * has a mode, so tapping the lit one is a no-op. Refused once the deadline
-   * has passed.
-   * @param {string} id - the task id.
-   * @param {string} mode - "WL", "HL" or "MT".
-   */
-  function editTaskMode(id, mode) {
-    var task = findTask(id);
-    if (!task) return;
-    if (task.mode === mode) return;
-    if (deadlinePassed(task, getNow())) {
-      refuseTimeEdit();
-      return;
-    }
-    pushUndo("edit task mode");
-    task.mode = mode;
+    task.mode = draft.mode;
     save();
     render();
   }
@@ -1889,14 +1788,62 @@
     render();
   }
 
-  // --------------------------------- combo -----------------------------------
+  // ---------------------------------- grass ----------------------------------
   /**
-   * Calendar day count of the active combo (1–10).
+   * The grass on hand: Hex 2^'s stored count less what Falsedge has spent.
+   * @returns {number} the balance, which a redo can leave negative.
+   */
+  function grassBalance() {
+    var stored = 0;
+    try {
+      stored = parseInt(localStorage.getItem(GRASS_KEY) || "0", 10) || 0;
+    } catch (e) {
+      // storage blocked; nothing is on hand
+    }
+    return stored - state.grassSpent;
+  }
+
+  /**
+   * What a task's next edit costs: one more than the edit before it.
+   * @param {Object} task - the active task.
+   * @returns {number} the price in grass.
+   */
+  function editCost(task) {
+    return task.edits + 1;
+  }
+
+  /**
+   * Refuses an edit the balance can't cover, toasting the price.
+   * @param {Object} task - the active task.
+   * @returns {boolean} true if the edit may go ahead.
+   */
+  function canAffordEdit(task) {
+    var cost = editCost(task);
+    if (grassBalance() < cost) {
+      toast("need " + cost + " grass");
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Pays for an edit. Both counters live in `state`, so the edit's own undo
+   * entry refunds it.
+   * @param {Object} task - the active task.
+   */
+  function chargeEdit(task) {
+    state.grassSpent += editCost(task);
+    task.edits += 1;
+  }
+
+  // ------------------------------ streak window ------------------------------
+  /**
+   * Calendar day count of the active streak (1–10).
    * @param {Date} now - the reference moment.
    * @returns {number}
    */
-  function comboDays(now) {
-    var c = state.combo;
+  function streakDays(now) {
+    var c = state.streak;
     if (!c || now.getTime() >= c.end) return 1;
     var startD = new Date(c.startDay + "T00:00:00");
     var todayD = new Date(dayKey(now) + "T00:00:00");
@@ -1911,38 +1858,38 @@
    * @param {Date} now - the reference moment.
    * @returns {number} 0.1 on day 1, up to 1.0 on day 10.
    */
-  function comboAward(now) {
+  function streakAward(now) {
     return roundScr(
-      Math.min(COMBO_MAX_AWARD,
-        comboDays(now) * COMBO_DAY_AWARD));
+      Math.min(STREAK_MAX_AWARD,
+        streakDays(now) * STREAK_DAY_AWARD));
   }
 
   /**
-   * Advances the combo window on task set: +4h while under 16h remaining,
-   * +1h once 16h or over, capped at +24h. Updates the calendar start day,
-   * awards the bonus. Rides the caller's undo entry.
+   * Advances the streak window on task set: +6h while under 24h remaining, +2h
+   * once 24h or over, capped at +36h. Updates the calendar start day, awards
+   * the bonus. Rides the caller's undo entry.
    * @param {Date} now - the reference moment.
    */
-  function awardComboSet(now) {
-    var c = state.combo;
-    var award = COMBO_DAY_AWARD;
+  function awardStreakSet(now) {
+    var c = state.streak;
+    var award = STREAK_DAY_AWARD;
     if (c && now.getTime() < c.end) {
-      award = comboAward(now);
+      award = streakAward(now);
       var remainingMs = c.end - now.getTime();
-      var step = COMBO_STEP_MS;
-      if (remainingMs >= COMBO_SLOW_THRESHOLD_MS) {
-        step = COMBO_SLOW_STEP_MS;
+      var step = STREAK_STEP_MS;
+      if (remainingMs >= STREAK_SLOW_THRESHOLD_MS) {
+        step = STREAK_SLOW_STEP_MS;
       }
-      state.combo = {
+      state.streak = {
         startDay: c.startDay,
         end: Math.min(
           c.end + step,
-          now.getTime() + COMBO_MAX_MS)
+          now.getTime() + STREAK_MAX_MS)
       };
     } else {
-      state.combo = {
+      state.streak = {
         startDay: dayKey(now),
-        end: now.getTime() + COMBO_STEP_MS
+        end: now.getTime() + STREAK_STEP_MS
       };
     }
     var before = Math.floor(state.scr);
@@ -1952,45 +1899,26 @@
   }
 
   /**
-   * Builds the combo indicator above the active tasks card.
-   * Shows countdown while active, elapsed time after expiry.
+   * Builds the streak indicator above the active tasks card, counting down to
+   * the window's end.
    * @param {Date} now - the reference moment.
-   * @returns {Element|null} null if no combo has ever been set.
+   * @returns {Element|null} null while there's no streak.
    */
-  function buildComboRow(now) {
-    var c = state.combo;
+  function buildStreakRow(now) {
+    var c = state.streak;
     if (!c) return null;
+    // render() breaks a lapsed streak before drawing, so time is always left
     var leftMs = c.end - now.getTime();
-    var endD = new Date(c.end);
-    var text;
-    if (leftMs > 0) {
-      var h = Math.floor(leftMs / (60 * 60 * 1000));
-      var m = Math.floor(
-        (leftMs % (60 * 60 * 1000)) / (60 * 1000));
-      text = "CE: in " + h + "h" + pad2(m) +
-        "m at " + hhmm(endD);
-    } else {
-      var ago = -leftMs;
-      var agoD = Math.floor(ago / (24 * 60 * 60 * 1000));
-      if (agoD > 99) {
-        text = "CE: very long ago";
-      } else if (agoD >= 1) {
-        var agoH = Math.floor((ago % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
-        text = "CE: " + agoD + "d" + pad2(agoH) + "h ago at " + hhmm(endD);
-      } else {
-        var aH = Math.floor(ago / (60 * 60 * 1000));
-        var aM = Math.floor((ago % (60 * 60 * 1000)) / (60 * 1000));
-        text = "CE: " + aH + "h" + pad2(aM) + "m ago at " + hhmm(endD);
-      }
-    }
-    var row = el("div", "combo-row");
-    if (leftMs > 0) {
-      var bar = el("div", "combo-bar");
-      var p = Math.min(1, leftMs / COMBO_MAX_MS);
-      bar.style.width = (p * 100).toFixed(1) + "%";
-      row.appendChild(bar);
-    }
-    row.appendChild(el("span", "combo-text", text));
+    var h = Math.floor(leftMs / (60 * 60 * 1000));
+    var m = Math.floor(
+      (leftMs % (60 * 60 * 1000)) / (60 * 1000));
+    var row = el("div", "streak-row");
+    var bar = el("div", "streak-bar");
+    var p = Math.min(1, leftMs / STREAK_MAX_MS);
+    bar.style.width = (p * 100).toFixed(1) + "%";
+    row.appendChild(bar);
+    row.appendChild(el("span", "streak-text", "SE: in " + h + "h" +
+      pad2(m) + "m at " + hhmm(new Date(c.end))));
     return row;
   }
 
@@ -2000,6 +1928,7 @@
    */
   function submitSet() {
     var now = getNow();
+    confirmStreakBreak();
     if (!lockdownClear(now)) return;
     var textEl = document.getElementById("setText");
     if (!textEl) return;
@@ -2026,12 +1955,13 @@
     }
     if (!deadlineClear(deadline, now)) return;
     pushUndo("set task");
-    awardComboSet(now);
+    awardStreakSet(now);
     state.activeTasks.push({
       id: uid(),
       text: text,
       deadline: deadline.toISOString(),
-      mode: mode
+      mode: mode,
+      edits: 0
     });
     state.setDraft = { text: "", time: null, mode: null, date: "" };
     save();
@@ -2247,6 +2177,7 @@
     var row = findRow(kind, id);
     if (!row) return;
     var now = getNow();
+    confirmStreakBreak();
     if (!lockdownClear(now)) return;
     var text = String(row.text).trim();
     if (!text) {
@@ -2254,7 +2185,7 @@
       return;
     }
     if (!isMode(row.mode)) {
-      toast("Pick WL, HL or MT");
+      toast("Pick DL, WL, HL or MT");
       return;
     }
     if (!row.time) {
@@ -2286,12 +2217,13 @@
     if (!deadlineClear(deadline, now)) return;
     var iso = deadline.toISOString();
     pushUndo("activate row");
-    awardComboSet(now);
+    awardStreakSet(now);
     var task = {
       id: uid(),
       text: text,
       deadline: iso,
-      mode: row.mode
+      mode: row.mode,
+      edits: 0
     };
     if (kind === "others") {
       task.sourceRowId = id;
@@ -2750,16 +2682,26 @@
    *   is appended to.
    * @param {string} sel - selector for the text element inside `host`.
    * @param {Function} onCommit - called once with the raw edited value.
+   * @param {Function} [pricedTask] - returns the active task the edit is
+   *   charged to, which puts its price on the overlay and gates the editor.
    */
-  function attachTextEdit(host, sel, onCommit) {
+  function attachTextEdit(host, sel, onCommit, pricedTask) {
     var textEl = host.querySelector(sel);
     textEl.addEventListener("click", function (e) {
       e.stopPropagation();
       closeEditOverlays();
-      var overlay = el("button", "edit-overlay", "edit?");
+      var label = "edit?";
+      if (pricedTask && pricedTask()) {
+        label = "edit? (" + editCost(pricedTask()) + " grass)";
+      }
+      var overlay = el("button", "edit-overlay", label);
       overlay.addEventListener("click", function (ev) {
         ev.stopPropagation();
         closeEditOverlays();
+        if (pricedTask) {
+          var task = pricedTask();
+          if (!task || !canAffordEdit(task)) return;
+        }
         var live = host.querySelector(sel);
         if (!live) return;
         inlineEdit(live, live.textContent, onCommit);
@@ -2787,9 +2729,10 @@
   }
 
   /**
-   * Wires the `edit time?` overlay onto a task's tier rows, the same shape as
-   * the `edit?` overlay on its text. Once the deadline has passed, tapping it
-   * toasts instead of opening the editor.
+   * Wires the `edit time? (N grass)` overlay onto a task's tier rows, the same
+   * shape as the `edit?` overlay on its text. Once the deadline has passed,
+   * tapping it toasts instead of opening the editor, and so does a balance
+   * short of the price.
    * @param {Element} wrap - the tier-row wrapper (the positioning parent).
    * @param {string} id - the task id.
    */
@@ -2797,17 +2740,26 @@
     wrap.addEventListener("click", function (e) {
       e.stopPropagation();
       closeEditOverlays();
-      var overlay = el("button", "edit-overlay", "edit time?");
+      var shown = findTask(id);
+      if (!shown) return;
+      var overlay = el("button", "edit-overlay",
+        "edit time? (" + editCost(shown) + " grass)");
       overlay.addEventListener("click", function (ev) {
         ev.stopPropagation();
         closeEditOverlays();
+        // this tap never reaches the page handler, so another task's open
+        // editor has to be closed (and its draft committed) here
+        if (timeEditId) {
+          closeTimeEdit();
+        }
         var task = findTask(id);
         if (!task) return;
         if (deadlinePassed(task, getNow())) {
           refuseTimeEdit();
           return;
         }
-        timeEditId = id;
+        if (!canAffordEdit(task)) return;
+        openTimeEdit(task, getNow());
         render();
       });
       wrap.appendChild(overlay);
@@ -2815,40 +2767,35 @@
   }
 
   /**
-   * Builds the deadline/leniency editor that replaces a task's tier rows
-   * while it's open. Every control commits on change, and the editor stays
-   * open across a commit so time, mode and date can be changed in one go.
+   * Builds the deadline/leniency editor that replaces a task's tier rows while
+   * it's open. Every control writes to the unsaved draft, which only commits as
+   * one paid edit once the editor closes.
    * @param {string} id - the task id.
    * @param {Date} now - the moment the dropdown is built against.
    * @returns {Element} the editor rows.
    */
   function buildTaskTimeEditor(id, now) {
     var task = findTask(id);
+    var draft = timeEditDraft;
     var wrap = el("div", "task-edit-rows");
     var row = el("div", "task-time-edit");
-    row.appendChild(buildTimeSelects(hhmm(new Date(task.deadline)),
-      function (v) {
-        if (!v) return;
-        editTaskTime(id, v);
-      }));
+    row.appendChild(buildTimeSelects(draft.clock, function (v) {
+      if (!v) return;
+      draft.clock = v;
+    }));
     row.appendChild(buildModeToggles(function () {
-      var live = findTask(id);
-      if (!live) return null;
-      return live.mode;
+      return draft.mode;
     }, function (next) {
+      // an active task always has a mode, so tapping the lit one does nothing
       if (!next) return;
-      editTaskMode(id, next);
+      draft.mode = next;
+      render();
     }));
     wrap.appendChild(row);
 
-    // an overdue deadline sits outside the picker's bounds, so show it empty
-    var held = dayKey(new Date(task.deadline));
-    if (!dateInRange(held, now)) {
-      held = "";
-    }
     var dateRow = el("div", "task-time-edit");
-    dateRow.appendChild(buildDateInput(held, now, function (v) {
-      editTaskDate(id, v);
+    dateRow.appendChild(buildDateInput(draft.date, now, function (v) {
+      draft.date = v;
     }, taskDateCeiling(task, now)));
     wrap.appendChild(dateRow);
     return wrap;
@@ -2878,6 +2825,8 @@
     textRow.appendChild(el("span", "task-text", task.text));
     attachTextEdit(textRow, ".task-text", function (value) {
       editTaskText(id, value);
+    }, function () {
+      return findTask(id);
     });
     block.appendChild(textRow);
 
@@ -2933,28 +2882,6 @@
   }
 
   /**
-   * Hours left in the streak window, floored.
-   * @param {Date} now - the reference moment.
-   * @returns {string} the hours, or "-" when the window has no start.
-   */
-  function streakHoursLeft(now) {
-    var win = streakWindow();
-    if (!win) {
-      return "-";
-    }
-    return String(Math.floor((win.to - now.getTime()) / (60 * 60 * 1000)));
-  }
-
-  /**
-   * Builds the countdown riding the ACTIVE TASKS label.
-   * @param {Date} now - the reference moment.
-   * @returns {Element} the counter.
-   */
-  function buildStreakLeft(now) {
-    return el("span", "streak-left", streakHoursLeft(now) + "/48h");
-  }
-
-  /**
    * Builds the ACTIVE TASKS section: a labelled card wrapping the task stack,
    * or the empty state with `[streak broke]`. The card is the only thing that
    * glows - the blocks inside keep their per-position border colour but have no
@@ -2967,11 +2894,10 @@
    */
   function buildTasks() {
     var now = getNow();
-    var section = buildSection("ACTIVE TASKS", "tasksCard", "sec-tasks",
-      buildStreakLeft(now));
-    var combo = buildComboRow(now);
-    if (combo) {
-      section.wrap.insertBefore(combo, section.card);
+    var section = buildSection("ACTIVE TASKS", "tasksCard", "sec-tasks");
+    var streak = buildStreakRow(now);
+    if (streak) {
+      section.wrap.insertBefore(streak, section.card);
     }
     var wrap = el("div", "tasks");
     section.card.appendChild(wrap);
@@ -3165,7 +3091,7 @@
   }
 
   /**
-   * Builds the WL/HL/MT toggle row. Tapping the lit one deselects it back to
+   * Builds the DL/WL/HL/MT toggle row. Tapping the lit one deselects it back to
    * unset; unset is none being lit.
    * @param {Function} getMode - returns the currently selected mode, or null.
    * @param {Function} onPick - called with the new mode (or null).
@@ -3590,6 +3516,7 @@
    * SET, ledger.
    */
   function render() {
+    confirmStreakBreak();
     closeAllMenus();
     document.querySelectorAll(".hs-scrim, .hs-panel").forEach(function (n) {
       n.remove();
@@ -3611,16 +3538,19 @@
     // scrollHeight only reads true once the element is in the document, so
     // every textarea is sized after the tree is built rather than on creation
     appEl.querySelectorAll("textarea").forEach(autoGrow);
-    var ct = appEl.querySelector(".combo-text");
-    if (ct) {
-      var cr = ct.closest(".combo-row");
-      var cb = cr ? cr.querySelector(".combo-bar") : null;
-      if (cb) {
-        var barR = cb.getBoundingClientRect().right;
-        var ctR = ct.getBoundingClientRect();
-        var covered = Math.max(0, barR - ctR.left);
-        var uncov = Math.max(0, ctR.width - covered);
-        ct.style.setProperty("--combo-clip-r", uncov.toFixed(1) + "px");
+    var st = appEl.querySelector(".streak-text");
+    if (st) {
+      var sr = st.closest(".streak-row");
+      var sb = null;
+      if (sr) {
+        sb = sr.querySelector(".streak-bar");
+      }
+      if (sb) {
+        var barR = sb.getBoundingClientRect().right;
+        var stR = st.getBoundingClientRect();
+        var covered = Math.max(0, barR - stR.left);
+        var uncov = Math.max(0, stR.width - covered);
+        st.style.setProperty("--streak-clip-r", uncov.toFixed(1) + "px");
       }
     }
   }
@@ -3688,8 +3618,7 @@
       closeEditOverlays();
     }
     if (timeEditId && !e.target.closest(".task-time-edit")) {
-      timeEditId = null;
-      render();
+      closeTimeEdit();
     }
   });
 
