@@ -579,14 +579,13 @@
   }
   .mode-row {
     display: flex;
-    gap: 8px;
   }
   #setCard .mode-row {
     margin-top: 14px;
   }
   .mode-btn {
     min-height: 40px;
-    padding: 0 12px;
+    padding: 0 8px;
     background: var(--panel-2);
     border: 1px solid var(--line);
     border-radius: 10px;
