@@ -3310,11 +3310,11 @@
   }
 
   /**
-   * Builds one ACTIVATE row: its text, a control row of time dropdown and
-   * optional date picker, then a second of mode toggles, sort chevrons and
-   * hamburger. Swipe left activates it outright, swipe right prefills SET. An
-   * `others` row on cooldown dims and carries its remaining time inline, but
-   * stays fully editable - only activation is blocked.
+   * Builds one ACTIVATE row: its text, then the control row of time dropdown,
+   * optional date picker, mode toggles, sort chevrons and hamburger. Swipe left
+   * activates it outright, swipe right prefills SET. An `others` row on
+   * cooldown dims and carries its remaining time inline, but stays fully
+   * editable - only activation is blocked.
    * @param {string} kind - "dailies" or "others".
    * @param {string} id - the row id.
    * @returns {Element} the row.
@@ -3355,7 +3355,7 @@
     controls.appendChild(buildByTime(r.time || "", function (v) {
       editRow(kind, id, "time", v);
     }));
-    // `others` adds its date; either way the toggles get a row of their own
+    // only `others` splits; dailies doesn't split line
     if (kind === "others") {
       controls.appendChild(buildDateInput(r.date || "", now, function (v) {
         editRow(kind, id, "date", v);
@@ -3363,17 +3363,17 @@
       if (r.nonRecurring) {
         controls.appendChild(el("span", "row-nonrec", "⊫"));
       }
-    }
-    row.appendChild(controls);
-    if (kind === "others" && r.lastDone) {
-      var done = new Date(r.lastDone);
-      if (!isNaN(done.getTime())) {
-        row.appendChild(el("div", "row-lastdone-note",
-          "last done: " + formatDateTime(done) + " · " +
-          formatAgo(now.getTime() - done.getTime())));
+      row.appendChild(controls);
+      if (r.lastDone) {
+        var done = new Date(r.lastDone);
+        if (!isNaN(done.getTime())) {
+          row.appendChild(el("div", "row-lastdone-note",
+            "last done: " + formatDateTime(done) + " · " +
+            formatAgo(now.getTime() - done.getTime())));
+        }
       }
+      controls = el("div", "tpl-controls");
     }
-    controls = el("div", "tpl-controls");
     controls.appendChild(buildModeToggles(function () {
       var live = findRow(kind, id);
       if (!live) return null;
@@ -3460,14 +3460,9 @@
         draft.date = v;
       }));
     }
-    wrap.appendChild(input);
-    // dailies gives its toggles and [add] a row of their own below the time
-    if (kind === "dailies") {
-      wrap.appendChild(controls);
-      controls = el("div", "tpl-controls");
-    }
     controls.appendChild(modes);
     controls.appendChild(addBtn);
+    wrap.appendChild(input);
     wrap.appendChild(controls);
     return wrap;
   }
