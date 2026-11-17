@@ -38,13 +38,14 @@ window.Hex2 = (function () {
   ];
   // Falsedge's spending is subtracted from GRASS_KEY, never written to it
   const FALSEDGE_KEY = "falsedge.data";
-  // Lockout dial: 12-hour face, 1/12 odds for +2 grass.
-  const GOLDEN_ODDS = 12;
-  const GOLDEN_SWEEP_MS = 1000;
+  // Lockout's clover dial: 12-hour face, +2 grass, every Nth mark wins.
+  const CLOVER_MARKS = 12;
+  const CLOVER_ODDS = [12, 6, 4];
+  const CLOVER_SWEEP_MS = 1000;
   // linear ramp down for no stupid slowness grrr
-  const GOLDEN_RAMP = 0.25;
+  const CLOVER_RAMP = 0.25;
   // random fonts wheee
-  const GOLDEN_FONTS = [
+  const CLOVER_FONTS = [
     "Marcellus", "Cinzel Decorative", "Bodoni Moda", "Eagle Lake",
     "Uncial Antiqua", "MedievalSharp", "UnifrakturMaguntia", "Orbitron",
     "Audiowide", "Rye", "Silkscreen", "Della Respira", "Metamorphous",
@@ -63,8 +64,8 @@ window.Hex2 = (function () {
   const OUTLINE_W = 0.1;    // stroke width, also as a share of a cell
   const BREAK_MS = 30 * 1000;
   const EARN_POP_MS = 380;
-  const FAKE_AD_MIN_MS = 30 * 1000;
-  const FAKE_AD_MAX_MS = 120 * 1000;
+  const FAKE_AD_MIN_S = 30;
+  const FAKE_AD_MAX_S = 120;
   const SWIPE_MIN = 22;      // px of travel before a drag counts as a swipe
   const PADS_KEY = "hex2.pads";
   const DIM_KEY = "hex2.dim";
@@ -1458,94 +1459,107 @@ window.Hex2 = (function () {
   let fakeAdRaf = 0;
 
   // absent on the standalone public build, which is never timed
-  // ----------------------- golden hour pre-roll -----------------------
-  const ghRing = document.getElementById("gh-ring");
-  const ghDial = document.getElementById("gh-dial");
-  const ghHand = document.getElementById("gh-hand");
-  let goldenPending = false;
-  let ghRaf = 0;
+  // ----------------------- clover dial pre-roll -----------------------
+  const clvRing = document.getElementById("clv-ring");
+  const clvDial = document.getElementById("clv-dial");
+  const clvHand = document.getElementById("clv-hand");
+  let cloverPending = false;
+  let clvRaf = 0;
 
   // 12 marks, 30 degrees apart, 12 at the top
-  function buildGoldenDial() {
-    if (!ghDial || ghDial.childElementCount) {
+  function buildCloverDial() {
+    if (!clvDial || clvDial.childElementCount) {
       return;
     }
-    for (let h = 1; h <= GOLDEN_ODDS; h++) {
+    for (let h = 1; h <= CLOVER_MARKS; h++) {
       const m = document.createElement("span");
-      m.className = "gh-mark";
+      m.className = "clv-mark";
       m.style.setProperty("--a", (h * 30) + "deg");
       m.textContent = String(h);
-      ghDial.appendChild(m);
+      clvDial.appendChild(m);
     }
   }
 
-  // Decelerates, but never below GOLDEN_RAMP of its average speed.
-  function goldenEase(t) {
-    return (1 - GOLDEN_RAMP) * (1 - Math.pow(1 - t, 3)) + GOLDEN_RAMP * t;
+  // Decelerates, but never below CLOVER_RAMP of its average speed.
+  function cloverEase(t) {
+    return (1 - CLOVER_RAMP) * (1 - Math.pow(1 - t, 3)) + CLOVER_RAMP * t;
   }
 
-  function clearGolden() {
-    if (ghRaf) {
-      cancelAnimationFrame(ghRaf);
-      ghRaf = 0;
+  function clearClover() {
+    if (clvRaf) {
+      cancelAnimationFrame(clvRaf);
+      clvRaf = 0;
     }
-    if (!ghRing) {
+    if (!clvRing) {
       return;
     }
-    ghRing.classList.remove("show", "won");
-    ghDial.querySelectorAll(".gh-mark").forEach(function (m) {
+    clvRing.classList.remove("show", "won");
+    clvDial.querySelectorAll(".clv-mark").forEach(function (m) {
       m.classList.remove("lit", "won", "lost");
     });
   }
 
   // One lap to wind up, then a second that lights each mark as the hand
   // passes it. What it lights stays lit.
-  function sweepGolden(hour) {
-    const marks = ghDial.querySelectorAll(".gh-mark");
+  function sweepClover(hour, odds) {
+    const marks = clvDial.querySelectorAll(".clv-mark");
     const end = 360 + hour * 30;
     const start = performance.now();
-    ghRing.classList.add("show");
+    clvRing.classList.add("show");
     function frame(now) {
-      const t = Math.min(1, (now - start) / GOLDEN_SWEEP_MS);
-      const a = end * goldenEase(t);
-      ghHand.style.transform =
+      const t = Math.min(1, (now - start) / CLOVER_SWEEP_MS);
+      const a = end * cloverEase(t);
+      clvHand.style.transform =
         "rotate(" + a.toFixed(2) + "deg)";
       marks.forEach(function (m, i) {
         m.classList.toggle(
           "lit", a >= 360 + (i + 1) * 30);
       });
       if (t < 1 && end - a >= 0.4) {
-        ghRaf = requestAnimationFrame(frame);
+        clvRaf = requestAnimationFrame(frame);
         return;
       }
-      ghRaf = 0;
-      ghHand.style.transform = "rotate(" + end.toFixed(2) + "deg)";
-      if (hour !== GOLDEN_ODDS) {
+      clvRaf = 0;
+      clvHand.style.transform = "rotate(" + end.toFixed(2) + "deg)";
+      if (hour % odds !== 0) {
         marks[hour - 1].classList.add("lost");
         return;
       }
       marks[hour - 1].classList.add("won");
-      ghRing.classList.add("won");
-      goldenPending = true;
+      clvRing.classList.add("won");
+      cloverPending = true;
       if (earnNum) {
         earnNum.textContent = "+2";
       }
     }
-    ghRaf = requestAnimationFrame(frame);
+    clvRaf = requestAnimationFrame(frame);
+  }
+
+  // 1-in-N win odds for this ad: 30-60s, 61-90s, 91-120s
+  function cloverOdds() {
+    const secs = fakeAdTotal / 1000;
+    if (secs <= 60) {
+      return CLOVER_ODDS[0];
+    }
+    if (secs <= 90) {
+      return CLOVER_ODDS[1];
+    }
+    return CLOVER_ODDS[2];
   }
 
   // Reset and roll the lockout dial animation
-  function preRollGolden() {
-    clearGolden();
-    goldenPending = false;
-    if (!ghRing) {
+  function preRollClover() {
+    clearClover();
+    cloverPending = false;
+    if (!clvRing) {
       return;
     }
-    buildGoldenDial();
-    const face = GOLDEN_FONTS[
-      Math.floor(Math.random() * GOLDEN_FONTS.length)];
-    ghDial.style.setProperty("--gh-font", '"' + face + '"');
-    sweepGolden(1 + Math.floor(Math.random() * GOLDEN_ODDS));
+    buildCloverDial();
+    const face = CLOVER_FONTS[
+      Math.floor(Math.random() * CLOVER_FONTS.length)];
+    clvDial.style.setProperty("--clv-font", '"' + face + '"');
+    const hour = 1 + Math.floor(Math.random() * CLOVER_MARKS);
+    sweepClover(hour, cloverOdds());
   }
 
   // absent on the standalone public build, which is never timed
@@ -1558,15 +1572,16 @@ window.Hex2 = (function () {
     }
     lockout.classList.add("show");
     startFakeAd();
-    preRollGolden();
+    preRollClover();
   }
 
   function startFakeAd() {
     if (!fakeAd) {
       return;
     }
-    const span = FAKE_AD_MAX_MS - FAKE_AD_MIN_MS;
-    fakeAdTotal = FAKE_AD_MIN_MS + Math.floor(Math.random() * (span + 1));
+    const span = FAKE_AD_MAX_S - FAKE_AD_MIN_S;
+    const secs = FAKE_AD_MIN_S + Math.floor(Math.random() * (span + 1));
+    fakeAdTotal = secs * 1000;
     fakeAdReady = false;
     fakeAd.disabled = true;
     fakeAd.classList.remove("ready");
@@ -1623,7 +1638,7 @@ window.Hex2 = (function () {
   // 12. Has its own key so neither app can rewind it.
   function payGrass() {
     let award = 1;
-    if (goldenPending) {
+    if (cloverPending) {
       award = 2;
     }
     addGrass(award);
@@ -1717,8 +1732,8 @@ window.Hex2 = (function () {
       fakeAdRaf = 0;
     }
     payGrass();
-    goldenPending = false;
-    clearGolden();
+    cloverPending = false;
+    clearClover();
     // the pop plays over the lockout, so the break's 30s starts after it
     setTimeout(function () {
       if (earn) {
@@ -1936,7 +1951,7 @@ window.Hex2 = (function () {
     for (const link of exits) {
       link.addEventListener("click", function () {
         store.set(BREAK_KEY, "0");
-        goldenPending = false;
+        cloverPending = false;
       });
     }
 

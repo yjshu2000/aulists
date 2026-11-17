@@ -456,7 +456,7 @@
   }
   .lockout.peek .fake-ad,
   .lockout.peek .earn,
-  .lockout.peek .gh-ring,
+  .lockout.peek .clv-ring,
   .lockout.peek .lockout-card .hexbtn {
     opacity: 0.25;
   }
@@ -594,40 +594,40 @@
   }
 
   /* ----------------------------- dial clock ----------------------------- */
-  .gh-ring {
-    --gh-d: 320px;
+  .clv-ring {
+    --clv-d: 320px;
     position: absolute;
     left: 50%;
     top: 50%;
-    width: var(--gh-d);
-    height: var(--gh-d);
-    margin-left: calc(var(--gh-d) / -2);
-    margin-top: calc(var(--gh-d) / -2);
+    width: var(--clv-d);
+    height: var(--clv-d);
+    margin-left: calc(var(--clv-d) / -2);
+    margin-top: calc(var(--clv-d) / -2);
     display: none;
     /* never eats a tap: both lockout buttons are live from the first frame */
     pointer-events: none;
   }
-  .gh-ring.show {
+  .clv-ring.show {
     display: block;
   }
-  .gh-face {
+  .clv-face {
     position: absolute;
     inset: 0;
     border-radius: 50%;
     border: 1px solid color-mix(in srgb, var(--hex-green) 20%, transparent);
   }
-  .gh-ring.won .gh-face {
+  .clv-ring.won .clv-face {
     box-shadow:
       0 0 6px var(--hex-green),
       0 0 22px color-mix(in srgb, var(--hex-green) 90%, transparent);
   }
-  .gh-dial {
+  .clv-dial {
     position: absolute;
     inset: 0;
   }
   /* Each mark is centred, pushed out along the radius by its own angle,
      then counter-rotated so the numeral stays upright */
-  .gh-mark {
+  .clv-mark {
     position: absolute;
     left: 50%;
     top: 50%;
@@ -637,7 +637,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--gh-font), serif;
+    font-family: var(--clv-font), serif;
     font-size: 16px;
     font-weight: 600;
     line-height: 1;
@@ -647,25 +647,25 @@
       translateY(-140px)
       rotate(calc(var(--a) * -1));
   }
-  .gh-mark.lit {
+  .clv-mark.lit {
     color: var(--hex-green);
     text-shadow: 0 0 12px color-mix(in srgb, var(--hex-green) 70%, transparent);
   }
   /* landed on 12 */
-  .gh-mark.won {
+  .clv-mark.won {
     color: #e8fced;
     text-shadow:
       0 0 6px var(--hex-green),
       0 0 22px color-mix(in srgb, var(--hex-green) 90%, transparent);
   }
   /* landed on anything else */
-  .gh-mark.lost {
+  .clv-mark.lost {
     color: var(--c-red, #f44b47);
     text-shadow:
       0 0 8px color-mix(in srgb, #f44b47 70%, transparent),
       0 0 20px color-mix(in srgb, #f44b47 45%, transparent);
   }
-  .gh-hand {
+  .clv-hand {
     position: absolute;
     left: 50%;
     top: 50%;
@@ -681,7 +681,7 @@
       color-mix(in srgb, var(--hex-green) 10%, transparent),
       var(--hex-green));
   }
-  .gh-hub {
+  .clv-hub {
     position: absolute;
     left: 50%;
     top: 50%;
