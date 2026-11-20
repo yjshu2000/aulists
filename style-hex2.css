@@ -140,16 +140,16 @@
   .hearts + #undo {
     margin-left: 8px;
   }
-  /* takes the slot the hearts box uses in Challenge; lit while the dim is on */
-  #dimtoggle {
+  /* takes the slot the hearts box uses in Challenge; lit while nyoom is on */
+  #nyoomtoggle {
     margin-left: auto;
     border-color: var(--hex-accent);
     color: var(--hex-accent);
   }
-  #dimtoggle + #undo {
+  #nyoomtoggle + #undo {
     margin-left: 8px;
   }
-  #dimtoggle.off {
+  #nyoomtoggle.off {
     border-color: var(--hex-line);
     color: var(--hex-ink-dim);
   }
@@ -190,12 +190,6 @@
     width: 100%;
     height: 100%;
     touch-action: none;
-  }
-  /* The delay clears one pass, so an ordinary swipe ends before this shows.
-     Instant on the way out - the snap back is what says input is yours. */
-  .board-busy.dim canvas {
-    transition: filter 140ms ease-out 210ms;
-    filter: grayscale(0.45) brightness(0.64);
   }
 
   /* ------------------------------- slide pads --------------------------- */

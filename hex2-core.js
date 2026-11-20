@@ -68,7 +68,7 @@ window.Hex2 = (function () {
   const FAKE_AD_MAX_S = 120;
   const SWIPE_MIN = 22;      // px of travel before a drag counts as a swipe
   const PADS_KEY = "hex2.pads";
-  const DIM_KEY = "hex2.dim";
+  const NYOOM_KEY = "hex2.nyoom";
   const PAD_H = 60;          // slide-pad thickness, all of it grown outward
   const PAD_GAP = 6;         // board edge to a pad's inner edge
   const PAD_EDGE = 6;        // pad ring's outer edge to the stage edge
@@ -836,10 +836,9 @@ window.Hex2 = (function () {
     endFrame();
   }
 
-  // A mode whose one gesture runs several passes marks the board busy while it
-  // plays out, so the stylesheet can pull it back and grey it over.
-  function setBoardBusy(on) {
-    canvas.parentElement.classList.toggle("board-busy", on);
+  // Cascading's speed toggle; the mode reads it once per pass
+  function isNyoom() {
+    return store.get(NYOOM_KEY) === "1";
   }
 
   // ---------------------------- undo, 2 deep --------------------------
@@ -1834,12 +1833,12 @@ window.Hex2 = (function () {
       heartsBox = null;
     }
 
-    // the dim only ever happens in Cascading, so its toggle is absent
+    // nyoom only ever does anything in Cascading, so its toggle is absent
     // everywhere else rather than sitting there inert
-    let dimBtn = document.getElementById("dimtoggle");
-    if (dimBtn && here !== "cascading") {
-      dimBtn.remove();
-      dimBtn = null;
+    let nyoomBtn = document.getElementById("nyoomtoggle");
+    if (nyoomBtn && here !== "cascading") {
+      nyoomBtn.remove();
+      nyoomBtn = null;
     }
 
     document.getElementById("newgame").addEventListener("click", reset);
@@ -1919,32 +1918,27 @@ window.Hex2 = (function () {
     });
     applyPads();
 
-    if (dimBtn) {
-      let dimOn = store.get(DIM_KEY) === "1";
-
-      // the label states what the dim is doing, not what tapping will do
-      const applyDim = function () {
-        if (dimOn) {
-          canvas.parentElement.classList.add("dim");
-          dimBtn.classList.remove("off");
-          dimBtn.textContent = "Dim on";
+    if (nyoomBtn) {
+      // the label states what nyoom is doing, not what tapping will do
+      const applyNyoom = function () {
+        if (isNyoom()) {
+          nyoomBtn.classList.remove("off");
+          nyoomBtn.textContent = "Nyoom on";
           return;
         }
-        canvas.parentElement.classList.remove("dim");
-        dimBtn.classList.add("off");
-        dimBtn.textContent = "Dim off";
+        nyoomBtn.classList.add("off");
+        nyoomBtn.textContent = "Nyoom off";
       };
 
-      dimBtn.addEventListener("click", function () {
-        dimOn = !dimOn;
-        if (dimOn) {
-          store.set(DIM_KEY, "1");
+      nyoomBtn.addEventListener("click", function () {
+        if (isNyoom()) {
+          store.set(NYOOM_KEY, "0");
         } else {
-          store.set(DIM_KEY, "0");
+          store.set(NYOOM_KEY, "1");
         }
-        applyDim();
+        applyNyoom();
       });
-      applyDim();
+      applyNyoom();
     }
 
     const exits = document.querySelectorAll(".navaway");
@@ -2029,7 +2023,7 @@ window.Hex2 = (function () {
     endFrame: endFrame,
     drawBoardBase: drawBoardBase,
     drawStatic: drawStatic,
-    setBoardBusy: setBoardBusy,
+    isNyoom: isNyoom,
     hexPath: hexPath,
     paintTile: paintTile,
     tileFontSize: tileFontSize,

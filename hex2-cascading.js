@@ -14,6 +14,11 @@
   const SAVE_KEY = "hex2.cascading.save";
   const SLIDE_MS = 110;
   const POP_MS = 90;
+  // nyoom: cascades run faster than initial swipe
+  const NYOOM_SLIDE_MS = 80;
+  const NYOOM_POP_MS = 80;
+  const NYOOM_CASCADE_SLIDE_MS = 50;
+  const NYOOM_CASCADE_POP_MS = 50;
   const POP_SWELL = 0.16;
 
   let busy = false;          // input lock for the whole cascade, not one pass
@@ -34,10 +39,10 @@
 
   // Tiles in flight are drawn from `movers`, not from the board, because the
   // board already holds the post-move arrangement.
-  function animateSlide(movers, then) {
+  function animateSlide(movers, ms, then) {
     const start = performance.now();
     function frame(now) {
-      const t = Math.min(1, (now - start) / SLIDE_MS);
+      const t = Math.min(1, (now - start) / ms);
       const e = easeOut(t);
       const layout = Hex2.getLayout();
       Hex2.drawBoardBase(0, 0);
@@ -58,11 +63,11 @@
     requestAnimationFrame(frame);
   }
 
-  function animatePop(popKeys, then) {
+  function animatePop(popKeys, ms, then) {
     const popping = new Set(popKeys);
     const start = performance.now();
     function frame(now) {
-      const t = Math.min(1, (now - start) / POP_MS);
+      const t = Math.min(1, (now - start) / ms);
       const layout = Hex2.getLayout();
       Hex2.drawBoardBase(0, 0);
       for (const entry of Hex2.getBoard()) {
@@ -88,7 +93,6 @@
   // takes precedence over the win, the order settle() uses.
   function finish() {
     busy = false;
-    Hex2.setBoardBusy(false);
     Hex2.save();
     Hex2.drawStatic();
     if (!Hex2.anyMovePossible()) {
@@ -113,13 +117,23 @@
     if (hit > wonTile) {
       wonTile = hit;
     }
-    animateSlide(res.movers, function () {
+    let slideMs = SLIDE_MS;
+    let popMs = POP_MS;
+    if (Hex2.isNyoom()) {
+      slideMs = NYOOM_SLIDE_MS;
+      popMs = NYOOM_POP_MS;
+      if (!first) {
+        slideMs = NYOOM_CASCADE_SLIDE_MS;
+        popMs = NYOOM_CASCADE_POP_MS;
+      }
+    }
+    animateSlide(res.movers, slideMs, function () {
       const spawnKey = Hex2.spawn();
       const popKeys = res.mergedDests.slice();
       if (spawnKey) {
         popKeys.push(spawnKey);
       }
-      animatePop(popKeys, function () {
+      animatePop(popKeys, popMs, function () {
         pass(dir, false);
       });
     });
@@ -136,7 +150,6 @@
     }
     busy = true;
     wonTile = 0;
-    Hex2.setBoardBusy(true);
     pass(dir, true);
   }
 
@@ -150,7 +163,6 @@
     onReset() {
       busy = false;
       wonTile = 0;
-      Hex2.setBoardBusy(false);
     },
   });
 })();
