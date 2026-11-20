@@ -1699,9 +1699,9 @@
   }
 
   /**
-   * Closes the time editor and commits its draft as one paid edit. A draft that
-   * changes nothing closes for free; one that's invalid toasts why and is
-   * thrown away, also for free.
+   * Closes the time editor and commits its draft as one edit, paid unless it
+   * moves the deadline earlier. A draft that changes nothing closes for free;
+   * one that's invalid toasts why and is thrown away, also for free.
    */
   function closeTimeEdit() {
     var task = findTask(timeEditId);
@@ -1743,12 +1743,15 @@
       render();
       return;
     }
-    if (!canAffordEdit(task)) {
+    var earlier = deadline.getTime() < new Date(task.deadline).getTime();
+    if (!earlier && !canAffordEdit(task)) {
       render();
       return;
     }
     pushUndo("edit task time");
-    chargeEdit(task);
+    if (!earlier) {
+      chargeEdit(task);
+    }
     task.deadline = iso;
     task.mode = draft.mode;
     save();
@@ -2836,7 +2839,7 @@
   /**
    * Builds the deadline/leniency editor that replaces a task's tier rows while
    * it's open. Every control writes to the unsaved draft, which only commits as
-   * one paid edit once the editor closes.
+   * one edit once the editor closes, free if it moves the deadline earlier.
    * @param {string} id - the task id.
    * @param {Date} now - the moment the dropdown is built against.
    * @returns {Element} the editor rows.
