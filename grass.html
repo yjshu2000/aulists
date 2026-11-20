@@ -25,27 +25,201 @@
     <img class="grass-icon" src="assets/icon-grass.svg" alt="grass">
     <span class="grass-count">Touched grass: <span id="grassCount">0</span></span>
   </div>
+  <div class="card shop-card">
+    <span class="grass-count">Bypassers: <span id="bypassCount">0</span></span>
+  </div>
+  <div class="card shop-card shop-items">
+    <button class="btn shop-item" id="buyPts" type="button">
+      <span class="shop-price">[30 <img class="shop-grass" src="assets/icon-grass.svg" alt="grass">]</span>
+      <span class="shop-what">+1 pts</span>
+    </button>
+    <button class="btn shop-item" id="buyBypass" type="button">
+      <span class="shop-price">[60 <img class="shop-grass" src="assets/icon-grass.svg" alt="grass">]</span>
+      <span class="shop-what">+1 bypasser</span>
+    </button>
+  </div>
 </div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 // Grass lives under its own key rather than inside falsedge.data, so
 // Falsedge's undo ring can never rewind grass earned in Hex 2^. What Falsedge
 // spends on edits is kept in falsedge.data instead, so its undo can refund it;
 // the balance on hand is the one less the other.
+//
+// Shop purchases are final: the price comes straight off grass.count and the
+// item lands under its own key, so no undo anywhere reaches either. Falsedge
+// counts the bypassers it spends in its own data, so its undo refunds those.
 (function () {
   "use strict";
   var GRASS_KEY = "grass.count";
-  var n = 0;
-  try {
-    n = parseInt(localStorage.getItem(GRASS_KEY) || "0", 10) || 0;
-    var data = JSON.parse(localStorage.getItem("falsedge.data"));
-    if (data && typeof data.grassSpent === "number") {
-      n -= data.grassSpent;
+  var ITEMS = {
+    buyPts: { cost: 30, key: "grass.shop.pts", what: "+1 pts" },
+    buyBypass: {
+      cost: 60,
+      key: "grass.shop.bypassers",
+      what: "+1 bypasser"
     }
-  } catch (e) {
-    // storage blocked or unreadable; the count stays at what was read
+  };
+  // a purchase takes two taps: the first arms the item, the second buys it
+  var ARM_MS = 3000;
+  var armed = null;
+  var armTimer = null;
+  var toastTimer = null;
+  var toastEl = document.getElementById("toast");
+
+  /**
+   * Reads an integer counter from storage.
+   * @param {string} key - the storage key.
+   * @returns {number} the count, or 0 if unset or unreadable.
+   */
+  function readInt(key) {
+    try {
+      return parseInt(localStorage.getItem(key) || "0", 10) || 0;
+    } catch (e) {
+      return 0;
+    }
   }
-  document.getElementById("grassCount").textContent = n;
+
+  /**
+   * Reads a number Falsedge keeps in its own data.
+   * @param {string} field - the field name.
+   * @returns {number} its value, or 0 if missing or unreadable.
+   */
+  function falsedgeCount(field) {
+    try {
+      var data = JSON.parse(localStorage.getItem("falsedge.data"));
+      if (data && typeof data[field] === "number") {
+        return data[field];
+      }
+    } catch (e) {
+      // unreadable Falsedge data has spent nothing
+    }
+    return 0;
+  }
+
+  /**
+   * @returns {number} grass on hand.
+   */
+  function grassBalance() {
+    return readInt(GRASS_KEY) - falsedgeCount("grassSpent");
+  }
+
+  /**
+   * @returns {number} bypassers on hand.
+   */
+  function bypassersLeft() {
+    return readInt(ITEMS.buyBypass.key) - falsedgeCount("bypassUsed");
+  }
+
+  /**
+   * Redraws both counts.
+   */
+  function show() {
+    document.getElementById("grassCount").textContent = grassBalance();
+    document.getElementById("bypassCount").textContent = bypassersLeft();
+  }
+
+  /**
+   * Shows a transient toast, replacing any still showing.
+   * @param {string} msg - the message.
+   */
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    if (toastTimer) {
+      clearTimeout(toastTimer);
+    }
+    toastTimer = setTimeout(function () {
+      toastEl.classList.remove("show");
+    }, 2200);
+  }
+
+  /**
+   * Puts every item back to its unarmed label.
+   */
+  function disarm() {
+    if (armTimer) {
+      clearTimeout(armTimer);
+    }
+    armTimer = null;
+    armed = null;
+    Object.keys(ITEMS).forEach(function (id) {
+      var btn = document.getElementById(id);
+      btn.classList.remove("armed");
+      btn.querySelector(".shop-what").textContent = ITEMS[id].what;
+    });
+  }
+
+  /**
+   * Arms an item, so the next tap on it buys.
+   * @param {string} id - the item's button id.
+   */
+  function arm(id) {
+    disarm();
+    armed = id;
+    var btn = document.getElementById(id);
+    btn.classList.add("armed");
+    btn.querySelector(".shop-what").textContent =
+      "buy " + ITEMS[id].what + "?";
+    armTimer = setTimeout(disarm, ARM_MS);
+  }
+
+  /**
+   * Refuses an item the balance can't cover, toasting the price.
+   * @param {string} id - the item's button id.
+   * @returns {boolean} true if it can be bought.
+   */
+  function canAfford(id) {
+    var cost = ITEMS[id].cost;
+    if (grassBalance() < cost) {
+      toast("need " + cost + " grass");
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Buys one of an item: its price comes off grass.count and its own counter
+   * goes up by one. Puts the grass back if the second write fails.
+   * @param {string} id - the item's button id.
+   */
+  function buy(id) {
+    var item = ITEMS[id];
+    var grass = readInt(GRASS_KEY);
+    var owned = readInt(item.key);
+    try {
+      localStorage.setItem(GRASS_KEY, String(grass - item.cost));
+      localStorage.setItem(item.key, String(owned + 1));
+    } catch (e) {
+      try {
+        localStorage.setItem(GRASS_KEY, String(grass));
+      } catch (e2) {
+        // storage is gone entirely; nothing left to put back
+      }
+      toast("could not save");
+      return;
+    }
+    toast("bought " + item.what);
+    show();
+  }
+
+  Object.keys(ITEMS).forEach(function (id) {
+    document.getElementById(id).addEventListener("click", function () {
+      if (!canAfford(id)) {
+        disarm();
+        return;
+      }
+      if (armed !== id) {
+        arm(id);
+        return;
+      }
+      disarm();
+      buy(id);
+    });
+  });
+  show();
 })();
 </script>
 <script>

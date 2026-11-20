@@ -804,6 +804,34 @@
     font-weight: 700;
     font-variant-numeric: tabular-nums;
   }
+  .fd-section .shop-card {
+    margin-top: 14px;
+  }
+  .shop-items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .shop-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    text-align: left;
+  }
+  .shop-price {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .shop-grass {
+    width: 16px;
+    height: 16px;
+  }
+  .shop-item.armed {
+    border-color: var(--c-green);
+  }
   .page-nav-bottom {
     display: flex;
     justify-content: center;

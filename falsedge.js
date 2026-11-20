@@ -27,6 +27,10 @@
   var STREAK_LOCKDOWN_MS = 36 * 60 * 60 * 1000;
   // grass on hand is this stored count less `state.grassSpent`
   var GRASS_KEY = "grass.count";
+  // Grass Shop's purchases. Kept outside `state` so undo never touches them;
+  // pts on hand add the bought ones, bypassers less `state.bypassUsed`.
+  var SHOP_PTS_KEY = "grass.shop.pts";
+  var SHOP_BYPASS_KEY = "grass.shop.bypassers";
   var TIER_POINTS = [6, 3, 2, 1];
   // Leniency: minutes past the deadline that still score, one entry per tier.
   // DL = double leniency
@@ -381,7 +385,7 @@
    *
    * `edits` counts an active task's paid edits; the next one costs edits + 1
    * grass. `grassSpent` totals every such payment, inside `state` so that undo
-   * refunds it.
+   * refunds it. `bypassUsed` counts bypassers spent, for the same reason.
    *
    * @returns {Object} an empty-but-well-formed state object.
    */
@@ -402,7 +406,8 @@
       ledgerCollapsed: true,
       lockdownEnd: null,
       streak: null,
-      grassSpent: 0
+      grassSpent: 0,
+      bypassUsed: 0
     };
   }
 
@@ -494,6 +499,9 @@
     }
     if (typeof raw.grassSpent === "number") {
       s.grassSpent = raw.grassSpent;
+    }
+    if (typeof raw.bypassUsed === "number") {
+      s.bypassUsed = raw.bypassUsed;
     }
     return s;
   }
@@ -1229,18 +1237,17 @@
   }
 
   /**
-   * Refuses task creation while a lockdown is running. Every route that makes
-   * an active task calls this first.
+   * The toast a running lockdown refuses task creation with. Every route that
+   * makes an active task checks this first.
    * @param {Date} now - the reference moment.
-   * @returns {boolean} true if a task may be created right now.
+   * @returns {string} the message, or "" when no lockdown is running.
    */
-  function lockdownClear(now) {
+  function lockdownMsg(now) {
     var left = lockdownLeft(now);
     if (left > 0) {
-      toast("streak broke lockdown - " + formatLeft(left) + " left");
-      return false;
+      return "streak broke lockdown - " + formatLeft(left) + " left";
     }
-    return true;
+    return "";
   }
 
   /**
@@ -1388,7 +1395,7 @@
       day = dayKey(getNow());
     }
     pushUndo("spend");
-    state.ledger.push(spendEntryText(text, cost, count, day, state.pts));
+    state.ledger.push(spendEntryText(text, cost, count, day, ptsOnHand()));
     state.pts = state.pts - cost * count;
     bumpSpendCost(cost);
     state.spendDraft = { text: "", cost: null, count: null, date: "" };
@@ -1502,14 +1509,14 @@
     var task = findTask(id);
     if (!task) return;
     pushUndo(label);
-    var oldPts = state.pts;
+    var oldPts = ptsOnHand();
     var oldScr = state.scr;
     var newScr = roundScr(oldScr + award);
     var delta = Math.floor(newScr) - Math.floor(oldScr);
     state.ledger.push(
       taskEntryText(task, byText, oldPts, delta, oldScr, award));
     state.scr = newScr;
-    state.pts = oldPts + delta;
+    state.pts = state.pts + delta;
     var row = sourceRowOf(task);
     if (row && kind === "complete" && row.nonRecurring) {
       var rowAt = indexOfRow("others", row.id);
@@ -1836,6 +1843,49 @@
     task.edits += 1;
   }
 
+  /**
+   * Reads one of Grass Shop's purchase counters.
+   * @param {string} key - the storage key.
+   * @returns {number} the count, or 0 if unset or unreadable.
+   */
+  function shopCount(key) {
+    try {
+      return parseInt(localStorage.getItem(key) || "0", 10) || 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /**
+   * Pts on hand: `state.pts` plus those bought in Grass Shop.
+   * @returns {number}
+   */
+  function ptsOnHand() {
+    return state.pts + shopCount(SHOP_PTS_KEY);
+  }
+
+  /**
+   * Bypassers on hand: those bought in Grass Shop less those spent.
+   * @returns {number} the count, which a redo can leave negative.
+   */
+  function bypassersLeft() {
+    return shopCount(SHOP_BYPASS_KEY) - state.bypassUsed;
+  }
+
+  /**
+   * Whether a blocked activation has a bypasser to spend. Toasts the block
+   * when it doesn't.
+   * @param {string} msg - the block's own toast.
+   * @returns {boolean} true if a bypasser is on hand.
+   */
+  function canBypass(msg) {
+    if (bypassersLeft() > 0) {
+      return true;
+    }
+    toast(msg);
+    return false;
+  }
+
   // ------------------------------ streak window ------------------------------
   /**
    * Calendar day count of the active streak (1–10).
@@ -1929,7 +1979,9 @@
   function submitSet() {
     var now = getNow();
     confirmStreakBreak();
-    if (!lockdownClear(now)) return;
+    // non-empty means a lockdown is running and a bypasser pays for this set
+    var bypass = lockdownMsg(now);
+    if (bypass && !canBypass(bypass)) return;
     var textEl = document.getElementById("setText");
     if (!textEl) return;
     var text = textEl.value.trim();
@@ -1955,6 +2007,9 @@
     }
     if (!deadlineClear(deadline, now)) return;
     pushUndo("set task");
+    if (bypass) {
+      state.bypassUsed += 1;
+    }
     awardStreakSet(now);
     state.activeTasks.push({
       id: uid(),
@@ -1966,6 +2021,9 @@
     state.setDraft = { text: "", time: null, mode: null, date: "" };
     save();
     render();
+    if (bypass) {
+      toast("bypassed - " + bypassersLeft() + " left");
+    }
   }
 
   // ------------------------------ row lifecycle ------------------------------
@@ -2178,7 +2236,9 @@
     if (!row) return;
     var now = getNow();
     confirmStreakBreak();
-    if (!lockdownClear(now)) return;
+    // non-empty means a lockdown or cooldown is running and a bypasser pays
+    var bypass = lockdownMsg(now);
+    if (bypass && !canBypass(bypass)) return;
     var text = String(row.text).trim();
     if (!text) {
       toast("Task needs text");
@@ -2195,9 +2255,10 @@
     var date = "";
     if (kind === "others") {
       var left = cooldownLeft(row, now);
-      if (left > 0) {
-        toast("on cooldown - " + formatLeft(left) + " left");
-        return;
+      // a lockdown's bypasser already covers the cooldown too
+      if (left > 0 && !bypass) {
+        bypass = "on cooldown - " + formatLeft(left) + " left";
+        if (!canBypass(bypass)) return;
       }
       if (rowIsOut(id)) {
         toast("already out as a task");
@@ -2217,6 +2278,9 @@
     if (!deadlineClear(deadline, now)) return;
     var iso = deadline.toISOString();
     pushUndo("activate row");
+    if (bypass) {
+      state.bypassUsed += 1;
+    }
     awardStreakSet(now);
     var task = {
       id: uid(),
@@ -2242,6 +2306,9 @@
     var stamp = hhmm(deadline);
     if (isFurther(iso, now)) {
       stamp = stamp + " (" + DAY_ABBR[deadline.getDay()] + ")";
+    }
+    if (bypass) {
+      stamp = stamp + " - bypassed, " + bypassersLeft() + " left";
     }
     toast("task set for " + stamp);
   }
@@ -2607,7 +2674,7 @@
     var wrap = el("div", "scores-wrap");
     var ptsBox = el("button", "score-box");
     ptsBox.appendChild(el("span", "score-label",
-      "Current pts: " + formatPts(state.pts)));
+      "Current pts: " + formatPts(ptsOnHand())));
     var ptsChev = ">";
     if (spendOpen) {
       ptsChev = "^";
